@@ -1,22 +1,39 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Personal Budget Management API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: expenses
+    description: Expense operations
+  - name: incomes
+    description: Income operations
+  - name: charity
+    description: Charity and tithe operations
+  - name: debts
+    description: Debt operations
+  - name: savings
+    description: Savings and assets operations
+  - name: notes
+    description: Notes operations
+  - name: reminders
+    description: Reminders and tasks operations
+  - name: settings
+    description: Settings operations
+  - name: dashboard
+    description: Dashboard summary operations
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +41,587 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  # Dashboard
+  /dashboard/summary:
+    get:
+      operationId: getDashboardSummary
+      tags: [dashboard]
+      summary: Get dashboard summary
+      responses:
+        "200":
+          description: Dashboard summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardSummary"
+
+  # Expenses
+  /expenses:
+    get:
+      operationId: getExpenses
+      tags: [expenses]
+      summary: Get all expenses
+      parameters:
+        - name: month
+          in: query
+          schema:
+            type: string
+        - name: category
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of expenses
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Expense"
+    post:
+      operationId: createExpense
+      tags: [expenses]
+      summary: Create expense
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateExpenseInput"
+      responses:
+        "201":
+          description: Created expense
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Expense"
+
+  /expenses/{id}:
+    put:
+      operationId: updateExpense
+      tags: [expenses]
+      summary: Update expense
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateExpenseInput"
+      responses:
+        "200":
+          description: Updated expense
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Expense"
+    delete:
+      operationId: deleteExpense
+      tags: [expenses]
+      summary: Delete expense
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  # Incomes
+  /incomes:
+    get:
+      operationId: getIncomes
+      tags: [incomes]
+      summary: Get all incomes
+      parameters:
+        - name: month
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of incomes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Income"
+    post:
+      operationId: createIncome
+      tags: [incomes]
+      summary: Create income
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateIncomeInput"
+      responses:
+        "201":
+          description: Created income
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Income"
+
+  /incomes/{id}:
+    put:
+      operationId: updateIncome
+      tags: [incomes]
+      summary: Update income
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateIncomeInput"
+      responses:
+        "200":
+          description: Updated income
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Income"
+    delete:
+      operationId: deleteIncome
+      tags: [incomes]
+      summary: Delete income
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  # Charity
+  /charity:
+    get:
+      operationId: getCharityEntries
+      tags: [charity]
+      summary: Get all charity entries
+      parameters:
+        - name: month
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of charity entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CharityEntry"
+    post:
+      operationId: createCharityEntry
+      tags: [charity]
+      summary: Create charity entry
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCharityEntryInput"
+      responses:
+        "201":
+          description: Created charity entry
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CharityEntry"
+
+  /charity/{id}:
+    put:
+      operationId: updateCharityEntry
+      tags: [charity]
+      summary: Update charity entry
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCharityEntryInput"
+      responses:
+        "200":
+          description: Updated charity entry
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CharityEntry"
+    delete:
+      operationId: deleteCharityEntry
+      tags: [charity]
+      summary: Delete charity entry
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  # Debts
+  /debts:
+    get:
+      operationId: getDebts
+      tags: [debts]
+      summary: Get all debts
+      responses:
+        "200":
+          description: List of debts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Debt"
+    post:
+      operationId: createDebt
+      tags: [debts]
+      summary: Create debt
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateDebtInput"
+      responses:
+        "201":
+          description: Created debt
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Debt"
+
+  /debts/{id}:
+    put:
+      operationId: updateDebt
+      tags: [debts]
+      summary: Update debt
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateDebtInput"
+      responses:
+        "200":
+          description: Updated debt
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Debt"
+    delete:
+      operationId: deleteDebt
+      tags: [debts]
+      summary: Delete debt
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  # Savings
+  /savings:
+    get:
+      operationId: getSavings
+      tags: [savings]
+      summary: Get all savings
+      responses:
+        "200":
+          description: List of savings
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Saving"
+    post:
+      operationId: createSaving
+      tags: [savings]
+      summary: Create saving
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSavingInput"
+      responses:
+        "201":
+          description: Created saving
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Saving"
+
+  /savings/{id}:
+    put:
+      operationId: updateSaving
+      tags: [savings]
+      summary: Update saving
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSavingInput"
+      responses:
+        "200":
+          description: Updated saving
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Saving"
+    delete:
+      operationId: deleteSaving
+      tags: [savings]
+      summary: Delete saving
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  # Notes
+  /notes:
+    get:
+      operationId: getNotes
+      tags: [notes]
+      summary: Get all notes
+      responses:
+        "200":
+          description: List of notes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Note"
+    post:
+      operationId: createNote
+      tags: [notes]
+      summary: Create note
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateNoteInput"
+      responses:
+        "201":
+          description: Created note
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Note"
+
+  /notes/{id}:
+    put:
+      operationId: updateNote
+      tags: [notes]
+      summary: Update note
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateNoteInput"
+      responses:
+        "200":
+          description: Updated note
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Note"
+    delete:
+      operationId: deleteNote
+      tags: [notes]
+      summary: Delete note
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  # Reminders
+  /reminders:
+    get:
+      operationId: getReminders
+      tags: [reminders]
+      summary: Get all reminders
+      responses:
+        "200":
+          description: List of reminders
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Reminder"
+    post:
+      operationId: createReminder
+      tags: [reminders]
+      summary: Create reminder
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateReminderInput"
+      responses:
+        "201":
+          description: Created reminder
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Reminder"
+
+  /reminders/{id}:
+    put:
+      operationId: updateReminder
+      tags: [reminders]
+      summary: Update reminder
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateReminderInput"
+      responses:
+        "200":
+          description: Updated reminder
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Reminder"
+    delete:
+      operationId: deleteReminder
+      tags: [reminders]
+      summary: Delete reminder
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /reminders/{id}/toggle:
+    patch:
+      operationId: toggleReminder
+      tags: [reminders]
+      summary: Toggle reminder completion
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Updated reminder
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Reminder"
+
+  # Settings
+  /settings:
+    get:
+      operationId: getSettings
+      tags: [settings]
+      summary: Get settings
+      responses:
+        "200":
+          description: Settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Settings"
+    put:
+      operationId: updateSettings
+      tags: [settings]
+      summary: Update settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateSettingsInput"
+      responses:
+        "200":
+          description: Updated settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Settings"
+
 components:
   schemas:
     HealthStatus:
@@ -31,6 +629,334 @@ components:
       properties:
         status:
           type: string
-      required:
-        - status
+      required: [status]
 
+    DashboardSummary:
+      type: object
+      properties:
+        totalIncome:
+          type: number
+        totalExpenses:
+          type: number
+        totalCharity:
+          type: number
+        totalDebts:
+          type: number
+        totalSavings:
+          type: number
+        balance:
+          type: number
+        monthlyBudget:
+          type: number
+        upcomingReminders:
+          type: array
+          items:
+            $ref: "#/components/schemas/Reminder"
+        recentExpenses:
+          type: array
+          items:
+            $ref: "#/components/schemas/Expense"
+      required:
+        - totalIncome
+        - totalExpenses
+        - totalCharity
+        - totalDebts
+        - totalSavings
+        - balance
+        - monthlyBudget
+        - upcomingReminders
+        - recentExpenses
+
+    Expense:
+      type: object
+      properties:
+        id:
+          type: integer
+        amount:
+          type: number
+        category:
+          type: string
+        description:
+          type: string
+        date:
+          type: string
+        isRecurring:
+          type: boolean
+        createdAt:
+          type: string
+      required: [id, amount, category, description, date, isRecurring, createdAt]
+
+    CreateExpenseInput:
+      type: object
+      properties:
+        amount:
+          type: number
+        category:
+          type: string
+        description:
+          type: string
+        date:
+          type: string
+        isRecurring:
+          type: boolean
+      required: [amount, category, description, date, isRecurring]
+
+    Income:
+      type: object
+      properties:
+        id:
+          type: integer
+        amount:
+          type: number
+        source:
+          type: string
+        description:
+          type: string
+        date:
+          type: string
+        isRecurring:
+          type: boolean
+        createdAt:
+          type: string
+      required: [id, amount, source, description, date, isRecurring, createdAt]
+
+    CreateIncomeInput:
+      type: object
+      properties:
+        amount:
+          type: number
+        source:
+          type: string
+        description:
+          type: string
+        date:
+          type: string
+        isRecurring:
+          type: boolean
+      required: [amount, source, description, date, isRecurring]
+
+    CharityEntry:
+      type: object
+      properties:
+        id:
+          type: integer
+        amount:
+          type: number
+        recipient:
+          type: string
+        description:
+          type: string
+        date:
+          type: string
+        isTithe:
+          type: boolean
+        createdAt:
+          type: string
+      required: [id, amount, recipient, description, date, isTithe, createdAt]
+
+    CreateCharityEntryInput:
+      type: object
+      properties:
+        amount:
+          type: number
+        recipient:
+          type: string
+        description:
+          type: string
+        date:
+          type: string
+        isTithe:
+          type: boolean
+      required: [amount, recipient, description, date, isTithe]
+
+    Debt:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        type:
+          type: string
+          enum: [owed_to_me, i_owe]
+        totalAmount:
+          type: number
+        remainingAmount:
+          type: number
+        dueDate:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [active, paid]
+        notes:
+          type: string
+        createdAt:
+          type: string
+      required: [id, name, type, totalAmount, remainingAmount, status, notes, createdAt]
+
+    CreateDebtInput:
+      type: object
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+          enum: [owed_to_me, i_owe]
+        totalAmount:
+          type: number
+        remainingAmount:
+          type: number
+        dueDate:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [active, paid]
+        notes:
+          type: string
+      required: [name, type, totalAmount, remainingAmount, status, notes]
+
+    Saving:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        category:
+          type: string
+        type:
+          type: string
+          enum: [savings, asset, investment]
+        targetAmount:
+          type: number
+          nullable: true
+        currentAmount:
+          type: number
+        notes:
+          type: string
+        createdAt:
+          type: string
+      required: [id, name, category, type, currentAmount, notes, createdAt]
+
+    CreateSavingInput:
+      type: object
+      properties:
+        name:
+          type: string
+        category:
+          type: string
+        type:
+          type: string
+          enum: [savings, asset, investment]
+        targetAmount:
+          type: number
+          nullable: true
+        currentAmount:
+          type: number
+        notes:
+          type: string
+      required: [name, category, type, currentAmount, notes]
+
+    Note:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        content:
+          type: string
+        color:
+          type: string
+        isPinned:
+          type: boolean
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required: [id, title, content, color, isPinned, createdAt, updatedAt]
+
+    CreateNoteInput:
+      type: object
+      properties:
+        title:
+          type: string
+        content:
+          type: string
+        color:
+          type: string
+        isPinned:
+          type: boolean
+      required: [title, content, color, isPinned]
+
+    Reminder:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        description:
+          type: string
+        dueDate:
+          type: string
+          nullable: true
+        isCompleted:
+          type: boolean
+        priority:
+          type: string
+          enum: [low, medium, high]
+        createdAt:
+          type: string
+      required: [id, title, description, isCompleted, priority, createdAt]
+
+    CreateReminderInput:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        dueDate:
+          type: string
+          nullable: true
+        isCompleted:
+          type: boolean
+        priority:
+          type: string
+          enum: [low, medium, high]
+      required: [title, description, isCompleted, priority]
+
+    Settings:
+      type: object
+      properties:
+        id:
+          type: integer
+        currency:
+          type: string
+        monthlyBudget:
+          type: number
+        incomeForTithe:
+          type: number
+        tithePercentage:
+          type: number
+        userName:
+          type: string
+      required: [id, currency, monthlyBudget, incomeForTithe, tithePercentage, userName]
+
+    UpdateSettingsInput:
+      type: object
+      properties:
+        currency:
+          type: string
+        monthlyBudget:
+          type: number
+        incomeForTithe:
+          type: number
+        tithePercentage:
+          type: number
+        userName:
+          type: string
+      required: [currency, monthlyBudget, incomeForTithe, tithePercentage, userName]

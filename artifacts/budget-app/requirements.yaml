@@ -1,0 +1,17 @@
+packages:
+  "recharts": "For rendering financial charts on the dashboard"
+  "framer-motion": "For smooth page transitions and interactive animations"
+  "date-fns": "For date manipulation and formatting"
+  "lucide-react": "For beautiful UI icons across all modules"
+  "clsx": "For conditional tailwind class merging"
+  "tailwind-merge": "For conditional tailwind class merging"
+
+images:
+  - path: "artifacts/budget-app/public/images/hero-bg.png"
+    description: "Abstract elegant gradient mesh background in deep teal and gold, modern finance clean aesthetic"
+    aspect_ratio: "16:9"
+
+notes:
+  - App is entirely in Hebrew and RTL
+  - Uses Google Fonts Heebo (Display) and Assistant (Body)
+  - Interacts with pre-generated Orval React Query hooks from @workspace/api-client-react
