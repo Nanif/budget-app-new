@@ -1,372 +1,719 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Link } from "wouter";
 import { cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
-  Wallet, Coins, Calendar, ShoppingBag, Landmark, HeartHandshake,
-  PiggyBank, ArrowUpRight, ArrowLeft, CreditCard,
+  HeartHandshake, CreditCard, CheckSquare, StickyNote,
+  ArrowLeft, Plus, Check, Circle, AlertCircle, Pin,
+  TrendingUp, TrendingDown, ChevronRight, Loader2,
+  BookOpen,
 } from "lucide-react";
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 const API = `${BASE}/api`;
 
-type Fund = {
-  id: number; name: string; fundBehavior: string; colorClass: string;
-  monthlyAllocation: number; annualAllocation: number; initialBalance: number; isActive: boolean;
-};
+/* ── Types ─────────────────────────────────────────────────── */
+type IncomeSummary = { totalIncome: number; totalDeductions: number; netIncome: number };
+type BudgetYear    = { tithePercentage: number };
+type Tithe         = { id: number; amount: number; recipient: string; isTithe: boolean; date: string };
+type Debt          = { id: number; name: string; type: string; remainingAmount: number; dueDate: string | null; status: string };
+type Task          = { id: number; title: string; priority: string; status: string; dueDate: string | null };
+type NoteTab       = { id: number; name: string; color: string };
+type Note          = { id: number; title: string; content: string; color: string; isPinned: boolean; tabId: number | null; tabName: string | null };
 
-async function apiFetch(path: string) {
-  const r = await fetch(`${API}${path}`);
-  if (!r.ok) return null;
-  return r.json();
+/* ── Helpers ────────────────────────────────────────────────── */
+async function apiFetch(path: string, opts?: RequestInit) {
+  const r = await fetch(`${API}${path}`, { headers: { "Content-Type": "application/json" }, ...opts });
+  if (!r.ok) throw new Error(await r.text());
+  return r.status === 204 ? null : r.json();
 }
 
-function fmt(n: number, short = false) {
-  if (short && n >= 1000) return `${Math.round(n / 1000)}K ₪`;
+function fmt(n: number) {
   return new Intl.NumberFormat("he-IL", { style: "currency", currency: "ILS", maximumFractionDigits: 0 }).format(n);
 }
 
-function toMonthStr(d: Date) {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-}
+const PRIORITY_LABEL: Record<string, string> = { high: "דחוף", medium: "רגיל", low: "נמוך" };
+const PRIORITY_COLOR: Record<string, string> = {
+  high:   "text-rose-600 bg-rose-50 border-rose-200",
+  medium: "text-amber-600 bg-amber-50 border-amber-200",
+  low:    "text-slate-500 bg-slate-50 border-slate-200",
+};
 
+const SECTION_STYLE = "bg-card rounded-2xl border border-border/60 flex flex-col overflow-hidden shadow-sm hover:shadow-md transition-shadow";
+const SECTION_HEAD  = "flex items-center justify-between px-5 pt-5 pb-3";
+const SECTION_TITLE = "flex items-center gap-2 font-display font-bold text-base";
+const ICON_WRAP     = (bg: string) => `w-8 h-8 rounded-xl ${bg} flex items-center justify-center shrink-0`;
+const GO_LINK       = "flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors";
+
+/* ─────────────────────────────────────────────────────────────
+   MAIN COMPONENT
+───────────────────────────────────────────────────────────── */
 export default function Home() {
-  const [funds, setFunds] = useState<Fund[]>([]);
-  const [walletData, setWalletData] = useState<{ totals: { deposits: number } } | null>(null);
-  const [annualSummary, setAnnualSummary] = useState<{ total: number } | null>(null);
-  const [largeSummary, setLargeSummary] = useState<{ total: number } | null>(null);
-  const [incomeSummary, setIncomeSummary] = useState<{ netIncome: number; totalIncome: number } | null>(null);
-  const [titheData, setTitheData] = useState<{ tithes: any[]; tithePercentage: number } | null>(null);
-  const [externalSummaries, setExternalSummaries] = useState<Record<number, number>>({});
-  const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
 
-  const now = new Date();
-  const currentMonth = toMonthStr(now);
+  /* global data */
+  const [income, setIncome]       = useState<IncomeSummary>({ totalIncome: 0, totalDeductions: 0, netIncome: 0 });
+  const [budgetYear, setBudgetYear] = useState<BudgetYear>({ tithePercentage: 10 });
+  const [tithes, setTithes]       = useState<Tithe[]>([]);
+  const [debts, setDebts]         = useState<Debt[]>([]);
+  const [tasks, setTasks]         = useState<Task[]>([]);
+  const [tabs, setTabs]           = useState<NoteTab[]>([]);
+  const [notes, setNotes]         = useState<Note[]>([]);
+  const [loading, setLoading]     = useState(true);
 
-  useEffect(() => {
-    (async () => {
-      setLoading(true);
-      try {
-        const allFunds: Fund[] = (await apiFetch("/funds?all=true")) || [];
-        const parsedFunds = allFunds.filter(f => f.isActive).map(f => ({
-          ...f,
-          monthlyAllocation: parseFloat(String(f.monthlyAllocation) || "0"),
-          annualAllocation: parseFloat(String(f.annualAllocation) || "0"),
-          initialBalance: parseFloat(String(f.initialBalance) || "0"),
-        }));
-        setFunds(parsedFunds);
-
-        const cashFund = parsedFunds.find(f => f.fundBehavior === "cash_monthly");
-        const annualFund = parsedFunds.find(f => f.fundBehavior === "annual_categorized");
-        const largeFund = parsedFunds.find(f => f.fundBehavior === "annual_large");
-        const externalFunds = parsedFunds.filter(f => f.fundBehavior === "non_budget");
-
-        const [wallet, annual, large, income, tithes, yearData, ...extResults] = await Promise.all([
-          cashFund ? apiFetch(`/wallet?month=${currentMonth}&fundId=${cashFund.id}`) : null,
-          annualFund ? apiFetch(`/expenses/summary?fundId=${annualFund.id}`) : null,
-          largeFund ? apiFetch(`/expenses/summary?fundId=${largeFund.id}`) : null,
-          apiFetch("/incomes/summary"),
-          apiFetch("/charity"),
-          apiFetch("/budget-year"),
-          ...externalFunds.map(f => apiFetch(`/expenses/summary?fundId=${f.id}`)),
-        ]);
-
-        setWalletData(wallet);
-        setAnnualSummary(annual);
-        setLargeSummary(large);
-        setIncomeSummary(income);
-
-        const extMap: Record<number, number> = {};
-        externalFunds.forEach((f, i) => {
-          extMap[f.id] = extResults[i]?.total ?? 0;
-        });
-        setExternalSummaries(extMap);
-
-        if (tithes && yearData) {
-          const titheGiven = tithes.filter((t: any) => t.isTithe).reduce((s: number, t: any) => s + parseFloat(String(t.amount) || "0"), 0);
-          setTitheData({ tithes: tithes, tithePercentage: parseFloat(String(yearData.tithePercentage) || "10") });
-        }
-      } catch (e) { console.error(e); }
-      finally { setLoading(false); }
-    })();
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [inc, by, tth, dbs, tks, nbs, nts] = await Promise.all([
+        apiFetch("/incomes/summary"),
+        apiFetch("/budget-year"),
+        apiFetch("/charity"),
+        apiFetch("/debts"),
+        apiFetch("/reminders"),
+        apiFetch("/note-tabs"),
+        apiFetch("/notes"),
+      ]);
+      setIncome(inc);
+      setBudgetYear(by);
+      setTithes(tth);
+      setDebts(dbs);
+      setTasks(tks);
+      setTabs(nbs);
+      setNotes(nts);
+    } catch {
+      toast({ title: "שגיאה בטעינה", variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  const cashFund = funds.find(f => f.fundBehavior === "cash_monthly");
-  const annualFund = funds.find(f => f.fundBehavior === "annual_categorized");
-  const largeFund = funds.find(f => f.fundBehavior === "annual_large");
-  const externalFunds = funds.filter(f => f.fundBehavior === "non_budget");
+  useEffect(() => { load(); }, [load]);
 
-  const walletDeposited = walletData?.totals.deposits ?? 0;
-  const walletAllocation = cashFund?.monthlyAllocation ?? 0;
-  const walletPct = walletAllocation > 0 ? Math.min(100, (walletDeposited / walletAllocation) * 100) : 0;
+  /* derived */
+  const titheTarget  = income.netIncome * (budgetYear.tithePercentage / 100);
+  const titheGiven   = tithes.filter(t => t.isTithe).reduce((s, t) => s + t.amount, 0);
+  const titheLeft    = titheTarget - titheGiven;
+  const tithePct     = titheTarget > 0 ? Math.min(100, (titheGiven / titheTarget) * 100) : 0;
 
-  const annualSpent = annualSummary?.total ?? 0;
-  const annualBudget = annualFund?.annualAllocation ?? 0;
-  const annualPct = annualBudget > 0 ? Math.min(100, (annualSpent / annualBudget) * 100) : 0;
-
-  const largeSpent = largeSummary?.total ?? 0;
-  const largeBudget = largeFund?.annualAllocation ?? 0;
-  const largePct = largeBudget > 0 ? Math.min(100, (largeSpent / largeBudget) * 100) : 0;
-
-  const netIncome = incomeSummary?.netIncome ?? 0;
-  const titheTarget = titheData ? netIncome * (titheData.tithePercentage / 100) : 0;
-  const titheGiven = titheData ? titheData.tithes.filter((t: any) => t.isTithe).reduce((s: number, t: any) => s + parseFloat(String(t.amount) || "0"), 0) : 0;
-  const titheRemaining = titheTarget - titheGiven;
-
+  const now = new Date();
   const MONTH_NAMES = ["ינואר","פברואר","מרץ","אפריל","מאי","יוני","יולי","אוגוסט","ספטמבר","אוקטובר","נובמבר","דצמבר"];
   const monthLabel = `${MONTH_NAMES[now.getMonth()]} ${now.getFullYear()}`;
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-display font-bold">שלום 👋</h1>
-        <p className="text-muted-foreground text-sm mt-1">{monthLabel} — סקירת מצב התקציב</p>
+    <div className="space-y-5" dir="rtl">
+      {/* ── Header ─────────────────────────────────────────── */}
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-display font-bold">שלום 👋</h1>
+          <p className="text-muted-foreground text-sm mt-0.5">{monthLabel} — סקירת מצב</p>
+        </div>
+        <Link href={`${BASE}/budget`}>
+          <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-border/60 text-sm text-muted-foreground hover:text-foreground hover:border-primary/40 transition-all">
+            תכנון תקציב <ChevronRight className="w-3.5 h-3.5" />
+          </button>
+        </Link>
       </div>
 
       {loading ? (
-        <div className="grid grid-cols-2 gap-4">
-          {[1,2,3,4,5,6].map(i => <div key={i} className="h-32 bg-muted animate-pulse rounded-2xl" />)}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {[1,2,3,4].map(i => (
+            <div key={i} className="h-72 bg-muted animate-pulse rounded-2xl" />
+          ))}
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
-          {/* קופת שוטף */}
-          <Link href={`${BASE}/cash`}>
-            <div className={cn("bg-card rounded-2xl border-2 p-5 hover:shadow-md transition-all cursor-pointer group",
-              cashFund ? "border-amber-200/60 hover:border-amber-400/60" : "border-border/40"
-            )}>
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center">
-                    <Wallet className="w-5 h-5 text-amber-600" />
-                  </div>
-                  <div>
-                    <p className="font-bold">{cashFund?.name || "קופת שוטף"}</p>
-                    <p className="text-xs text-muted-foreground">{monthLabel}</p>
-                  </div>
-                </div>
-                <ArrowLeft className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-              </div>
-              {cashFund ? (
-                <>
-                  <div className="flex justify-between text-sm mb-2">
-                    <span className="text-muted-foreground">הופקד</span>
-                    <span className="font-bold">{fmt(walletDeposited)} / {fmt(walletAllocation)}</span>
-                  </div>
-                  <div className="h-2.5 bg-muted rounded-full overflow-hidden">
-                    <div className={cn("h-full rounded-full transition-all", walletPct >= 100 ? "bg-amber-500" : "bg-amber-400")}
-                      style={{ width: `${walletPct}%` }} />
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1.5">
-                    {walletPct >= 100 ? "הגעת ליעד החודשי" : `נותר להפקיד: ${fmt(walletAllocation - walletDeposited)}`}
-                  </p>
-                </>
-              ) : (
-                <p className="text-sm text-muted-foreground">לא הוגדרה קופת שוטף</p>
-              )}
-            </div>
-          </Link>
+          {/* ══════════════════════════════════════════════════
+              CARD 1 — מעשרות
+          ══════════════════════════════════════════════════ */}
+          <TitheCard
+            income={income}
+            budgetYear={budgetYear}
+            tithes={tithes}
+            titheTarget={titheTarget}
+            titheGiven={titheGiven}
+            titheLeft={titheLeft}
+            tithePct={tithePct}
+            onAdd={async (payload) => {
+              const created = await apiFetch("/charity", { method: "POST", body: JSON.stringify(payload) });
+              setTithes(prev => [{ ...created, amount: parseFloat(String(created.amount)) }, ...prev]);
+            }}
+          />
 
-          {/* מעגל השנה */}
-          <Link href={`${BASE}/annual`}>
-            <div className={cn("bg-card rounded-2xl border-2 p-5 hover:shadow-md transition-all cursor-pointer group",
-              annualFund ? "border-violet-200/60 hover:border-violet-400/60" : "border-border/40"
-            )}>
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-violet-100 flex items-center justify-center">
-                    <Calendar className="w-5 h-5 text-violet-600" />
-                  </div>
-                  <div>
-                    <p className="font-bold">{annualFund?.name || "מעגל השנה"}</p>
-                    <p className="text-xs text-muted-foreground">שנתי</p>
-                  </div>
-                </div>
-                <ArrowLeft className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-              </div>
-              {annualFund ? (
-                <>
-                  <div className="flex justify-between text-sm mb-2">
-                    <span className="text-muted-foreground">הוצא</span>
-                    <span className="font-bold">{fmt(annualSpent)} / {fmt(annualBudget)}</span>
-                  </div>
-                  <div className="h-2.5 bg-muted rounded-full overflow-hidden">
-                    <div className={cn("h-full rounded-full transition-all",
-                      annualPct >= 100 ? "bg-rose-500" : annualPct > 80 ? "bg-amber-500" : "bg-violet-500"
-                    )} style={{ width: `${annualPct}%` }} />
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1.5">
-                    {Math.round(annualPct)}% מהתקציב · נותר {fmt(annualBudget - annualSpent)}
-                  </p>
-                </>
-              ) : (
-                <p className="text-sm text-muted-foreground">לא הוגדרה קופת מעגל השנה</p>
-              )}
-            </div>
-          </Link>
+          {/* ══════════════════════════════════════════════════
+              CARD 2 — חובות
+          ══════════════════════════════════════════════════ */}
+          <DebtsCard
+            debts={debts}
+            onAdd={async (payload) => {
+              const created = await apiFetch("/debts", { method: "POST", body: JSON.stringify(payload) });
+              setDebts(prev => [created, ...prev]);
+            }}
+          />
 
-          {/* הוצאות גדולות */}
-          <Link href={`${BASE}/large`}>
-            <div className={cn("bg-card rounded-2xl border-2 p-5 hover:shadow-md transition-all cursor-pointer group",
-              largeFund ? "border-rose-200/60 hover:border-rose-400/60" : "border-border/40"
-            )}>
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-rose-100 flex items-center justify-center">
-                    <ShoppingBag className="w-5 h-5 text-rose-600" />
-                  </div>
-                  <div>
-                    <p className="font-bold">{largeFund?.name || "הוצאות גדולות"}</p>
-                    <p className="text-xs text-muted-foreground">שנתי</p>
-                  </div>
-                </div>
-                <ArrowLeft className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-              </div>
-              {largeFund ? (
-                <>
-                  <div className="flex justify-between text-sm mb-2">
-                    <span className="text-muted-foreground">הוצא</span>
-                    <span className="font-bold">{fmt(largeSpent)} / {fmt(largeBudget)}</span>
-                  </div>
-                  <div className="h-2.5 bg-muted rounded-full overflow-hidden">
-                    <div className={cn("h-full rounded-full transition-all",
-                      largePct >= 100 ? "bg-rose-600" : largePct > 80 ? "bg-amber-500" : "bg-rose-400"
-                    )} style={{ width: `${largePct}%` }} />
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1.5">
-                    {Math.round(largePct)}% מהתקציב · נותר {fmt(largeBudget - largeSpent)}
-                  </p>
-                </>
-              ) : (
-                <p className="text-sm text-muted-foreground">לא הוגדרה קופת הוצאות גדולות</p>
-              )}
-            </div>
-          </Link>
+          {/* ══════════════════════════════════════════════════
+              CARD 3 — תזכורות
+          ══════════════════════════════════════════════════ */}
+          <RemindersCard
+            tasks={tasks}
+            onToggle={async (id) => {
+              const updated = await apiFetch(`/reminders/${id}/toggle`, { method: "PATCH" });
+              setTasks(prev => prev.map(t => t.id === id ? updated : t));
+            }}
+            onAdd={async (title, priority) => {
+              const created = await apiFetch("/reminders", {
+                method: "POST",
+                body: JSON.stringify({ title, priority, status: "open", description: "" }),
+              });
+              setTasks(prev => [created, ...prev]);
+            }}
+          />
 
-          {/* הכנסות */}
-          <Link href={`${BASE}/incomes`}>
-            <div className="bg-card rounded-2xl border-2 border-emerald-200/60 hover:border-emerald-400/60 p-5 hover:shadow-md transition-all cursor-pointer group">
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center">
-                    <Landmark className="w-5 h-5 text-emerald-600" />
-                  </div>
-                  <div>
-                    <p className="font-bold">הכנסות</p>
-                    <p className="text-xs text-muted-foreground">נטו לאחר ניכויים</p>
-                  </div>
-                </div>
-                <ArrowLeft className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-              </div>
-              <p className="text-2xl font-display font-bold text-emerald-600">{fmt(netIncome)}</p>
-              <p className="text-xs text-muted-foreground mt-1.5">הכנסה נטו צבורה השנה</p>
-            </div>
-          </Link>
-
-          {/* מעשרות */}
-          <Link href={`${BASE}/charity`}>
-            <div className="bg-card rounded-2xl border-2 border-violet-200/60 hover:border-violet-400/60 p-5 hover:shadow-md transition-all cursor-pointer group">
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-violet-100 flex items-center justify-center">
-                    <HeartHandshake className="w-5 h-5 text-violet-600" />
-                  </div>
-                  <div>
-                    <p className="font-bold">מעשרות</p>
-                    <p className="text-xs text-muted-foreground">{titheData?.tithePercentage ?? 10}% מהכנסה נטו</p>
-                  </div>
-                </div>
-                <ArrowLeft className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-              </div>
-              <div className="flex justify-between items-end">
-                <div>
-                  <p className="text-2xl font-display font-bold text-violet-600">{fmt(titheGiven)}</p>
-                  <p className="text-xs text-muted-foreground mt-1">ניתן מתוך {fmt(titheTarget)}</p>
-                </div>
-                {titheRemaining > 0 && (
-                  <div className="text-left">
-                    <p className="text-sm font-bold text-rose-500">{fmt(titheRemaining)}</p>
-                    <p className="text-xs text-muted-foreground">נותר לתת</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          </Link>
-
-          {/* קופות חיצוניות */}
-          {externalFunds.length > 0 && (
-            <Link href={`${BASE}/external`}>
-              <div className="bg-card rounded-2xl border-2 border-blue-200/60 hover:border-blue-400/60 p-5 hover:shadow-md transition-all cursor-pointer group">
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center">
-                      <PiggyBank className="w-5 h-5 text-blue-600" />
-                    </div>
-                    <div>
-                      <p className="font-bold">קופות חיצוניות</p>
-                      <p className="text-xs text-muted-foreground">{externalFunds.length} קופות</p>
-                    </div>
-                  </div>
-                  <ArrowLeft className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-                </div>
-                <div className="space-y-1.5">
-                  {externalFunds.slice(0, 3).map(f => {
-                    const spent = externalSummaries[f.id] ?? 0;
-                    const balance = f.initialBalance - spent;
-                    return (
-                      <div key={f.id} className="flex items-center justify-between text-sm">
-                        <div className="flex items-center gap-2">
-                          <span className="w-2 h-2 rounded-full" style={{ background: f.colorClass }} />
-                          <span>{f.name}</span>
-                        </div>
-                        <span className={cn("font-semibold tabular-nums", balance < 0 ? "text-rose-600" : "text-emerald-600")}>
-                          {fmt(balance)}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </Link>
-          )}
-
-          {/* חובות וחסכונות */}
-          <Link href={`${BASE}/debts`}>
-            <div className="bg-card rounded-2xl border-2 border-slate-200/60 hover:border-slate-400/60 p-5 hover:shadow-md transition-all cursor-pointer group">
-              <div className="flex items-start justify-between mb-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center">
-                    <CreditCard className="w-5 h-5 text-slate-600" />
-                  </div>
-                  <div>
-                    <p className="font-bold">חובות וחסכונות</p>
-                    <p className="text-xs text-muted-foreground">משכנתא, הלוואות, נכסים</p>
-                  </div>
-                </div>
-                <ArrowLeft className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-              </div>
-              <p className="text-sm text-muted-foreground">לחץ לצפייה בפרטים</p>
-            </div>
-          </Link>
+          {/* ══════════════════════════════════════════════════
+              CARD 4 — פתקים
+          ══════════════════════════════════════════════════ */}
+          <NotesCard
+            tabs={tabs}
+            notes={notes}
+            onAdd={async (title, content, tabId) => {
+              const created = await apiFetch("/notes", {
+                method: "POST",
+                body: JSON.stringify({ title, content, tabId, color: "#fef9c3", isPinned: false, sortOrder: 0 }),
+              });
+              setNotes(prev => [{ ...created, tabName: tabs.find(t => t.id === tabId)?.name ?? null }, ...prev]);
+            }}
+          />
 
         </div>
       )}
+    </div>
+  );
+}
 
-      {/* Quick setup prompt if no funds */}
-      {!loading && funds.length === 0 && (
-        <div className="bg-primary/5 border-2 border-primary/20 rounded-2xl p-6 text-center space-y-3">
-          <Coins className="w-12 h-12 mx-auto text-primary/40" />
-          <h3 className="font-bold text-lg">מתחילים להגדיר את התקציב</h3>
-          <p className="text-sm text-muted-foreground max-w-sm mx-auto">
-            עבור לעמוד תכנון התקציב כדי להגדיר את הקופות השנתיות והחודשיות שלך
-          </p>
-          <Link href={`${BASE}/budget`}>
-            <button className="mt-2 px-6 py-2.5 bg-primary text-white rounded-xl font-medium text-sm hover:bg-primary/90 transition-colors inline-flex items-center gap-2">
-              <ArrowLeft className="w-4 h-4" /> לתכנון תקציב
+/* ─────────────────────────────────────────────────────────────
+   CARD 1: מעשרות
+───────────────────────────────────────────────────────────── */
+function TitheCard({ income, budgetYear, tithes, titheTarget, titheGiven, titheLeft, tithePct, onAdd }: {
+  income: IncomeSummary; budgetYear: BudgetYear;
+  tithes: Tithe[]; titheTarget: number; titheGiven: number; titheLeft: number; tithePct: number;
+  onAdd: (p: any) => Promise<void>;
+}) {
+  const { toast } = useToast();
+  const [recipient, setRecipient] = useState("");
+  const [amount, setAmount]       = useState("");
+  const [saving, setSaving]       = useState(false);
+  const [open, setOpen]           = useState(false);
+
+  const handleAdd = async () => {
+    if (!recipient.trim() || !amount || parseFloat(amount) <= 0) {
+      toast({ title: "נמען וסכום נדרשים", variant: "destructive" }); return;
+    }
+    setSaving(true);
+    try {
+      await onAdd({ recipient: recipient.trim(), amount: parseFloat(amount), isTithe: true, date: new Date().toISOString().split("T")[0], description: "" });
+      setRecipient(""); setAmount(""); setOpen(false);
+      toast({ title: "מעשר נרשם ✓" });
+    } catch { toast({ title: "שגיאה", variant: "destructive" }); }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <div className={SECTION_STYLE}>
+      <div className={SECTION_HEAD}>
+        <div className={SECTION_TITLE}>
+          <div className={ICON_WRAP("bg-violet-100")}>
+            <HeartHandshake className="w-4 h-4 text-violet-600" />
+          </div>
+          מעשרות
+        </div>
+        <Link href={`${BASE}/charity`}>
+          <span className={GO_LINK}>לכל הצדקות <ArrowLeft className="w-3 h-3" /></span>
+        </Link>
+      </div>
+
+      <div className="px-5 pb-4 space-y-4 flex-1">
+        {/* Stats grid */}
+        <div className="grid grid-cols-2 gap-2">
+          {[
+            { label: "הכנסה נטו", value: fmt(income.netIncome), color: "text-foreground" },
+            { label: `יעד (${budgetYear.tithePercentage}%)`, value: fmt(titheTarget), color: "text-violet-600" },
+            { label: "נתרם", value: fmt(titheGiven), color: "text-emerald-600" },
+            { label: titheLeft > 0 ? "נותר לתת" : "עודף", value: fmt(Math.abs(titheLeft)), color: titheLeft > 0 ? "text-rose-500" : "text-emerald-600" },
+          ].map(s => (
+            <div key={s.label} className="bg-muted/40 rounded-xl p-3">
+              <p className="text-xs text-muted-foreground">{s.label}</p>
+              <p className={cn("font-bold mt-0.5", s.color)}>{s.value}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* Progress */}
+        <div>
+          <div className="flex justify-between text-xs text-muted-foreground mb-1.5">
+            <span>התקדמות</span>
+            <span className="font-semibold">{Math.round(tithePct)}%</span>
+          </div>
+          <div className="h-2.5 bg-muted rounded-full overflow-hidden">
+            <div className={cn("h-full rounded-full transition-all", tithePct >= 100 ? "bg-emerald-500" : "bg-violet-500")}
+              style={{ width: `${tithePct}%` }} />
+          </div>
+        </div>
+
+        {/* Recent 2 */}
+        {tithes.length > 0 && (
+          <div className="space-y-1.5">
+            {tithes.slice(0, 2).map(t => (
+              <div key={t.id} className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground truncate">{t.recipient}</span>
+                <span className="font-semibold text-violet-600 tabular-nums mr-2">{fmt(t.amount)}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Quick-add */}
+      <div className="border-t border-border/50 px-4 py-3">
+        {open ? (
+          <div className="flex gap-2 items-center">
+            <Input value={recipient} onChange={e => setRecipient(e.target.value)}
+              placeholder="נמען..." className="rounded-lg h-8 text-sm flex-1" autoFocus />
+            <Input value={amount} onChange={e => setAmount(e.target.value)}
+              type="number" placeholder="₪" dir="ltr" className="rounded-lg h-8 text-sm w-20" />
+            <button onClick={handleAdd} disabled={saving}
+              className="p-1.5 rounded-lg bg-violet-600 text-white hover:bg-violet-700 transition-colors">
+              {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
             </button>
-          </Link>
+            <button onClick={() => setOpen(false)} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground transition-colors">
+              <span className="text-xs">ביטול</span>
+            </button>
+          </div>
+        ) : (
+          <button onClick={() => setOpen(true)}
+            className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-violet-600 transition-colors w-full">
+            <Plus className="w-4 h-4" /> רשום מעשר חדש
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────
+   CARD 2: חובות
+───────────────────────────────────────────────────────────── */
+function DebtsCard({ debts, onAdd }: { debts: Debt[]; onAdd: (p: any) => Promise<void> }) {
+  const { toast } = useToast();
+  const [open, setOpen]   = useState(false);
+  const [name, setName]   = useState("");
+  const [amount, setAmount] = useState("");
+  const [type, setType]   = useState<"i_owe" | "owed_to_me">("i_owe");
+  const [saving, setSaving] = useState(false);
+
+  const activeDebts = debts.filter(d => d.status === "active");
+  const iOwe        = activeDebts.filter(d => d.type === "i_owe");
+  const owedToMe    = activeDebts.filter(d => d.type === "owed_to_me");
+  const totalIOwe   = iOwe.reduce((s, d) => s + d.remainingAmount, 0);
+  const totalOwed   = owedToMe.reduce((s, d) => s + d.remainingAmount, 0);
+
+  const handleAdd = async () => {
+    if (!name.trim() || !amount || parseFloat(amount) <= 0) {
+      toast({ title: "שם וסכום נדרשים", variant: "destructive" }); return;
+    }
+    setSaving(true);
+    try {
+      const amt = parseFloat(amount);
+      await onAdd({ name: name.trim(), type, totalAmount: amt, remainingAmount: amt, interestRate: 0, status: "active", notes: "" });
+      setName(""); setAmount(""); setOpen(false);
+      toast({ title: "חוב נרשם ✓" });
+    } catch { toast({ title: "שגיאה", variant: "destructive" }); }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <div className={SECTION_STYLE}>
+      <div className={SECTION_HEAD}>
+        <div className={SECTION_TITLE}>
+          <div className={ICON_WRAP("bg-rose-100")}>
+            <CreditCard className="w-4 h-4 text-rose-600" />
+          </div>
+          חובות
         </div>
+        <Link href={`${BASE}/debts`}>
+          <span className={GO_LINK}>לכל החובות <ArrowLeft className="w-3 h-3" /></span>
+        </Link>
+      </div>
+
+      <div className="px-5 pb-4 space-y-4 flex-1">
+        {/* Totals */}
+        <div className="grid grid-cols-2 gap-2">
+          <div className="bg-rose-50 border border-rose-100 rounded-xl p-3">
+            <div className="flex items-center gap-1.5 mb-1">
+              <TrendingDown className="w-3.5 h-3.5 text-rose-500" />
+              <p className="text-xs text-rose-700 font-medium">אני חייב</p>
+            </div>
+            <p className="font-bold text-rose-600 text-lg">{fmt(totalIOwe)}</p>
+            <p className="text-xs text-muted-foreground">{iOwe.length} חובות</p>
+          </div>
+          <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3">
+            <div className="flex items-center gap-1.5 mb-1">
+              <TrendingUp className="w-3.5 h-3.5 text-emerald-500" />
+              <p className="text-xs text-emerald-700 font-medium">חייבים לי</p>
+            </div>
+            <p className="font-bold text-emerald-600 text-lg">{fmt(totalOwed)}</p>
+            <p className="text-xs text-muted-foreground">{owedToMe.length} חובות</p>
+          </div>
+        </div>
+
+        {/* Short list */}
+        {activeDebts.length === 0 ? (
+          <p className="text-sm text-muted-foreground text-center py-3">אין חובות פעילים</p>
+        ) : (
+          <div className="space-y-1.5">
+            {activeDebts.slice(0, 4).map(d => (
+              <div key={d.id} className="flex items-center justify-between text-sm py-1 border-b border-border/30 last:border-0">
+                <div className="flex items-center gap-2">
+                  <span className={cn("w-2 h-2 rounded-full shrink-0", d.type === "i_owe" ? "bg-rose-400" : "bg-emerald-400")} />
+                  <span className="truncate max-w-[130px]">{d.name}</span>
+                </div>
+                <span className={cn("font-semibold tabular-nums", d.type === "i_owe" ? "text-rose-600" : "text-emerald-600")}>
+                  {fmt(d.remainingAmount)}
+                </span>
+              </div>
+            ))}
+            {activeDebts.length > 4 && (
+              <p className="text-xs text-muted-foreground text-center">ועוד {activeDebts.length - 4}...</p>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Quick-add */}
+      <div className="border-t border-border/50 px-4 py-3">
+        {open ? (
+          <div className="space-y-2">
+            <div className="flex gap-1.5">
+              {[{ v: "i_owe", l: "אני חייב" }, { v: "owed_to_me", l: "חייבים לי" }].map(t => (
+                <button key={t.v} onClick={() => setType(t.v as any)}
+                  className={cn("flex-1 text-xs py-1.5 rounded-lg border font-medium transition-colors",
+                    type === t.v ? "bg-foreground text-background border-foreground" : "border-border text-muted-foreground"
+                  )}>
+                  {t.l}
+                </button>
+              ))}
+            </div>
+            <div className="flex gap-2 items-center">
+              <Input value={name} onChange={e => setName(e.target.value)}
+                placeholder="שם..." className="rounded-lg h-8 text-sm flex-1" autoFocus />
+              <Input value={amount} onChange={e => setAmount(e.target.value)}
+                type="number" placeholder="₪" dir="ltr" className="rounded-lg h-8 text-sm w-20" />
+              <button onClick={handleAdd} disabled={saving}
+                className="p-1.5 rounded-lg bg-rose-600 text-white hover:bg-rose-700 transition-colors">
+                {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+              </button>
+              <button onClick={() => setOpen(false)} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground transition-colors text-xs">ביטול</button>
+            </div>
+          </div>
+        ) : (
+          <button onClick={() => setOpen(true)}
+            className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-rose-600 transition-colors w-full">
+            <Plus className="w-4 h-4" /> הוסף חוב חדש
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────
+   CARD 3: תזכורות
+───────────────────────────────────────────────────────────── */
+function RemindersCard({ tasks, onToggle, onAdd }: {
+  tasks: Task[]; onToggle: (id: number) => Promise<void>; onAdd: (title: string, priority: string) => Promise<void>;
+}) {
+  const { toast } = useToast();
+  const [open, setOpen]       = useState(false);
+  const [title, setTitle]     = useState("");
+  const [priority, setPriority] = useState("medium");
+  const [saving, setSaving]   = useState(false);
+  const [toggling, setToggling] = useState<number | null>(null);
+
+  const openTasks   = tasks.filter(t => t.status !== "done");
+  const high        = openTasks.filter(t => t.priority === "high");
+  const others      = openTasks.filter(t => t.priority !== "high");
+  const doneTasks   = tasks.filter(t => t.status === "done").slice(0, 2);
+
+  const handleToggle = async (id: number) => {
+    setToggling(id);
+    try { await onToggle(id); }
+    catch { toast({ title: "שגיאה", variant: "destructive" }); }
+    finally { setToggling(null); }
+  };
+
+  const handleAdd = async () => {
+    if (!title.trim()) { toast({ title: "כותרת נדרשת", variant: "destructive" }); return; }
+    setSaving(true);
+    try {
+      await onAdd(title.trim(), priority);
+      setTitle(""); setOpen(false);
+      toast({ title: "משימה נוצרה ✓" });
+    } catch { toast({ title: "שגיאה", variant: "destructive" }); }
+    finally { setSaving(false); }
+  };
+
+  const TaskRow = ({ task }: { task: Task }) => (
+    <div className={cn("flex items-start gap-2.5 py-1.5 border-b border-border/30 last:border-0",
+      task.status === "done" && "opacity-50"
+    )}>
+      <button onClick={() => handleToggle(task.id)} disabled={toggling === task.id}
+        className="mt-0.5 shrink-0 transition-colors">
+        {toggling === task.id
+          ? <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+          : task.status === "done"
+            ? <Check className="w-4 h-4 text-emerald-500" />
+            : <Circle className="w-4 h-4 text-muted-foreground hover:text-primary" />
+        }
+      </button>
+      <div className="flex-1 min-w-0">
+        <p className={cn("text-sm leading-snug", task.status === "done" && "line-through")}>{task.title}</p>
+        {task.dueDate && (
+          <p className="text-xs text-muted-foreground mt-0.5">{new Date(task.dueDate).toLocaleDateString("he-IL")}</p>
+        )}
+      </div>
+      {task.priority !== "medium" && (
+        <span className={cn("text-[10px] px-1.5 py-0.5 rounded-full font-medium border shrink-0 mt-0.5", PRIORITY_COLOR[task.priority])}>
+          {PRIORITY_LABEL[task.priority]}
+        </span>
       )}
+    </div>
+  );
+
+  return (
+    <div className={SECTION_STYLE}>
+      <div className={SECTION_HEAD}>
+        <div className={SECTION_TITLE}>
+          <div className={ICON_WRAP("bg-amber-100")}>
+            <CheckSquare className="w-4 h-4 text-amber-600" />
+          </div>
+          תזכורות ומשימות
+        </div>
+        <Link href={`${BASE}/reminders`}>
+          <span className={GO_LINK}>לכל המשימות <ArrowLeft className="w-3 h-3" /></span>
+        </Link>
+      </div>
+
+      <div className="px-5 pb-4 space-y-3 flex-1">
+        {/* Summary counts */}
+        <div className="flex items-center gap-3 text-sm">
+          <span className="flex items-center gap-1.5">
+            <AlertCircle className="w-3.5 h-3.5 text-rose-500" />
+            <span className="font-semibold text-rose-600">{high.length}</span>
+            <span className="text-muted-foreground">דחופות</span>
+          </span>
+          <span className="text-border">·</span>
+          <span className="flex items-center gap-1.5">
+            <Circle className="w-3.5 h-3.5 text-amber-500" />
+            <span className="font-semibold">{others.length}</span>
+            <span className="text-muted-foreground">שאר</span>
+          </span>
+          <span className="text-border">·</span>
+          <span className="flex items-center gap-1.5">
+            <Check className="w-3.5 h-3.5 text-emerald-500" />
+            <span className="font-semibold">{tasks.filter(t => t.status === "done").length}</span>
+            <span className="text-muted-foreground">הושלמו</span>
+          </span>
+        </div>
+
+        {openTasks.length === 0 && doneTasks.length === 0 ? (
+          <p className="text-sm text-muted-foreground text-center py-4">אין משימות עדיין</p>
+        ) : (
+          <div>
+            {/* High priority first */}
+            {high.length > 0 && (
+              <div className="mb-1">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-rose-500 mb-1">דחוף</p>
+                {high.slice(0, 3).map(t => <TaskRow key={t.id} task={t} />)}
+              </div>
+            )}
+            {/* Others */}
+            {others.slice(0, high.length >= 2 ? 1 : 3).map(t => <TaskRow key={t.id} task={t} />)}
+            {/* Done */}
+            {doneTasks.length > 0 && openTasks.length < 3 && (
+              <div className="mt-1">
+                {doneTasks.map(t => <TaskRow key={t.id} task={t} />)}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Quick-add */}
+      <div className="border-t border-border/50 px-4 py-3">
+        {open ? (
+          <div className="space-y-2">
+            <div className="flex gap-1.5">
+              {[{ v: "high", l: "דחוף" }, { v: "medium", l: "רגיל" }, { v: "low", l: "נמוך" }].map(p => (
+                <button key={p.v} onClick={() => setPriority(p.v)}
+                  className={cn("flex-1 text-xs py-1.5 rounded-lg border font-medium transition-colors",
+                    priority === p.v ? "bg-foreground text-background border-foreground" : "border-border text-muted-foreground"
+                  )}>
+                  {p.l}
+                </button>
+              ))}
+            </div>
+            <div className="flex gap-2 items-center">
+              <Input value={title} onChange={e => setTitle(e.target.value)}
+                placeholder="משימה חדשה..." className="rounded-lg h-8 text-sm flex-1" autoFocus
+                onKeyDown={e => e.key === "Enter" && handleAdd()} />
+              <button onClick={handleAdd} disabled={saving}
+                className="p-1.5 rounded-lg bg-amber-500 text-white hover:bg-amber-600 transition-colors">
+                {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+              </button>
+              <button onClick={() => setOpen(false)} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground transition-colors text-xs">ביטול</button>
+            </div>
+          </div>
+        ) : (
+          <button onClick={() => setOpen(true)}
+            className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-amber-600 transition-colors w-full">
+            <Plus className="w-4 h-4" /> הוסף משימה
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────
+   CARD 4: פתקים
+───────────────────────────────────────────────────────────── */
+function NotesCard({ tabs, notes, onAdd }: {
+  tabs: NoteTab[]; notes: Note[]; onAdd: (title: string, content: string, tabId: number | null) => Promise<void>;
+}) {
+  const { toast } = useToast();
+  const [activeTab, setActiveTab] = useState<number | null>(null);
+  const [open, setOpen]           = useState(false);
+  const [noteTitle, setNoteTitle] = useState("");
+  const [noteContent, setNoteContent] = useState("");
+  const [saving, setSaving]       = useState(false);
+
+  /* auto-select first tab */
+  useEffect(() => {
+    if (tabs.length > 0 && activeTab === null) setActiveTab(tabs[0].id);
+  }, [tabs]);
+
+  const visibleNotes = activeTab !== null
+    ? notes.filter(n => n.tabId === activeTab)
+    : notes.filter(n => n.tabId === null);
+
+  const pinned  = visibleNotes.filter(n => n.isPinned);
+  const regular = visibleNotes.filter(n => !n.isPinned);
+  const all     = [...pinned, ...regular].slice(0, 5);
+
+  const handleAdd = async () => {
+    if (!noteContent.trim()) { toast({ title: "תוכן הפתק נדרש", variant: "destructive" }); return; }
+    setSaving(true);
+    try {
+      await onAdd(noteTitle.trim(), noteContent.trim(), activeTab);
+      setNoteTitle(""); setNoteContent(""); setOpen(false);
+      toast({ title: "פתק נוצר ✓" });
+    } catch { toast({ title: "שגיאה", variant: "destructive" }); }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <div className={SECTION_STYLE}>
+      <div className={SECTION_HEAD}>
+        <div className={SECTION_TITLE}>
+          <div className={ICON_WRAP("bg-yellow-100")}>
+            <StickyNote className="w-4 h-4 text-yellow-600" />
+          </div>
+          פתקים
+        </div>
+        <Link href={`${BASE}/notes`}>
+          <span className={GO_LINK}>לכל הפתקים <ArrowLeft className="w-3 h-3" /></span>
+        </Link>
+      </div>
+
+      <div className="px-5 flex-1 space-y-3 pb-4">
+        {/* Tabs */}
+        {tabs.length > 0 && (
+          <div className="flex gap-1.5 flex-wrap">
+            {tabs.map(tab => (
+              <button key={tab.id} onClick={() => setActiveTab(tab.id)}
+                className={cn(
+                  "flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium border transition-all",
+                  activeTab === tab.id
+                    ? "border-transparent text-white shadow-sm"
+                    : "border-border text-muted-foreground hover:border-primary/30"
+                )}
+                style={activeTab === tab.id ? { background: tab.color || "#6366f1" } : {}}>
+                <span className="w-1.5 h-1.5 rounded-full inline-block shrink-0"
+                  style={{ background: tab.color || "#94a3b8", opacity: activeTab === tab.id ? 0 : 1 }} />
+                {tab.name}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Notes list */}
+        {all.length === 0 ? (
+          <div className="text-center py-6">
+            <BookOpen className="w-8 h-8 mx-auto mb-2 text-muted-foreground/20" />
+            <p className="text-sm text-muted-foreground">אין פתקים בטאב זה</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {all.map(note => (
+              <div key={note.id}
+                className="rounded-xl p-3 border border-border/40 hover:border-border transition-colors relative"
+                style={{ background: note.color ? `${note.color}40` : "#fef9c340" }}>
+                {note.isPinned && (
+                  <Pin className="w-3 h-3 text-muted-foreground absolute top-2.5 left-2.5 rotate-45" />
+                )}
+                {note.title && (
+                  <p className="text-sm font-semibold mb-0.5 pr-1 line-clamp-1">{note.title}</p>
+                )}
+                <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
+                  {note.content || <span className="italic">פתק ריק</span>}
+                </p>
+              </div>
+            ))}
+            {visibleNotes.length > 5 && (
+              <p className="text-xs text-muted-foreground text-center">ועוד {visibleNotes.length - 5} פתקים...</p>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Quick-add */}
+      <div className="border-t border-border/50 px-4 py-3">
+        {open ? (
+          <div className="space-y-2">
+            <Input value={noteTitle} onChange={e => setNoteTitle(e.target.value)}
+              placeholder="כותרת (אופציונלי)..." className="rounded-lg h-8 text-sm" autoFocus />
+            <div className="flex gap-2 items-start">
+              <textarea value={noteContent} onChange={e => setNoteContent(e.target.value)}
+                placeholder="תוכן הפתק..."
+                rows={2}
+                className="flex-1 text-sm rounded-lg border border-input bg-background px-3 py-1.5 resize-none focus:outline-none focus:ring-1 focus:ring-ring" />
+              <div className="flex flex-col gap-1.5">
+                <button onClick={handleAdd} disabled={saving}
+                  className="p-1.5 rounded-lg bg-yellow-500 text-white hover:bg-yellow-600 transition-colors">
+                  {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                </button>
+                <button onClick={() => setOpen(false)} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground transition-colors text-xs">ביטול</button>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <button onClick={() => setOpen(true)}
+            className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-yellow-600 transition-colors w-full">
+            <Plus className="w-4 h-4" /> כתוב פתק חדש
+          </button>
+        )}
+      </div>
     </div>
   );
 }
