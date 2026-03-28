@@ -108,6 +108,55 @@ router.get("/latest", async (req, res) => {
   }
 });
 
+// ── GET /api/asset-balances/net-worth-history ─────────────────────
+/**
+ * Returns the net worth timeline computed from all balance snapshots.
+ * For each unique snapshot date, computes total assets and total liabilities
+ * as of that date (using the latest snapshot on or before each date).
+ * Response: { date, totalAssets, totalLiabilities, netWorth }[]
+ */
+router.get("/net-worth-history", async (req, res) => {
+  try {
+    const allItems = await db
+      .select()
+      .from(assetsTable)
+      .where(and(eq(assetsTable.userId, UID), eq(assetsTable.isActive, true)));
+
+    const allSnaps = await db
+      .select()
+      .from(assetBalancesTable)
+      .where(eq(assetBalancesTable.userId, UID));
+
+    if (allSnaps.length === 0) { res.json([]); return; }
+
+    const LIAB_TYPES = new Set([
+      "mortgage", "bank_loan", "private_loan", "credit_balance", "other_liability",
+    ]);
+
+    const dates = [...new Set(allSnaps.map(s => s.recordedAt))].sort();
+
+    const history = dates.map(date => {
+      let totalAssets = 0;
+      let totalLiabilities = 0;
+
+      for (const item of allItems) {
+        const snap = allSnaps
+          .filter(s => s.assetId === item.id && s.recordedAt <= date)
+          .sort((a, b) => b.recordedAt.localeCompare(a.recordedAt))[0];
+        const val = snap ? parseNum(snap.balance) : parseNum(item.currentAmount);
+        if (LIAB_TYPES.has(item.type)) totalLiabilities += val;
+        else totalAssets += val;
+      }
+
+      return { date, totalAssets, totalLiabilities, netWorth: totalAssets - totalLiabilities };
+    });
+
+    res.json(history);
+  } catch (err) {
+    serverError(req, res, err, "Failed to get net worth history");
+  }
+});
+
 // ── GET /api/asset-balances/:id ───────────────────────────────────
 router.get("/:id", async (req, res) => {
   try {
