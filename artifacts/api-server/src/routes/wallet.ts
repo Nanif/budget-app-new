@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, cashEnvelopeTransactionsTable, fundsTable, insertCashEnvelopeTransactionSchema } from "@workspace/db";
+import { db, cashEnvelopeTransactionsTable, fundsTable } from "@workspace/db";
 import { eq, and, gte, lte, desc, sum, sql } from "drizzle-orm";
 
 const router = Router();
@@ -21,7 +21,9 @@ router.get("/", async (req, res) => {
     if (month) {
       const [y, m] = String(month).split("-");
       const start = `${y}-${m}-01`;
-      const end = `${y}-${m}-31`;
+      // Use actual last day of the month (avoids "2026-02-31" errors for Feb/30-day months)
+      const lastDay = new Date(parseInt(y), parseInt(m), 0).getDate();
+      const end = `${y}-${m}-${String(lastDay).padStart(2, "0")}`;
       conditions.push(gte(cashEnvelopeTransactionsTable.date, start));
       conditions.push(lte(cashEnvelopeTransactionsTable.date, end));
     }
@@ -74,14 +76,28 @@ router.get("/summary", async (req, res) => {
 // POST /api/wallet
 router.post("/", async (req, res) => {
   try {
-    const raw = { ...req.body, userId: DEFAULT_USER_ID, budgetYearId: getBYID(req) };
-    const body = Object.fromEntries(Object.entries(raw).filter(([_, v]) => v !== null && v !== ""));
-    const parsed = insertCashEnvelopeTransactionSchema.safeParse(body);
-    if (!parsed.success) {
-      res.status(400).json({ error: "Invalid input", details: parsed.error.issues });
+    const { fundId, type, amount, description, date } = req.body;
+
+    if (!type || amount === undefined || amount === null || !date) {
+      res.status(400).json({ error: "חסרים שדות: type, amount, date" });
       return;
     }
-    const [created] = await db.insert(cashEnvelopeTransactionsTable).values(parsed.data).returning();
+    const amountNum = parseFloat(String(amount));
+    if (isNaN(amountNum) || amountNum <= 0) {
+      res.status(400).json({ error: "סכום לא תקין" });
+      return;
+    }
+
+    const [created] = await db.insert(cashEnvelopeTransactionsTable).values({
+      userId: DEFAULT_USER_ID,
+      budgetYearId: getBYID(req),
+      fundId: fundId ? parseInt(String(fundId)) : null,
+      type: String(type),
+      amount: String(amountNum),
+      description: description ? String(description) : (type === "deposit" ? "הפקדה" : "משיכה"),
+      date: String(date),
+    }).returning();
+
     res.status(201).json({ ...created, amount: parseNum(created.amount) });
   } catch (err) {
     req.log.error({ err }, "Failed to create wallet transaction");
