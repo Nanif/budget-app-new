@@ -9,6 +9,7 @@ import NotFound from "@/pages/not-found";
 import Home from "@/pages/Home";
 import Budget from "@/pages/Budget";
 import CashWallet from "@/pages/CashWallet";
+import FixedExpenses from "@/pages/FixedExpenses";
 import AnnualExpenses from "@/pages/AnnualExpenses";
 import LargeExpenses from "@/pages/LargeExpenses";
 import ExternalFunds from "@/pages/ExternalFunds";
@@ -39,6 +40,7 @@ function Router() {
         <Route path="/" component={Home} />
         <Route path="/budget" component={Budget} />
         <Route path="/cash" component={CashWallet} />
+        <Route path="/fixed" component={FixedExpenses} />
         <Route path="/annual" component={AnnualExpenses} />
         <Route path="/large" component={LargeExpenses} />
         <Route path="/external" component={ExternalFunds} />

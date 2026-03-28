@@ -21,7 +21,7 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 A full Hebrew RTL personal budget management web app built around the user's specific budget workflow.
 
 ### Fund Behavior System (5 types)
-1. `fixed_monthly` — קבועות: fixed monthly expenses, framework only
+1. `fixed_monthly` — קבועות: fixed monthly expenses, with full detail page at `/fixed`
 2. `cash_monthly` — שוטף: monthly cash envelope, deposit-tracking wallet
 3. `annual_categorized` — מעגל השנה: annual budget with category tracking
 4. `annual_large` — הוצאות גדולות: large purchases, annual budget
@@ -33,6 +33,7 @@ A full Hebrew RTL personal budget management web app built around the user's spe
 | `/` | Home | Dashboard — fund status overview |
 | `/budget` | Budget | Annual budget setup, fund definitions |
 | `/cash` | CashWallet | Monthly cash wallet deposits/withdrawals |
+| `/fixed` | FixedExpenses | Fixed monthly expense items (CRUD + totals) |
 | `/annual` | AnnualExpenses | מעגל השנה with categories |
 | `/large` | LargeExpenses | Large purchase tracking |
 | `/external` | ExternalFunds | Off-budget (non_budget) funds |

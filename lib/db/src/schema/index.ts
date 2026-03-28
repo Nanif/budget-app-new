@@ -14,3 +14,4 @@ export * from "./noteTabs";
 export * from "./notes";
 export * from "./tasks";
 export * from "./systemSettings";
+export * from "./fixedItems";

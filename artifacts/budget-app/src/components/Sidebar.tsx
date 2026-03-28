@@ -2,7 +2,7 @@ import { Link, useLocation } from "wouter";
 import {
   Home, CalendarDays, Wallet, ShoppingBag, Calendar, PiggyBank,
   Landmark, HeartHandshake, CreditCard, StickyNote, CheckSquare,
-  Settings, Tag, Receipt, Scale,
+  Settings, Tag, Receipt, Scale, ListChecks,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { YearSwitcher } from "@/components/YearSwitcher";
@@ -18,6 +18,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/", label: "דף בית", icon: Home },
   { href: "/budget", label: "תכנון תקציב", icon: CalendarDays, section: "קופות" },
   { href: "/cash", label: "קופת שוטף", icon: Wallet, section: "קופות" },
+  { href: "/fixed", label: "קבועות", icon: ListChecks, section: "קופות" },
   { href: "/annual", label: "מעגל השנה", icon: Calendar, section: "קופות" },
   { href: "/large", label: "הוצאות גדולות", icon: ShoppingBag, section: "קופות" },
   { href: "/external", label: "קופות חיצוניות", icon: PiggyBank, section: "קופות" },

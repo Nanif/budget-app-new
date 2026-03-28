@@ -73,6 +73,7 @@ import noteTabsRouter      from "./noteTabs";
 import remindersRouter     from "./reminders";
 import dashboardRouter     from "./dashboard";
 import settingsRouter      from "./settings";
+import fixedItemsRouter    from "./fixedItems";
 
 const router = Router();
 
@@ -121,6 +122,9 @@ router.use("/tasks",     remindersRouter);        // alias
 
 // Dashboard & analytics
 router.use("/dashboard", dashboardRouter);
+
+// Fixed items (קבועות)
+router.use("/fixed-items", fixedItemsRouter);
 
 // Settings
 router.use("/settings", settingsRouter);

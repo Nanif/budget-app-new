@@ -783,10 +783,11 @@ function FundCard({ fund, spent, onEdit, onDelete, dimmed = false }: {
   const statusBg    = status === "over" ? "bg-rose-100 text-rose-700" : status === "warn" ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700";
 
   /* route to detail page */
-  const detailPath = fund.fundBehavior === "cash_monthly"       ? `/cash`
-    : fund.fundBehavior === "annual_categorized" ? `/annual`
-    : fund.fundBehavior === "annual_large"        ? `/large`
-    : fund.fundBehavior === "non_budget"          ? `/external`
+  const detailPath = fund.fundBehavior === "cash_monthly"        ? `/cash`
+    : fund.fundBehavior === "fixed_monthly"       ? `/fixed`
+    : fund.fundBehavior === "annual_categorized"  ? `/annual`
+    : fund.fundBehavior === "annual_large"         ? `/large`
+    : fund.fundBehavior === "non_budget"           ? `/external`
     : `/budget`;
 
   return (
