@@ -15,6 +15,8 @@ import Savings from "@/pages/Savings";
 import Notes from "@/pages/Notes";
 import Reminders from "@/pages/Reminders";
 import Settings from "@/pages/Settings";
+import Funds from "@/pages/Funds";
+import Categories from "@/pages/Categories";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -40,6 +42,8 @@ function Router() {
         <Route path="/notes" component={Notes} />
         <Route path="/reminders" component={Reminders} />
         <Route path="/settings" component={Settings} />
+        <Route path="/funds" component={Funds} />
+        <Route path="/categories" component={Categories} />
         <Route component={NotFound} />
       </Switch>
     </Layout>

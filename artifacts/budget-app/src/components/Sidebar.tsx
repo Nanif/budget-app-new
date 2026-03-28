@@ -1,38 +1,84 @@
 import { Link, useLocation } from "wouter";
-import { 
-  Home, 
-  LayoutDashboard, 
-  Receipt, 
-  Landmark, 
-  HeartHandshake, 
-  CreditCard, 
-  PiggyBank, 
-  StickyNote, 
-  CheckSquare, 
+import {
+  Home,
+  LayoutDashboard,
+  Receipt,
+  Landmark,
+  HeartHandshake,
+  CreditCard,
+  PiggyBank,
+  StickyNote,
+  CheckSquare,
   Settings,
-  Wallet
+  Wallet,
+  Coins,
+  Tag,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const NAV_ITEMS = [
+type NavItem = {
+  href: string;
+  label: string;
+  icon: React.ElementType;
+  section?: string;
+};
+
+const NAV_ITEMS: NavItem[] = [
   { href: "/", label: "דף בית", icon: Home },
   { href: "/dashboard", label: "דשבורד", icon: LayoutDashboard },
-  { href: "/expenses", label: "הוצאות", icon: Receipt },
-  { href: "/incomes", label: "הכנסות", icon: Landmark },
-  { href: "/charity", label: "צדקה ומעשרות", icon: HeartHandshake },
-  { href: "/debts", label: "חובות", icon: CreditCard },
-  { href: "/savings", label: "חסכונות ונכסים", icon: PiggyBank },
-  { href: "/notes", label: "פתקים", icon: StickyNote },
-  { href: "/reminders", label: "תזכורות ומשימות", icon: CheckSquare },
-  { href: "/settings", label: "הגדרות", icon: Settings },
+  { href: "/expenses", label: "הוצאות", icon: Receipt, section: "מעקב" },
+  { href: "/incomes", label: "הכנסות", icon: Landmark, section: "מעקב" },
+  { href: "/charity", label: "צדקה ומעשרות", icon: HeartHandshake, section: "מעקב" },
+  { href: "/debts", label: "חובות", icon: CreditCard, section: "מעקב" },
+  { href: "/savings", label: "חסכונות ונכסים", icon: PiggyBank, section: "מעקב" },
+  { href: "/notes", label: "פתקים", icon: StickyNote, section: "כלים" },
+  { href: "/reminders", label: "תזכורות ומשימות", icon: CheckSquare, section: "כלים" },
+  { href: "/funds", label: "קופות", icon: Coins, section: "הגדרות" },
+  { href: "/categories", label: "קטגוריות", icon: Tag, section: "הגדרות" },
+  { href: "/settings", label: "הגדרות מערכת", icon: Settings, section: "הגדרות" },
 ];
 
 export function Sidebar() {
   const [location] = useLocation();
 
+  // Group by section
+  const sections: Record<string, NavItem[]> = {};
+  const topItems: NavItem[] = [];
+  for (const item of NAV_ITEMS) {
+    if (!item.section) { topItems.push(item); continue; }
+    if (!sections[item.section]) sections[item.section] = [];
+    sections[item.section].push(item);
+  }
+
+  const NavLink = ({ item }: { item: NavItem }) => {
+    const isActive = location === item.href;
+    const Icon = item.icon;
+    return (
+      <Link key={item.href} href={item.href} className="block">
+        <div className={cn(
+          "flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 group cursor-pointer",
+          isActive
+            ? "bg-primary text-primary-foreground font-medium shadow-md shadow-primary/20"
+            : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+        )}>
+          <Icon className={cn(
+            "w-4 h-4 shrink-0 transition-transform duration-200",
+            isActive ? "scale-110" : "group-hover:scale-110 text-muted-foreground group-hover:text-primary"
+          )} />
+          <span className="text-sm">{item.label}</span>
+        </div>
+      </Link>
+    );
+  };
+
+  const SectionLabel = ({ label }: { label: string }) => (
+    <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 px-4 pt-4 pb-1.5">{label}</p>
+  );
+
   return (
     <aside className="fixed top-0 bottom-0 start-0 z-40 w-64 border-e border-sidebar-border bg-sidebar pt-6 pb-4 flex flex-col hidden md:flex shadow-xl shadow-black/5">
-      <div className="px-6 mb-8 flex items-center gap-3">
+      {/* Logo */}
+      <div className="px-6 mb-6 flex items-center gap-3">
         <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-teal-400 flex items-center justify-center text-white shadow-lg shadow-primary/20">
           <Wallet className="w-6 h-6" />
         </div>
@@ -42,32 +88,19 @@ export function Sidebar() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-4 space-y-1">
-        {NAV_ITEMS.map((item) => {
-          const isActive = location === item.href;
-          const Icon = item.icon;
-          
-          return (
-            <Link key={item.href} href={item.href} className="block">
-              <div
-                className={cn(
-                  "flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group cursor-pointer",
-                  isActive 
-                    ? "bg-primary text-primary-foreground font-medium shadow-md shadow-primary/20" 
-                    : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                )}
-              >
-                <Icon className={cn(
-                  "w-5 h-5 transition-transform duration-200", 
-                  isActive ? "scale-110" : "group-hover:scale-110 text-muted-foreground group-hover:text-primary"
-                )} />
-                <span>{item.label}</span>
-              </div>
-            </Link>
-          );
-        })}
+      <div className="flex-1 overflow-y-auto px-4 space-y-0.5">
+        {/* Top-level items */}
+        {topItems.map(item => <NavLink key={item.href} item={item} />)}
+
+        {/* Sections */}
+        {Object.entries(sections).map(([section, items]) => (
+          <div key={section}>
+            <SectionLabel label={section} />
+            {items.map(item => <NavLink key={item.href} item={item} />)}
+          </div>
+        ))}
       </div>
-      
+
       <div className="px-6 mt-auto">
         <div className="p-4 rounded-xl bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/10">
           <p className="text-xs text-center text-primary font-medium">Clear Budget v1.0</p>
