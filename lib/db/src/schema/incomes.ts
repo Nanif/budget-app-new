@@ -1,22 +1,21 @@
-import { pgTable, serial, integer, text, numeric, date, boolean, jsonb, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, serial, integer, text, numeric, date, timestamp } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { usersTable } from "./users";
 import { budgetYearsTable } from "./budgetYears";
-import { categoriesTable } from "./categories";
 
+/**
+ * entry_type: 'income' = regular income, 'work_deduction' = work expense that reduces net income
+ */
 export const incomesTable = pgTable("incomes", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
   budgetYearId: integer("budget_year_id").notNull().references(() => budgetYearsTable.id, { onDelete: "cascade" }),
-  categoryId: integer("category_id").references(() => categoriesTable.id, { onDelete: "set null" }),
   amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
   source: text("source").notNull(),
   description: text("description").notNull().default(""),
   date: date("date").notNull(),
-  isTaxable: boolean("is_taxable").notNull().default(true),
-  isRecurring: boolean("is_recurring").notNull().default(false),
-  recurringRule: jsonb("recurring_rule"),
+  entryType: text("entry_type").notNull().default("income"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });

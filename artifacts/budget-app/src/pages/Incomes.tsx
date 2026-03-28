@@ -1,23 +1,20 @@
 import { useState, useEffect } from "react";
 import { PageHeader } from "@/components/PageHeader";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { formatILS, formatILDate } from "@/lib/format";
-import { Plus, Edit2, Trash2, Search, Landmark } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
+import { Plus, Trash2, Pencil, Landmark, ArrowUpRight, ArrowDownRight, Check, X, Loader2 } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 const API = `${BASE}/api`;
 
-type Category = { id: number; name: string; color: string; type: string };
-type Income = {
-  id: number; userId: number; budgetYearId: number; categoryId: number | null;
-  amount: number; source: string; description: string; date: string;
-  isTaxable: boolean; isRecurring: boolean; categoryName?: string; categoryColor?: string;
-};
+type Income = { id: number; amount: number; source: string; description: string; date: string; entryType: string };
+type Summary = { totalIncome: number; totalDeductions: number; netIncome: number };
 
 async function apiFetch(path: string, opts?: RequestInit) {
   const r = await fetch(`${API}${path}`, { headers: { "Content-Type": "application/json" }, ...opts });
@@ -25,181 +22,231 @@ async function apiFetch(path: string, opts?: RequestInit) {
   return r.status === 204 ? null : r.json();
 }
 
+function fmt(n: number) {
+  return new Intl.NumberFormat("he-IL", { style: "currency", currency: "ILS", maximumFractionDigits: 0 }).format(n);
+}
+
+type FormState = { amount: string; source: string; description: string; date: string; entryType: string };
+const DEFAULT_FORM: FormState = { amount: "", source: "", description: "", date: "", entryType: "income" };
+
 export default function Incomes() {
   const { toast } = useToast();
-  const [incomes, setIncomes] = useState<Income[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingItem, setEditingItem] = useState<Income | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
+  const [entries, setEntries] = useState<Income[]>([]);
+  const [summary, setSummary] = useState<Summary>({ totalIncome: 0, totalDeductions: 0, netIncome: 0 });
+  const [loading, setLoading] = useState(true);
+  const [tab, setTab] = useState<"all" | "income" | "work_deduction">("all");
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editEntry, setEditEntry] = useState<Income | null>(null);
+  const [form, setForm] = useState<FormState>(DEFAULT_FORM);
+  const [saving, setSaving] = useState(false);
+  const [deleteId, setDeleteId] = useState<number | null>(null);
 
-  const incomeCategories = categories.filter(c => c.type === "income" || c.type === "both");
-
-  const loadData = async () => {
-    setIsLoading(true);
+  const load = async () => {
+    setLoading(true);
     try {
-      const [inc, cats] = await Promise.all([apiFetch("/incomes"), apiFetch("/categories")]);
-      setIncomes(inc); setCategories(cats);
+      const [all, summ] = await Promise.all([apiFetch("/incomes"), apiFetch("/incomes/summary")]);
+      setEntries(all);
+      setSummary(summ);
     } catch { toast({ title: "שגיאה בטעינה", variant: "destructive" }); }
-    finally { setIsLoading(false); }
+    finally { setLoading(false); }
+  };
+  useEffect(() => { load(); }, []);
+
+  const openCreate = (type = "income") => {
+    setEditEntry(null);
+    setForm({ ...DEFAULT_FORM, entryType: type, date: new Date().toISOString().split("T")[0] });
+    setDialogOpen(true);
+  };
+  const openEdit = (e: Income) => {
+    setEditEntry(e);
+    setForm({ amount: String(e.amount), source: e.source, description: e.description, date: e.date, entryType: e.entryType });
+    setDialogOpen(true);
   };
 
-  useEffect(() => { loadData(); }, []);
-
-  const filteredIncomes = incomes.filter(i =>
-    i.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    i.source.includes(searchTerm) ||
-    (i.categoryName || "").includes(searchTerm)
-  );
-
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setIsSaving(true);
-    const formData = new FormData(e.currentTarget);
-    const categoryId = formData.get("categoryId");
-    const data = {
-      amount: Number(formData.get("amount")),
-      source: formData.get("source") as string,
-      description: formData.get("description") as string,
-      date: formData.get("date") as string,
-      categoryId: categoryId ? Number(categoryId) : null,
-      isRecurring: formData.get("isRecurring") === "on",
-    };
+  const handleSave = async () => {
+    if (!form.amount || parseFloat(form.amount) <= 0) { toast({ title: "הכנס סכום תקין", variant: "destructive" }); return; }
+    if (!form.source.trim()) { toast({ title: "מקור נדרש", variant: "destructive" }); return; }
+    setSaving(true);
     try {
-      if (editingItem) {
-        await apiFetch(`/incomes/${editingItem.id}`, { method: "PUT", body: JSON.stringify(data) });
-        toast({ title: "עודכן בהצלחה" });
+      const payload = { amount: parseFloat(form.amount), source: form.source.trim(), description: form.description, date: form.date || new Date().toISOString().split("T")[0], entryType: form.entryType };
+      if (editEntry) {
+        const updated = await apiFetch(`/incomes/${editEntry.id}`, { method: "PUT", body: JSON.stringify(payload) });
+        setEntries(prev => prev.map(e => e.id === editEntry.id ? updated : e));
+        toast({ title: "עודכן" });
       } else {
-        await apiFetch("/incomes", { method: "POST", body: JSON.stringify(data) });
-        toast({ title: "נוצר בהצלחה" });
+        const created = await apiFetch("/incomes", { method: "POST", body: JSON.stringify(payload) });
+        setEntries(prev => [created, ...prev]);
+        toast({ title: form.entryType === "income" ? "הכנסה נרשמה" : "ניכוי נרשם" });
       }
-      setIsDialogOpen(false);
-      await loadData();
-    } catch { toast({ title: "שגיאה", variant: "destructive" }); }
-    finally { setIsSaving(false); }
+      const summ = await apiFetch("/incomes/summary");
+      setSummary(summ);
+      setDialogOpen(false);
+    } catch { toast({ title: "שגיאה בשמירה", variant: "destructive" }); }
+    finally { setSaving(false); }
   };
 
-  const handleDelete = async (id: number) => {
-    if (!confirm("האם אתה בטוח שברצונך למחוק הכנסה זו?")) return;
+  const handleDelete = async () => {
+    if (!deleteId) return;
     try {
-      await apiFetch(`/incomes/${id}`, { method: "DELETE" });
-      toast({ title: "נמחק בהצלחה" });
-      await loadData();
+      await apiFetch(`/incomes/${deleteId}`, { method: "DELETE" });
+      setEntries(prev => prev.filter(e => e.id !== deleteId));
+      const summ = await apiFetch("/incomes/summary");
+      setSummary(summ);
+      toast({ title: "נמחק" });
     } catch { toast({ title: "שגיאה", variant: "destructive" }); }
+    finally { setDeleteId(null); }
   };
+
+  const filtered = tab === "all" ? entries : entries.filter(e => e.entryType === tab);
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title="הכנסות"
-        description="מעקב אחר כל מקורות ההכנסה שלך"
-        action={
-          <Button onClick={() => { setEditingItem(null); setIsDialogOpen(true); }} className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-lg shadow-emerald-600/20 gap-2">
-            <Plus className="w-4 h-4" />הוסף הכנסה
+      <PageHeader title="הכנסות" description="תיעוד הכנסות וניכויי הוצאות עבודה — חישוב הכנסה נטו">
+        <div className="flex gap-2">
+          <Button onClick={() => openCreate("work_deduction")} variant="outline"
+            className="rounded-xl gap-2 border-rose-200 text-rose-600 hover:bg-rose-50">
+            <ArrowDownRight className="w-4 h-4" /> ניכוי הוצאות עבודה
           </Button>
-        }
-      />
+          <Button onClick={() => openCreate("income")} className="rounded-xl gap-2">
+            <Plus className="w-4 h-4" /> הכנסה חדשה
+          </Button>
+        </div>
+      </PageHeader>
 
-      <div className="bg-card rounded-2xl shadow-sm border border-border/50 overflow-hidden">
-        <div className="p-4 border-b border-border/50 bg-muted/30">
-          <div className="relative w-full max-w-sm">
-            <Search className="absolute start-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input placeholder="חיפוש הכנסה..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="ps-9 bg-background border-border/50 rounded-xl" />
-          </div>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm text-start">
-            <thead className="bg-muted/50 text-muted-foreground text-xs uppercase font-semibold">
-              <tr>
-                <th className="px-6 py-4">תאריך</th>
-                <th className="px-6 py-4">מקור</th>
-                <th className="px-6 py-4">קטגוריה</th>
-                <th className="px-6 py-4">תיאור</th>
-                <th className="px-6 py-4 text-end">סכום</th>
-                <th className="px-6 py-4 w-24">פעולות</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border/50">
-              {isLoading ? (
-                <tr><td colSpan={6} className="px-6 py-8 text-center text-muted-foreground">טוען...</td></tr>
-              ) : filteredIncomes.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-muted-foreground">
-                    <div className="flex flex-col items-center"><Landmark className="w-12 h-12 mb-3 text-muted-foreground/30" /><p>לא נמצאו הכנסות</p></div>
-                  </td>
-                </tr>
-              ) : filteredIncomes.map((income) => (
-                <tr key={income.id} className="hover:bg-muted/30 transition-colors group">
-                  <td className="px-6 py-4 whitespace-nowrap">{formatILDate(income.date)}</td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className="bg-secondary text-secondary-foreground px-2.5 py-1 rounded-md text-xs font-medium border border-border">{income.source}</span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {income.categoryName ? (
-                      <span className="px-2.5 py-1 rounded-md text-xs font-medium text-white" style={{ backgroundColor: income.categoryColor || '#22c55e' }}>{income.categoryName}</span>
-                    ) : <span className="text-muted-foreground text-xs">—</span>}
-                  </td>
-                  <td className="px-6 py-4 font-medium">{income.description}</td>
-                  <td className="px-6 py-4 text-end font-bold text-emerald-600" dir="ltr">+{formatILS(income.amount)}</td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button onClick={() => { setEditingItem(income); setIsDialogOpen(true); }} className="text-muted-foreground hover:text-primary p-1 rounded-md hover:bg-primary/10"><Edit2 className="w-4 h-4" /></button>
-                      <button onClick={() => handleDelete(income.id)} className="text-muted-foreground hover:text-destructive p-1 rounded-md hover:bg-destructive/10"><Trash2 className="w-4 h-4" /></button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      <div className="grid grid-cols-3 gap-4">
+        {[
+          { icon: ArrowUpRight, color: "text-emerald-600", bg: "bg-emerald-50/50 border-emerald-200/50", label: 'סה"כ הכנסות', value: summary.totalIncome },
+          { icon: ArrowDownRight, color: "text-rose-600", bg: "bg-rose-50/50 border-rose-200/50", label: "ניכויי עבודה", value: summary.totalDeductions },
+          { icon: Landmark, color: "text-primary", bg: "bg-primary/5 border-primary/20", label: "הכנסה נטו", value: summary.netIncome },
+        ].map(s => (
+          <Card key={s.label} className={cn("rounded-2xl", s.bg)}>
+            <CardContent className="pt-5 text-center">
+              <s.icon className={cn("w-6 h-6 mx-auto mb-2", s.color)} />
+              <p className={cn("text-2xl font-display font-bold", s.color)}>{fmt(s.value)}</p>
+              <p className="text-xs text-muted-foreground mt-1">{s.label}</p>
+            </CardContent>
+          </Card>
+        ))}
       </div>
 
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-[460px]" dir="rtl">
-          <form onSubmit={handleSubmit}>
-            <DialogHeader><DialogTitle>{editingItem ? "עריכת הכנסה" : "הוספת הכנסה חדשה"}</DialogTitle></DialogHeader>
-            <div className="grid gap-4 py-6">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <Label>סכום (₪)</Label>
-                  <Input name="amount" type="number" step="0.01" required defaultValue={editingItem?.amount} className="rounded-xl" dir="ltr" />
+      <div className="flex gap-1 p-1 bg-muted/50 rounded-xl w-fit">
+        {[{ key: "all", label: "הכל" }, { key: "income", label: "הכנסות" }, { key: "work_deduction", label: "ניכויים" }].map(t => (
+          <button key={t.key} onClick={() => setTab(t.key as any)}
+            className={cn("px-4 py-1.5 rounded-lg text-sm font-medium transition-all",
+              tab === t.key ? "bg-white shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"
+            )}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {loading ? (
+        <div className="space-y-2">{[1,2,3].map(i => <div key={i} className="h-16 bg-muted animate-pulse rounded-xl" />)}</div>
+      ) : filtered.length === 0 ? (
+        <div className="text-center py-10 text-muted-foreground border-2 border-dashed rounded-2xl">
+          <Landmark className="w-8 h-8 mx-auto mb-2 opacity-30" />
+          <p className="text-sm">אין רשומות</p>
+          <Button onClick={() => openCreate()} variant="outline" size="sm" className="mt-3 rounded-xl gap-1.5">
+            <Plus className="w-3.5 h-3.5" /> הוסף ראשון
+          </Button>
+        </div>
+      ) : (
+        <div className="space-y-1.5">
+          {filtered.map(entry => (
+            <div key={entry.id} className="flex items-center gap-3 p-4 rounded-2xl bg-card border border-border/60 hover:border-border transition-all group">
+              <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center shrink-0",
+                entry.entryType === "income" ? "bg-emerald-100" : "bg-rose-100"
+              )}>
+                {entry.entryType === "income" ? <ArrowUpRight className="w-5 h-5 text-emerald-600" /> : <ArrowDownRight className="w-5 h-5 text-rose-600" />}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold truncate">{entry.source}</p>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <p className="text-xs text-muted-foreground">{new Date(entry.date).toLocaleDateString("he-IL")}</p>
+                  {entry.description && <p className="text-xs text-muted-foreground truncate">· {entry.description}</p>}
+                  <span className={cn("text-xs px-2 py-0.5 rounded-full font-medium",
+                    entry.entryType === "income" ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-700"
+                  )}>
+                    {entry.entryType === "income" ? "הכנסה" : "ניכוי"}
+                  </span>
                 </div>
-                <div className="grid gap-2">
-                  <Label>תאריך</Label>
-                  <Input name="date" type="date" required defaultValue={editingItem?.date?.split('T')[0] || new Date().toISOString().split('T')[0]} className="rounded-xl" />
-                </div>
               </div>
-              <div className="grid gap-2">
-                <Label>מקור</Label>
-                <Input name="source" required placeholder="לדוגמה: משכורת ינואר" defaultValue={editingItem?.source} className="rounded-xl" />
-              </div>
-              <div className="grid gap-2">
-                <Label>קטגוריה</Label>
-                <Select name="categoryId" defaultValue={editingItem?.categoryId?.toString() || ""}>
-                  <SelectTrigger className="rounded-xl" dir="rtl"><SelectValue placeholder="בחר קטגוריה" /></SelectTrigger>
-                  <SelectContent dir="rtl">
-                    {incomeCategories.map(c => <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid gap-2">
-                <Label>תיאור (אופציונלי)</Label>
-                <Input name="description" defaultValue={editingItem?.description} className="rounded-xl" />
-              </div>
-              <div className="flex items-center gap-2">
-                <input type="checkbox" id="isRecurring" name="isRecurring" defaultChecked={editingItem?.isRecurring} className="w-4 h-4 rounded border-gray-300 text-emerald-600" />
-                <Label htmlFor="isRecurring" className="cursor-pointer">הכנסה קבועה (חוזרת)</Label>
+              <p className={cn("text-lg font-display font-bold tabular-nums",
+                entry.entryType === "income" ? "text-emerald-600" : "text-rose-600"
+              )}>
+                {entry.entryType === "income" ? "+" : "−"}{fmt(entry.amount)}
+              </p>
+              <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <button onClick={() => openEdit(entry)} className="p-2 rounded-xl hover:bg-blue-50 text-muted-foreground hover:text-blue-600 transition-colors">
+                  <Pencil className="w-4 h-4" />
+                </button>
+                <button onClick={() => setDeleteId(entry.id)} className="p-2 rounded-xl hover:bg-rose-50 text-muted-foreground hover:text-rose-600 transition-colors">
+                  <Trash2 className="w-4 h-4" />
+                </button>
               </div>
             </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)} className="rounded-xl">ביטול</Button>
-              <Button type="submit" disabled={isSaving} className="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white">{isSaving ? "שומר..." : "שמור"}</Button>
-            </DialogFooter>
-          </form>
+          ))}
+        </div>
+      )}
+
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="max-w-sm rounded-2xl" dir="rtl">
+          <DialogHeader>
+            <DialogTitle>
+              {form.entryType === "income" ? (editEntry ? "עריכת הכנסה" : "הכנסה חדשה") : (editEntry ? "עריכת ניכוי" : "ניכוי הוצאות עבודה")}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="flex gap-2">
+              {[{ value: "income", label: "הכנסה", cls: "bg-emerald-600 hover:bg-emerald-700" }, { value: "work_deduction", label: "ניכוי", cls: "bg-rose-600 hover:bg-rose-700" }].map(t => (
+                <button key={t.value} type="button" onClick={() => setForm(p => ({ ...p, entryType: t.value }))}
+                  className={cn("flex-1 py-2 rounded-xl text-sm font-semibold transition-all",
+                    form.entryType === t.value ? `${t.cls} text-white` : "bg-muted text-muted-foreground"
+                  )}>
+                  {t.label}
+                </button>
+              ))}
+            </div>
+            <div className="space-y-1.5">
+              <Label className="font-semibold">{form.entryType === "income" ? "מקור הכנסה *" : "תיאור הניכוי *"}</Label>
+              <Input value={form.source} onChange={e => setForm(p => ({ ...p, source: e.target.value }))}
+                placeholder={form.entryType === "income" ? "משכורת, עבודה..." : "נסיעות, ציוד..."} className="rounded-xl" autoFocus />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="font-semibold">סכום (₪) *</Label>
+              <Input type="number" dir="ltr" value={form.amount}
+                onChange={e => setForm(p => ({ ...p, amount: e.target.value }))} placeholder="0" className="rounded-xl text-lg font-bold" />
+            </div>
+            <div className="grid grid-cols-1 gap-3">
+              <div className="space-y-1.5">
+                <Label className="font-semibold">תאריך</Label>
+                <Input type="date" value={form.date} onChange={e => setForm(p => ({ ...p, date: e.target.value }))} className="rounded-xl" dir="ltr" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="font-semibold">הערה</Label>
+                <Input value={form.description} onChange={e => setForm(p => ({ ...p, description: e.target.value }))}
+                  placeholder="פרטים נוספים..." className="rounded-xl" />
+              </div>
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setDialogOpen(false)} className="rounded-xl flex-1"><X className="w-4 h-4 ml-1" /> ביטול</Button>
+            <Button onClick={handleSave} disabled={saving} className="rounded-xl flex-1">
+              {saving ? <Loader2 className="w-4 h-4 animate-spin ml-1" /> : <Check className="w-4 h-4 ml-1" />} שמור
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!deleteId} onOpenChange={o => !o && setDeleteId(null)}>
+        <AlertDialogContent dir="rtl" className="rounded-2xl">
+          <AlertDialogHeader><AlertDialogTitle>מחק רשומה?</AlertDialogTitle><AlertDialogDescription>פעולה זו לא ניתנת לביטול.</AlertDialogDescription></AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-xl">ביטול</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="rounded-xl bg-rose-600 hover:bg-rose-700">מחק</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

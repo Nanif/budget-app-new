@@ -13,23 +13,55 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 - **API framework**: Express 5
 - **Database**: PostgreSQL + Drizzle ORM
 - **Validation**: Zod (`zod/v4`), `drizzle-zod`
-- **API codegen**: Orval (from OpenAPI spec)
 - **Build**: esbuild (CJS bundle)
 - **Frontend**: React + Vite + Tailwind + shadcn/ui + RTL + Hebrew
 
 ## Project: ניהול תקציב אישי (Personal Budget Manager)
 
-A full Hebrew RTL personal budget management web app with 10 modules:
-1. דף בית (Home) - Comprehensive home dashboard with 4 widgets: מעשרות, חובות, תזכורות, פתקים; quick-add for tasks & charity
-2. דשבורד (Dashboard) - Full annual budget dashboard: KPI cards, monthly area chart, fund status, category pie, annual summary, anomaly detection
-3. הוצאות (Expenses) - Full CRUD expense tracking
-4. הכנסות (Incomes) - Full CRUD income tracking
-5. צדקה ומעשרות (Charity) - Charitable giving tracker
-6. חובות (Debts) - Debt management (owed/owing)
-7. חסכונות ונכסים (Savings) - Savings goals and assets
-8. פתקים (Notes) - Sticky notes
-9. תזכורות ומשימות (Reminders) - Task manager with priorities
-10. הגדרות (Settings) - User preferences
+A full Hebrew RTL personal budget management web app built around the user's specific budget workflow.
+
+### Fund Behavior System (5 types)
+1. `fixed_monthly` — קבועות: fixed monthly expenses, framework only
+2. `cash_monthly` — שוטף: monthly cash envelope, deposit-tracking wallet
+3. `annual_categorized` — מעגל השנה: annual budget with category tracking
+4. `annual_large` — הוצאות גדולות: large purchases, annual budget
+5. `non_budget` — קופות חיצוניות: off-budget funds with depleting initial balance
+
+### Page/Route Structure
+| Route | Page | Description |
+|-------|------|-------------|
+| `/` | Home | Dashboard — fund status overview |
+| `/budget` | Budget | Annual budget setup, fund definitions |
+| `/cash` | CashWallet | Monthly cash wallet deposits/withdrawals |
+| `/annual` | AnnualExpenses | מעגל השנה with categories |
+| `/large` | LargeExpenses | Large purchase tracking |
+| `/external` | ExternalFunds | Off-budget (non_budget) funds |
+| `/incomes` | Incomes | Income + work deductions (net income) |
+| `/charity` | Charity | Tithe/charity with % of net income |
+| `/debts` | Debts | Debt management |
+| `/savings` | Savings | Savings goals and assets |
+| `/notes` | Notes | Sticky notes with tabs |
+| `/reminders` | Reminders | Task/reminder manager |
+| `/categories` | Categories | Expense categories |
+| `/settings` | Settings | System settings |
+
+### Key Architecture Decisions
+- **Single user**: All routes hardcode `DEFAULT_USER_ID = 1`, `DEFAULT_BUDGET_YEAR_ID = 1`
+- **Numeric fields**: Drizzle `numeric()` returns strings — always `parseFloat()` in frontend
+- **API base**: API server on port 8080, Vite dev at 24432 (nginx proxy at 80)
+- **DB migrations**: Direct SQL `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`
+- **Wallet**: `cashEnvelopeTransactionsTable` stores deposits/withdrawals for `cash_monthly` funds
+
+### API Routes
+- `GET/PUT /api/budget-year` — budget year config (totalBudget, tithePercentage)
+- `GET /api/funds?all=true` — all funds (active + inactive)
+- `GET /api/wallet?month=YYYY-MM&fundId=N` — wallet transactions + totals
+- `POST /api/wallet` — add wallet transaction (type: deposit|withdrawal)
+- `DELETE /api/wallet/:id` — delete transaction
+- `GET /api/expenses?fundId=N` — expenses filtered by fund
+- `GET /api/expenses/summary?fundId=N` — total + byCategory breakdown
+- `GET /api/incomes/summary` — totalIncome, totalDeductions, netIncome
+- `GET /api/charity` — all charity/tithe entries
 
 ## Structure
 
@@ -39,9 +71,6 @@ artifacts-monorepo/
 │   ├── budget-app/         # React+Vite frontend (previewPath: "/")
 │   └── api-server/         # Express API server
 ├── lib/
-│   ├── api-spec/           # OpenAPI spec + Orval codegen config
-│   ├── api-client-react/   # Generated React Query hooks
-│   ├── api-zod/            # Generated Zod schemas from OpenAPI
 │   └── db/                 # Drizzle ORM schema + DB connection
 ├── scripts/                # Utility scripts
 ├── pnpm-workspace.yaml
@@ -50,43 +79,30 @@ artifacts-monorepo/
 └── package.json
 ```
 
-## Database Schema
+## DB Schema (key tables)
 
-Tables: `expenses`, `incomes`, `charity`, `debts`, `savings`, `notes`, `reminders`, `settings`
+- `budget_years`: id, name, totalBudget, tithePercentage
+- `funds`: id, name, fundBehavior, colorClass, monthlyAllocation, annualAllocation, initialBalance, includeInBudget, displayOrder
+- `incomes`: id, amount, source, description, date, entryType (income|work_deduction)
+- `expenses`: id, amount, description, date, fundId, categoryId, paymentMethod
+- `cash_envelope_transactions`: id, fundId, type (deposit|withdrawal), amount, date, description
+- `charity`: id, amount, recipient, description, date, isTithe
 
-## TypeScript & Composite Projects
+## Development
 
-Every package extends `tsconfig.base.json` which sets `composite: true`. The root `tsconfig.json` lists all packages as project references.
+```bash
+# Start API server
+pnpm --filter @workspace/api-server run dev
 
-- **Always typecheck from the root** — run `pnpm run typecheck`
-- **`emitDeclarationOnly`** — we only emit `.d.ts` files during typecheck
+# Start frontend
+pnpm --filter @workspace/budget-app run dev
 
-## Root Scripts
+# DB connection
+DATABASE_URL env var (auto-configured by Replit)
+```
 
-- `pnpm run build` — runs `typecheck` first, then recursively runs `build` in all packages
-- `pnpm run typecheck` — runs `tsc --build --emitDeclarationOnly`
+## Ports
 
-## Packages
-
-### `artifacts/budget-app` (`@workspace/budget-app`)
-
-React + Vite frontend. Full Hebrew RTL. Pages in `src/pages/`, components in `src/components/`.
-Key dependencies: recharts, lucide-react, framer-motion, date-fns, wouter, @tanstack/react-query, shadcn/ui
-
-### `artifacts/api-server` (`@workspace/api-server`)
-
-Express 5 API server. Routes in `src/routes/` for all 10 budget modules + dashboard.
-
-### `lib/db` (`@workspace/db`)
-
-Database layer using Drizzle ORM with PostgreSQL. Schema files for all budget tables.
-- `pnpm --filter @workspace/db run push` — push schema to DB
-
-### `lib/api-spec` (`@workspace/api-spec`)
-
-OpenAPI 3.1 spec with full budget management API. Run codegen:
-- `pnpm --filter @workspace/api-spec run codegen`
-
-### `lib/api-zod` / `lib/api-client-react`
-
-Generated Zod schemas and React Query hooks from the OpenAPI spec.
+- API server: process.env.PORT (assigned by Replit)
+- Frontend: process.env.PORT (assigned by Replit)
+- Both proxied through nginx at port 80

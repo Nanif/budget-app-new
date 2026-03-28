@@ -6,8 +6,11 @@ import { Layout } from "@/components/Layout";
 import NotFound from "@/pages/not-found";
 
 import Home from "@/pages/Home";
-import Dashboard from "@/pages/Dashboard";
-import Expenses from "@/pages/Expenses";
+import Budget from "@/pages/Budget";
+import CashWallet from "@/pages/CashWallet";
+import AnnualExpenses from "@/pages/AnnualExpenses";
+import LargeExpenses from "@/pages/LargeExpenses";
+import ExternalFunds from "@/pages/ExternalFunds";
 import Incomes from "@/pages/Incomes";
 import Charity from "@/pages/Charity";
 import Debts from "@/pages/Debts";
@@ -15,7 +18,6 @@ import Savings from "@/pages/Savings";
 import Notes from "@/pages/Notes";
 import Reminders from "@/pages/Reminders";
 import Settings from "@/pages/Settings";
-import Funds from "@/pages/Funds";
 import Categories from "@/pages/Categories";
 
 const queryClient = new QueryClient({
@@ -33,8 +35,11 @@ function Router() {
     <Layout>
       <Switch>
         <Route path="/" component={Home} />
-        <Route path="/dashboard" component={Dashboard} />
-        <Route path="/expenses" component={Expenses} />
+        <Route path="/budget" component={Budget} />
+        <Route path="/cash" component={CashWallet} />
+        <Route path="/annual" component={AnnualExpenses} />
+        <Route path="/large" component={LargeExpenses} />
+        <Route path="/external" component={ExternalFunds} />
         <Route path="/incomes" component={Incomes} />
         <Route path="/charity" component={Charity} />
         <Route path="/debts" component={Debts} />
@@ -42,7 +47,6 @@ function Router() {
         <Route path="/notes" component={Notes} />
         <Route path="/reminders" component={Reminders} />
         <Route path="/settings" component={Settings} />
-        <Route path="/funds" component={Funds} />
         <Route path="/categories" component={Categories} />
         <Route component={NotFound} />
       </Switch>

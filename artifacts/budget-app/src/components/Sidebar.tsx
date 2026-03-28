@@ -1,18 +1,8 @@
 import { Link, useLocation } from "wouter";
 import {
-  Home,
-  LayoutDashboard,
-  Receipt,
-  Landmark,
-  HeartHandshake,
-  CreditCard,
-  PiggyBank,
-  StickyNote,
-  CheckSquare,
-  Settings,
-  Wallet,
-  Coins,
-  Tag,
+  Home, CalendarDays, Wallet, ShoppingBag, Calendar, PiggyBank,
+  Landmark, HeartHandshake, CreditCard, StickyNote, CheckSquare,
+  Settings, Tag,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -25,15 +15,17 @@ type NavItem = {
 
 const NAV_ITEMS: NavItem[] = [
   { href: "/", label: "דף בית", icon: Home },
-  { href: "/dashboard", label: "דשבורד", icon: LayoutDashboard },
-  { href: "/expenses", label: "הוצאות", icon: Receipt, section: "מעקב" },
-  { href: "/incomes", label: "הכנסות", icon: Landmark, section: "מעקב" },
-  { href: "/charity", label: "צדקה ומעשרות", icon: HeartHandshake, section: "מעקב" },
-  { href: "/debts", label: "חובות", icon: CreditCard, section: "מעקב" },
-  { href: "/savings", label: "חסכונות ונכסים", icon: PiggyBank, section: "מעקב" },
+  { href: "/budget", label: "תכנון תקציב", icon: CalendarDays, section: "קופות" },
+  { href: "/cash", label: "קופת שוטף", icon: Wallet, section: "קופות" },
+  { href: "/annual", label: "מעגל השנה", icon: Calendar, section: "קופות" },
+  { href: "/large", label: "הוצאות גדולות", icon: ShoppingBag, section: "קופות" },
+  { href: "/external", label: "קופות חיצוניות", icon: PiggyBank, section: "קופות" },
+  { href: "/incomes", label: "הכנסות", icon: Landmark, section: "מעקב פיננסי" },
+  { href: "/charity", label: "צדקה ומעשרות", icon: HeartHandshake, section: "מעקב פיננסי" },
+  { href: "/debts", label: "חובות", icon: CreditCard, section: "מעקב פיננסי" },
+  { href: "/savings", label: "חסכונות ונכסים", icon: PiggyBank, section: "מעקב פיננסי" },
   { href: "/notes", label: "פתקים", icon: StickyNote, section: "כלים" },
   { href: "/reminders", label: "תזכורות ומשימות", icon: CheckSquare, section: "כלים" },
-  { href: "/funds", label: "קופות", icon: Coins, section: "הגדרות" },
   { href: "/categories", label: "קטגוריות", icon: Tag, section: "הגדרות" },
   { href: "/settings", label: "הגדרות מערכת", icon: Settings, section: "הגדרות" },
 ];
@@ -41,7 +33,6 @@ const NAV_ITEMS: NavItem[] = [
 export function Sidebar() {
   const [location] = useLocation();
 
-  // Group by section
   const sections: Record<string, NavItem[]> = {};
   const topItems: NavItem[] = [];
   for (const item of NAV_ITEMS) {
@@ -77,7 +68,6 @@ export function Sidebar() {
 
   return (
     <aside className="fixed top-0 bottom-0 start-0 z-40 w-64 border-e border-sidebar-border bg-sidebar pt-6 pb-4 flex flex-col hidden md:flex shadow-xl shadow-black/5">
-      {/* Logo */}
       <div className="px-6 mb-6 flex items-center gap-3">
         <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-teal-400 flex items-center justify-center text-white shadow-lg shadow-primary/20">
           <Wallet className="w-6 h-6" />
@@ -89,10 +79,7 @@ export function Sidebar() {
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 space-y-0.5">
-        {/* Top-level items */}
         {topItems.map(item => <NavLink key={item.href} item={item} />)}
-
-        {/* Sections */}
         {Object.entries(sections).map(([section, items]) => (
           <div key={section}>
             <SectionLabel label={section} />
@@ -103,7 +90,7 @@ export function Sidebar() {
 
       <div className="px-6 mt-auto">
         <div className="p-4 rounded-xl bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/10">
-          <p className="text-xs text-center text-primary font-medium">Clear Budget v1.0</p>
+          <p className="text-xs text-center text-primary font-medium">Clear Budget v2.0</p>
         </div>
       </div>
     </aside>

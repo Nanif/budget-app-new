@@ -4,9 +4,11 @@ interface PageHeaderProps {
   title: string;
   description?: string;
   action?: ReactNode;
+  children?: ReactNode;
 }
 
-export function PageHeader({ title, description, action }: PageHeaderProps) {
+export function PageHeader({ title, description, action, children }: PageHeaderProps) {
+  const actions = children || action;
   return (
     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
       <div>
@@ -15,9 +17,9 @@ export function PageHeader({ title, description, action }: PageHeaderProps) {
           <p className="text-muted-foreground mt-1">{description}</p>
         )}
       </div>
-      {action && (
-        <div className="flex-shrink-0">
-          {action}
+      {actions && (
+        <div className="flex-shrink-0 flex items-center gap-2">
+          {actions}
         </div>
       )}
     </div>
