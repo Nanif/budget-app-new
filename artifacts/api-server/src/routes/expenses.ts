@@ -46,6 +46,27 @@ router.get("/", async (req, res) => {
   }
 });
 
+// GET /api/expenses/by-fund — total spent per fund
+router.get("/by-fund", async (req, res) => {
+  try {
+    const rows = await db
+      .select({
+        fundId: expensesTable.fundId,
+        total: sum(expensesTable.amount),
+      })
+      .from(expensesTable)
+      .where(and(
+        eq(expensesTable.userId, DEFAULT_USER_ID),
+        eq(expensesTable.budgetYearId, DEFAULT_BUDGET_YEAR_ID),
+      ))
+      .groupBy(expensesTable.fundId);
+    res.json(rows.map(r => ({ fundId: r.fundId, total: parseNum(r.total ?? null) })));
+  } catch (err) {
+    req.log.error({ err }, "Failed to get expenses by fund");
+    res.status(500).json({ error: "Failed to get expenses by fund" });
+  }
+});
+
 // GET /api/expenses/summary?fundId=N
 router.get("/summary", async (req, res) => {
   try {
