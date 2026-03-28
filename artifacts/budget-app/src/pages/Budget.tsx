@@ -11,11 +11,15 @@ import { apiFetch } from "@/lib/api";
 import {
   Pencil, Check, X, Loader2, Plus, Wallet, Settings2,
   TrendingUp, TrendingDown, AlertTriangle, ArrowLeft,
-  Minus, BarChart3, CalendarDays, CircleDollarSign,
+  Minus, BarChart3, CalendarDays, CircleDollarSign, Trash2,
 } from "lucide-react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 
 /* ═══════════════════════════════════════════════════════════
@@ -119,6 +123,10 @@ export default function Budget() {
     includeInBudget: true, description: "",
   });
   const [fundSaving, setFundSaving] = useState(false);
+
+  /* ── fund delete ─────────────────────────────────────────── */
+  const [deleteFund,    setDeleteFund]    = useState<Fund | null>(null);
+  const [fundDeleting,  setFundDeleting]  = useState(false);
 
   /* ── load ────────────────────────────────────────────────── */
   const load = async () => {
@@ -242,6 +250,18 @@ export default function Budget() {
     finally { setFundSaving(false); }
   };
 
+  const handleDeleteFund = async () => {
+    if (!deleteFund) return;
+    setFundDeleting(true);
+    try {
+      await apiFetch(`/funds/${deleteFund.id}`, { method: "DELETE" });
+      setFunds(prev => prev.filter(f => f.id !== deleteFund.id));
+      toast({ title: "קופה הוסרה", description: deleteFund.name });
+      setDeleteFund(null);
+    } catch { toast({ title: "שגיאה במחיקה", variant: "destructive" }); }
+    finally { setFundDeleting(false); }
+  };
+
   /* ── anomalies ───────────────────────────────────────────── */
   const anomalies = budgetFunds
     .map(f => ({ f, budget: fundBudget(f), spent: spendMap[f.id] ?? 0 }))
@@ -317,6 +337,7 @@ export default function Budget() {
                       fund={fund}
                       spent={spendMap[fund.id] ?? 0}
                       onEdit={() => openEditFund(fund)}
+                      onDelete={() => setDeleteFund(fund)}
                     />
                   ))}
               </div>
@@ -334,6 +355,7 @@ export default function Budget() {
                     fund={fund}
                     spent={spendMap[fund.id] ?? 0}
                     onEdit={() => openEditFund(fund)}
+                    onDelete={() => setDeleteFund(fund)}
                     dimmed
                   />
                 ))}
@@ -378,6 +400,30 @@ export default function Budget() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* ══ Delete Fund AlertDialog ══════════════════════════════ */}
+      <AlertDialog open={!!deleteFund} onOpenChange={o => !o && setDeleteFund(null)}>
+        <AlertDialogContent dir="rtl" className="rounded-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>הסרת קופה</AlertDialogTitle>
+            <AlertDialogDescription>
+              האם להסיר את הקופה "{deleteFund?.name}"?<br />
+              הקופה תוסר מהתצוגה אך הנתונים ההיסטוריים יישמרו.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-xl">ביטול</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteFund}
+              disabled={fundDeleting}
+              className="rounded-xl bg-rose-600 hover:bg-rose-700"
+            >
+              {fundDeleting && <Loader2 className="w-4 h-4 ml-2 animate-spin" />}
+              הסר קופה
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* ══ Fund Dialog ══════════════════════════════════════════ */}
       <Dialog open={fundDialog} onOpenChange={setFundDialog}>
@@ -723,8 +769,8 @@ function AnomalySection({ anomalies, onEdit }: {
 /* ═══════════════════════════════════════════════════════════
    FUND CARD
 ═══════════════════════════════════════════════════════════ */
-function FundCard({ fund, spent, onEdit, dimmed = false }: {
-  fund: Fund; spent: number; onEdit: () => void; dimmed?: boolean;
+function FundCard({ fund, spent, onEdit, onDelete, dimmed = false }: {
+  fund: Fund; spent: number; onEdit: () => void; onDelete: () => void; dimmed?: boolean;
 }) {
   const budget    = fundBudget(fund);
   const remaining = budget - spent;
@@ -763,6 +809,10 @@ function FundCard({ fund, spent, onEdit, dimmed = false }: {
           </div>
         </div>
         <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+          <button onClick={onDelete}
+            className="p-1.5 rounded-lg hover:bg-rose-50 text-muted-foreground hover:text-rose-600 transition-colors">
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
           <button onClick={onEdit}
             className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors">
             <Pencil className="w-3.5 h-3.5" />
