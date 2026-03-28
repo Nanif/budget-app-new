@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { apiFetch } from "@/lib/api";
 import {
   Plus, Pencil, Trash2, Search, X, ChevronDown, ChevronRight,
   Landmark, Loader2, Check, AlertTriangle, Filter,
@@ -15,8 +16,6 @@ import {
   CircleDollarSign, Tag,
 } from "lucide-react";
 
-const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
-const API  = `${BASE}/api`;
 
 /* ═══════════════════════════════════════════════════════════
    TYPES
@@ -98,11 +97,6 @@ const EMPTY_FORM: IncomeForm = {
 /* ═══════════════════════════════════════════════════════════
    HELPERS
 ═══════════════════════════════════════════════════════════ */
-async function apiFetch(path: string, opts?: RequestInit) {
-  const r = await fetch(`${API}${path}`, { headers: { "Content-Type": "application/json" }, ...opts });
-  if (!r.ok) throw new Error(await r.text());
-  return r.status === 204 ? null : r.json();
-}
 function fmt(n: number) {
   return new Intl.NumberFormat("he-IL", { style: "currency", currency: "ILS", maximumFractionDigits: 0 }).format(n);
 }

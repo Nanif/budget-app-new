@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { apiFetch } from "@/lib/api";
 import {
   Plus, Trash2, Pencil, Tag, Check, X, Loader2, Search, Filter,
 } from "lucide-react";
@@ -20,18 +21,11 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
-const API = `${BASE}/api`;
 
 type Fund = { id: number; name: string; colorClass: string; fundBehavior: string; annualAllocation: number; isActive: boolean };
 type Category = { id: number; name: string; color: string; isActive: boolean };
 type Expense = { id: number; amount: number; description: string; date: string; categoryId: number | null; fundId: number | null; categoryName?: string; categoryColor?: string };
 
-async function apiFetch(path: string, opts?: RequestInit) {
-  const r = await fetch(`${API}${path}`, { headers: { "Content-Type": "application/json" }, ...opts });
-  if (!r.ok) throw new Error(await r.text());
-  return r.status === 204 ? null : r.json();
-}
 
 function fmt(n: number) {
   return new Intl.NumberFormat("he-IL", { style: "currency", currency: "ILS", maximumFractionDigits: 0 }).format(n);

@@ -5,6 +5,7 @@ import { eq, and, asc, sql } from "drizzle-orm";
 const router = Router();
 const DEFAULT_USER_ID = 1;
 const DEFAULT_BUDGET_YEAR_ID = 1;
+function getBYID(req: any): number { const b = parseInt(String(req.query.bid)); return isNaN(b) ? DEFAULT_BUDGET_YEAR_ID : b; }
 
 /* ── GET all (active + inactive) ──────────────────────────────── */
 router.get("/", async (req, res) => {
@@ -12,7 +13,7 @@ router.get("/", async (req, res) => {
     const includeInactive = req.query.all === "true";
     const baseWhere = and(
       eq(fundsTable.userId, DEFAULT_USER_ID),
-      eq(fundsTable.budgetYearId, DEFAULT_BUDGET_YEAR_ID),
+      eq(fundsTable.budgetYearId, getBYID(req)),
       ...(includeInactive ? [] : [eq(fundsTable.isActive, true)])
     );
     const rows = await db.select().from(fundsTable)
@@ -28,7 +29,7 @@ router.get("/", async (req, res) => {
 /* ── POST ─────────────────────────────────────────────────────── */
 router.post("/", async (req, res) => {
   try {
-    const body = { ...req.body, userId: DEFAULT_USER_ID, budgetYearId: DEFAULT_BUDGET_YEAR_ID };
+    const body = { ...req.body, userId: DEFAULT_USER_ID, budgetYearId: getBYID(req) };
     const parsed = insertFundSchema.safeParse(body);
     if (!parsed.success) { res.status(400).json({ error: "Invalid input", details: parsed.error.issues }); return; }
     const [created] = await db.insert(fundsTable).values(parsed.data).returning();
@@ -43,7 +44,7 @@ router.post("/", async (req, res) => {
 router.put("/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-    const body = { ...req.body, userId: DEFAULT_USER_ID, budgetYearId: DEFAULT_BUDGET_YEAR_ID };
+    const body = { ...req.body, userId: DEFAULT_USER_ID, budgetYearId: getBYID(req) };
     const parsed = insertFundSchema.safeParse(body);
     if (!parsed.success) { res.status(400).json({ error: "Invalid input", details: parsed.error.issues }); return; }
     const [updated] = await db.update(fundsTable).set({ ...parsed.data, updatedAt: new Date() })
@@ -82,7 +83,7 @@ router.patch("/reorder", async (req, res) => {
         .where(and(eq(fundsTable.id, id), eq(fundsTable.userId, DEFAULT_USER_ID)))
     ));
     const rows = await db.select().from(fundsTable)
-      .where(and(eq(fundsTable.userId, DEFAULT_USER_ID), eq(fundsTable.budgetYearId, DEFAULT_BUDGET_YEAR_ID)))
+      .where(and(eq(fundsTable.userId, DEFAULT_USER_ID), eq(fundsTable.budgetYearId, getBYID(req))))
       .orderBy(asc(fundsTable.displayOrder));
     res.json(rows);
   } catch (err) {

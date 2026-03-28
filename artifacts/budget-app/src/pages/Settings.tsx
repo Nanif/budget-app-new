@@ -6,9 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Save } from "lucide-react";
-
-const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
-const API = `${BASE}/api`;
+import { apiFetch } from "@/lib/api";
 
 type Settings = {
   id: number; userId: number; currency: string; locale: string; userName: string;
@@ -24,7 +22,7 @@ export default function Settings() {
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
-    fetch(`${API}/settings`).then(r => r.json()).then(setSettings).finally(() => setIsLoading(false));
+    apiFetch("/settings").then(setSettings).finally(() => setIsLoading(false));
   }, []);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -39,11 +37,10 @@ export default function Settings() {
       tithePercentage: Number(formData.get("tithePercentage")),
     };
     try {
-      const updated = await fetch(`${API}/settings`, {
+      const updated = await apiFetch("/settings", {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
-      }).then(r => r.json());
+      });
       setSettings(updated);
       toast({ title: "ההגדרות נשמרו בהצלחה!" });
     } catch {

@@ -45,12 +45,23 @@ A full Hebrew RTL personal budget management web app built around the user's spe
 | `/categories` | Categories | Expense categories |
 | `/settings` | Settings | System settings |
 
+### Multi-Year Budget Support
+- **YearSwitcher** component in the sidebar lets users switch between budget years
+- All API routes accept `?bid=X` (budget year ID) query param, defaulting to 1
+- Frontend: `src/lib/api.ts` exports `apiFetch()` — automatically appends `?bid=X` from module-level `_activeBid`
+- Frontend: `src/contexts/BudgetYearContext.tsx` stores list of years + active year, persists to `localStorage`
+- Frontend: `src/components/YearSwitcher.tsx` — dropdown + "create new year" dialog
+- `/api/budget-years` — CRUD for budget years (already had activate endpoint)
+- `/api/budget-year?bid=X` — get/put settings for specific year
+
 ### Key Architecture Decisions
-- **Single user**: All routes hardcode `DEFAULT_USER_ID = 1`, `DEFAULT_BUDGET_YEAR_ID = 1`
+- **Single user**: All routes hardcode `DEFAULT_USER_ID = 1`
+- **Budget year**: Routes use `getBYID(req)` — reads `?bid=X` or defaults to 1
 - **Numeric fields**: Drizzle `numeric()` returns strings — always `parseFloat()` in frontend
 - **API base**: API server on port 8080, Vite dev at 24432 (nginx proxy at 80)
 - **DB migrations**: Direct SQL `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`
 - **Wallet**: `cashEnvelopeTransactionsTable` stores deposits/withdrawals for `cash_monthly` funds
+- **apiFetch**: All pages import from `@/lib/api` — DO NOT define local apiFetch
 
 ### API Routes
 - `GET/PUT /api/budget-year` — budget year config (totalBudget, tithePercentage)

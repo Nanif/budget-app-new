@@ -10,18 +10,12 @@ import { Plus, Trash2, Pencil, Wallet, Check, X, Loader2, PiggyBank } from "luci
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { apiFetch } from "@/lib/api";
 
-const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
-const API = `${BASE}/api`;
 
 type Fund = { id: number; name: string; colorClass: string; fundBehavior: string; initialBalance: number; isActive: boolean; annualAllocation: number };
 type Expense = { id: number; amount: number; description: string; date: string; fundId: number | null };
 
-async function apiFetch(path: string, opts?: RequestInit) {
-  const r = await fetch(`${API}${path}`, { headers: { "Content-Type": "application/json" }, ...opts });
-  if (!r.ok) throw new Error(await r.text());
-  return r.status === 204 ? null : r.json();
-}
 
 function fmt(n: number) {
   return new Intl.NumberFormat("he-IL", { style: "currency", currency: "ILS", maximumFractionDigits: 0 }).format(n);

@@ -7,9 +7,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Plus, Trash2, Pin } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import { apiFetch } from "@/lib/api";
 
-const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
-const API = `${BASE}/api`;
 
 type Note = {
   id: number; userId: number; tabId: number; title: string; content: string;
@@ -25,11 +24,6 @@ const NOTE_COLORS = [
   { val: 'bg-card text-foreground border-border', name: 'רגיל' }
 ];
 
-async function apiFetch(path: string, opts?: RequestInit) {
-  const r = await fetch(`${API}${path}`, { headers: { "Content-Type": "application/json" }, ...opts });
-  if (!r.ok) throw new Error(await r.text());
-  return r.status === 204 ? null : r.json();
-}
 
 export default function Notes() {
   const { toast } = useToast();

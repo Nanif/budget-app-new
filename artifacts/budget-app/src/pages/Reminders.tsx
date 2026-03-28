@@ -8,9 +8,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Plus, Trash2, CheckCircle2, Circle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import { apiFetch } from "@/lib/api";
 
-const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
-const API = `${BASE}/api`;
 
 type Task = {
   id: number; userId: number; title: string; description: string;
@@ -18,11 +17,6 @@ type Task = {
   completedAt?: string | null; createdAt: string; updatedAt: string;
 };
 
-async function apiFetch(path: string, opts?: RequestInit) {
-  const r = await fetch(`${API}${path}`, { headers: { "Content-Type": "application/json" }, ...opts });
-  if (!r.ok) throw new Error(await r.text());
-  return r.status === 204 ? null : r.json();
-}
 
 const PRIORITY_WEIGHT: Record<string, number> = { urgent: 4, high: 3, medium: 2, low: 1 };
 

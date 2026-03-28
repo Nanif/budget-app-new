@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { apiFetch } from "@/lib/api";
 import {
   Plus, Pencil, Trash2, ChevronUp, ChevronDown, ToggleLeft, ToggleRight,
   Wallet, Check, X, Loader2, GripVertical, Coins, Eye, EyeOff,
@@ -21,8 +22,6 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
-const API = `${BASE}/api`;
 
 type Fund = {
   id: number; name: string; type: string; description: string;
@@ -66,11 +65,6 @@ const DEFAULT_FORM: FormState = {
   includeInBudget: true, isCash: false, isActive: true,
 };
 
-async function apiFetch(path: string, opts?: RequestInit) {
-  const r = await fetch(`${API}${path}`, { headers: { "Content-Type": "application/json" }, ...opts });
-  if (!r.ok) throw new Error(await r.text());
-  return r.status === 204 ? null : r.json();
-}
 
 export default function Funds() {
   const { toast } = useToast();

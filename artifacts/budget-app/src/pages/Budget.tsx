@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { apiFetch } from "@/lib/api";
 import {
   Pencil, Check, X, Loader2, Plus, Wallet, Settings2,
   TrendingUp, TrendingDown, AlertTriangle, ArrowLeft,
@@ -15,8 +16,6 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 
-const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
-const API  = `${BASE}/api`;
 
 /* ═══════════════════════════════════════════════════════════
    TYPES
@@ -65,11 +64,6 @@ const MONTH_HE = ["ינ׳","פב׳","מר׳","אפ׳","מי׳","יו׳","יל׳"
 /* ═══════════════════════════════════════════════════════════
    HELPERS
 ═══════════════════════════════════════════════════════════ */
-async function apiFetch(path: string, opts?: RequestInit) {
-  const r = await fetch(`${API}${path}`, { headers: { "Content-Type": "application/json" }, ...opts });
-  if (!r.ok) throw new Error(await r.text());
-  return r.status === 204 ? null : r.json();
-}
 function fmt(n: number, compact = false) {
   if (compact && Math.abs(n) >= 1000)
     return `${(n / 1000).toFixed(n % 1000 === 0 ? 0 : 1)}K ₪`;
@@ -741,11 +735,11 @@ function FundCard({ fund, spent, onEdit, dimmed = false }: {
   const statusBg    = status === "over" ? "bg-rose-100 text-rose-700" : status === "warn" ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700";
 
   /* route to detail page */
-  const detailPath = fund.fundBehavior === "cash_monthly"       ? `${BASE}/cash`
-    : fund.fundBehavior === "annual_categorized" ? `${BASE}/annual`
-    : fund.fundBehavior === "annual_large"        ? `${BASE}/large`
-    : fund.fundBehavior === "non_budget"          ? `${BASE}/external`
-    : `${BASE}/budget`;
+  const detailPath = fund.fundBehavior === "cash_monthly"       ? `/cash`
+    : fund.fundBehavior === "annual_categorized" ? `/annual`
+    : fund.fundBehavior === "annual_large"        ? `/large`
+    : fund.fundBehavior === "non_budget"          ? `/external`
+    : `/budget`;
 
   return (
     <div className={cn(

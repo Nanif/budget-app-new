@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { apiFetch } from "@/lib/api";
 import {
   HeartHandshake, CreditCard, CheckSquare, StickyNote,
   ArrowLeft, Plus, Check, Circle, AlertCircle, Pin,
@@ -11,8 +12,6 @@ import {
   BookOpen,
 } from "lucide-react";
 
-const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
-const API = `${BASE}/api`;
 
 /* ── Types ─────────────────────────────────────────────────── */
 type IncomeSummary = { totalIncome: number; totalDeductions: number; netIncome: number };
@@ -24,11 +23,6 @@ type NoteTab       = { id: number; name: string; color: string };
 type Note          = { id: number; title: string; content: string; color: string; isPinned: boolean; tabId: number | null; tabName: string | null };
 
 /* ── Helpers ────────────────────────────────────────────────── */
-async function apiFetch(path: string, opts?: RequestInit) {
-  const r = await fetch(`${API}${path}`, { headers: { "Content-Type": "application/json" }, ...opts });
-  if (!r.ok) throw new Error(await r.text());
-  return r.status === 204 ? null : r.json();
-}
 
 function fmt(n: number) {
   return new Intl.NumberFormat("he-IL", { style: "currency", currency: "ILS", maximumFractionDigits: 0 }).format(n);
@@ -109,7 +103,7 @@ export default function Home() {
           <h1 className="text-2xl font-display font-bold">שלום 👋</h1>
           <p className="text-muted-foreground text-sm mt-0.5">{monthLabel} — סקירת מצב</p>
         </div>
-        <Link href={`${BASE}/budget`}>
+        <Link href={`/budget`}>
           <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-border/60 text-sm text-muted-foreground hover:text-foreground hover:border-primary/40 transition-all">
             תכנון תקציב <ChevronRight className="w-3.5 h-3.5" />
           </button>
@@ -228,7 +222,7 @@ function TitheCard({ income, budgetYear, tithes, titheTarget, titheGiven, titheL
           </div>
           מעשרות
         </div>
-        <Link href={`${BASE}/charity`}>
+        <Link href={`/charity`}>
           <span className={GO_LINK}>לכל הצדקות <ArrowLeft className="w-3 h-3" /></span>
         </Link>
       </div>
@@ -341,7 +335,7 @@ function DebtsCard({ debts, onAdd }: { debts: Debt[]; onAdd: (p: any) => Promise
           </div>
           חובות
         </div>
-        <Link href={`${BASE}/debts`}>
+        <Link href={`/debts`}>
           <span className={GO_LINK}>לכל החובות <ArrowLeft className="w-3 h-3" /></span>
         </Link>
       </div>
@@ -499,7 +493,7 @@ function RemindersCard({ tasks, onToggle, onAdd }: {
           </div>
           תזכורות ומשימות
         </div>
-        <Link href={`${BASE}/reminders`}>
+        <Link href={`/reminders`}>
           <span className={GO_LINK}>לכל המשימות <ArrowLeft className="w-3 h-3" /></span>
         </Link>
       </div>
@@ -631,7 +625,7 @@ function NotesCard({ tabs, notes, onAdd }: {
           </div>
           פתקים
         </div>
-        <Link href={`${BASE}/notes`}>
+        <Link href={`/notes`}>
           <span className={GO_LINK}>לכל הפתקים <ArrowLeft className="w-3 h-3" /></span>
         </Link>
       </div>

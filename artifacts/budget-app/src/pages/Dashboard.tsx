@@ -4,6 +4,7 @@ import { formatILS } from "@/lib/format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Link } from "wouter";
 import { cn } from "@/lib/utils";
+import { apiFetch } from "@/lib/api";
 import {
   TrendingUp, TrendingDown, Wallet, PiggyBank, HeartHandshake, CreditCard,
   AlertTriangle, ChevronLeft, Coins, Target, ArrowLeft, BarChart3,
@@ -12,9 +13,6 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend,
 } from "recharts";
-
-const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
-const API = `${BASE}/api`;
 
 type MonthlyPoint = { month: string; monthNum: number; income: number; expenses: number; budget: number };
 type CategoryBreakdown = { categoryName: string; categoryColor: string; total: number };
@@ -66,8 +64,8 @@ export default function Dashboard() {
 
   useEffect(() => {
     setIsLoading(true);
-    fetch(`${API}/dashboard/annual?year=${selectedYear}`)
-      .then(r => r.json()).then(setData).finally(() => setIsLoading(false));
+    apiFetch(`/dashboard/annual?year=${selectedYear}`)
+      .then(setData).finally(() => setIsLoading(false));
   }, [selectedYear]);
 
   const kpiCards = [

@@ -5,6 +5,7 @@ import { eq } from "drizzle-orm";
 const router = Router();
 const DEFAULT_USER_ID = 1;
 const DEFAULT_BUDGET_YEAR_ID = 1;
+function getBYID(req: any): number { const b = parseInt(String(req.query.bid)); return isNaN(b) ? DEFAULT_BUDGET_YEAR_ID : b; }
 
 // GET current budget year config
 router.get("/", async (req, res) => {
@@ -12,7 +13,7 @@ router.get("/", async (req, res) => {
     const [year] = await db
       .select()
       .from(budgetYearsTable)
-      .where(eq(budgetYearsTable.id, DEFAULT_BUDGET_YEAR_ID));
+      .where(eq(budgetYearsTable.id, getBYID(req)));
     if (!year) { res.status(404).json({ error: "Budget year not found" }); return; }
     res.json({
       ...year,
@@ -38,7 +39,7 @@ router.put("/", async (req, res) => {
     const [updated] = await db
       .update(budgetYearsTable)
       .set(updateData)
-      .where(eq(budgetYearsTable.id, DEFAULT_BUDGET_YEAR_ID))
+      .where(eq(budgetYearsTable.id, getBYID(req)))
       .returning();
     res.json({
       ...updated,

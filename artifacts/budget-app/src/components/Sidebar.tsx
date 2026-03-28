@@ -5,6 +5,7 @@ import {
   Settings, Tag, Receipt, Scale,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { YearSwitcher } from "@/components/YearSwitcher";
 
 type NavItem = {
   href: string;
@@ -69,7 +70,7 @@ export function Sidebar() {
 
   return (
     <aside className="fixed top-0 bottom-0 start-0 z-40 w-64 border-e border-sidebar-border bg-sidebar pt-6 pb-4 flex flex-col hidden md:flex shadow-xl shadow-black/5">
-      <div className="px-6 mb-6 flex items-center gap-3">
+      <div className="px-6 mb-4 flex items-center gap-3">
         <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-teal-400 flex items-center justify-center text-white shadow-lg shadow-primary/20">
           <Wallet className="w-6 h-6" />
         </div>
@@ -77,6 +78,10 @@ export function Sidebar() {
           <h1 className="font-display font-bold text-xl text-sidebar-foreground tracking-tight">קליר</h1>
           <p className="text-xs text-muted-foreground font-medium">ניהול תקציב חכם</p>
         </div>
+      </div>
+
+      <div className="px-4 mb-3">
+        <YearSwitcher />
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 space-y-0.5">

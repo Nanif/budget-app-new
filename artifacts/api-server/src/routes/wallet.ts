@@ -5,6 +5,7 @@ import { eq, and, gte, lte, desc, sum, sql } from "drizzle-orm";
 const router = Router();
 const DEFAULT_USER_ID = 1;
 const DEFAULT_BUDGET_YEAR_ID = 1;
+function getBYID(req: any): number { const b = parseInt(String(req.query.bid)); return isNaN(b) ? DEFAULT_BUDGET_YEAR_ID : b; }
 
 function parseNum(v: string | null) { return v ? parseFloat(v) : 0; }
 
@@ -14,7 +15,7 @@ router.get("/", async (req, res) => {
     const { month, fundId } = req.query;
     const conditions: any[] = [
       eq(cashEnvelopeTransactionsTable.userId, DEFAULT_USER_ID),
-      eq(cashEnvelopeTransactionsTable.budgetYearId, DEFAULT_BUDGET_YEAR_ID),
+      eq(cashEnvelopeTransactionsTable.budgetYearId, getBYID(req)),
     ];
     if (fundId) conditions.push(eq(cashEnvelopeTransactionsTable.fundId, parseInt(String(fundId))));
     if (month) {
@@ -31,7 +32,6 @@ router.get("/", async (req, res) => {
       .where(and(...conditions))
       .orderBy(desc(cashEnvelopeTransactionsTable.date));
 
-    // Compute totals
     const deposits = rows.filter(r => r.type === "deposit").reduce((s, r) => s + parseNum(r.amount), 0);
     const withdrawals = rows.filter(r => r.type === "withdrawal").reduce((s, r) => s + parseNum(r.amount), 0);
 
@@ -58,7 +58,7 @@ router.get("/summary", async (req, res) => {
       .from(cashEnvelopeTransactionsTable)
       .where(and(
         eq(cashEnvelopeTransactionsTable.userId, DEFAULT_USER_ID),
-        eq(cashEnvelopeTransactionsTable.budgetYearId, DEFAULT_BUDGET_YEAR_ID),
+        eq(cashEnvelopeTransactionsTable.budgetYearId, getBYID(req)),
         sql`EXTRACT(YEAR FROM ${cashEnvelopeTransactionsTable.date}::date) = ${year}`,
       ))
       .groupBy(
@@ -74,7 +74,7 @@ router.get("/summary", async (req, res) => {
 // POST /api/wallet
 router.post("/", async (req, res) => {
   try {
-    const raw = { ...req.body, userId: DEFAULT_USER_ID, budgetYearId: DEFAULT_BUDGET_YEAR_ID };
+    const raw = { ...req.body, userId: DEFAULT_USER_ID, budgetYearId: getBYID(req) };
     const body = Object.fromEntries(Object.entries(raw).filter(([_, v]) => v !== null && v !== ""));
     const parsed = insertCashEnvelopeTransactionSchema.safeParse(body);
     if (!parsed.success) {

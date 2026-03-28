@@ -5,6 +5,7 @@ import { eq, desc, and, sum, sql } from "drizzle-orm";
 const router = Router();
 const DEFAULT_USER_ID = 1;
 const DEFAULT_BUDGET_YEAR_ID = 1;
+function getBYID(req: any): number { const b = parseInt(String(req.query.bid)); return isNaN(b) ? DEFAULT_BUDGET_YEAR_ID : b; }
 
 function parseNum(v: string | null) { return v ? parseFloat(v) : 0; }
 
@@ -14,7 +15,7 @@ router.get("/", async (req, res) => {
     const { type } = req.query;
     const conditions: any[] = [
       eq(incomesTable.userId, DEFAULT_USER_ID),
-      eq(incomesTable.budgetYearId, DEFAULT_BUDGET_YEAR_ID),
+      eq(incomesTable.budgetYearId, getBYID(req)),
     ];
     if (type && (type === "income" || type === "work_deduction")) {
       conditions.push(eq(incomesTable.entryType, String(type)));
@@ -32,6 +33,7 @@ router.get("/", async (req, res) => {
 // GET /api/incomes/summary — income, deductions, net, tithe needed
 router.get("/summary", async (req, res) => {
   try {
+    const byid = getBYID(req);
     const rows = await db
       .select({
         entryType: incomesTable.entryType,
@@ -40,7 +42,7 @@ router.get("/summary", async (req, res) => {
       .from(incomesTable)
       .where(and(
         eq(incomesTable.userId, DEFAULT_USER_ID),
-        eq(incomesTable.budgetYearId, DEFAULT_BUDGET_YEAR_ID),
+        eq(incomesTable.budgetYearId, byid),
       ))
       .groupBy(incomesTable.entryType);
 
@@ -51,7 +53,6 @@ router.get("/summary", async (req, res) => {
     const totalDeductions = parseNum(deductionTotal?.total ?? null);
     const netIncome = totalIncome - totalDeductions;
 
-    // Get monthly breakdown
     const monthly = await db
       .select({
         month: sql<string>`to_char(${incomesTable.date}::date, 'YYYY-MM')`,
@@ -61,7 +62,7 @@ router.get("/summary", async (req, res) => {
       .from(incomesTable)
       .where(and(
         eq(incomesTable.userId, DEFAULT_USER_ID),
-        eq(incomesTable.budgetYearId, DEFAULT_BUDGET_YEAR_ID),
+        eq(incomesTable.budgetYearId, byid),
       ))
       .groupBy(
         sql`to_char(${incomesTable.date}::date, 'YYYY-MM')`,
@@ -82,7 +83,7 @@ router.get("/summary", async (req, res) => {
 // POST /api/incomes
 router.post("/", async (req, res) => {
   try {
-    const raw = { ...req.body, userId: DEFAULT_USER_ID, budgetYearId: DEFAULT_BUDGET_YEAR_ID };
+    const raw = { ...req.body, userId: DEFAULT_USER_ID, budgetYearId: getBYID(req) };
     const body = Object.fromEntries(Object.entries(raw).filter(([_, v]) => v !== null && v !== ""));
     const parsed = insertIncomeSchema.safeParse(body);
     if (!parsed.success) {
@@ -101,7 +102,7 @@ router.post("/", async (req, res) => {
 router.put("/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-    const raw = { ...req.body, userId: DEFAULT_USER_ID, budgetYearId: DEFAULT_BUDGET_YEAR_ID };
+    const raw = { ...req.body, userId: DEFAULT_USER_ID, budgetYearId: getBYID(req) };
     const body = Object.fromEntries(Object.entries(raw).filter(([_, v]) => v !== null && v !== ""));
     const parsed = insertIncomeSchema.safeParse(body);
     if (!parsed.success) {

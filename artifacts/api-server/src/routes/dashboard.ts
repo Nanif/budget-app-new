@@ -9,31 +9,33 @@ import { desc, gte, lte, and, eq, sql } from "drizzle-orm";
 const router = Router();
 const DEFAULT_USER_ID = 1;
 const DEFAULT_BUDGET_YEAR_ID = 1;
+function getBYID(req: any): number { const b = parseInt(String(req.query.bid)); return isNaN(b) ? DEFAULT_BUDGET_YEAR_ID : b; }
 
 /* ─── Monthly summary (current month) ──────────────────────────── */
 router.get("/summary", async (req, res) => {
   try {
+    const byid = getBYID(req);
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split("T")[0];
     const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split("T")[0];
 
     const userFilter = eq(expensesTable.userId, DEFAULT_USER_ID);
-    const yearFilter = eq(expensesTable.budgetYearId, DEFAULT_BUDGET_YEAR_ID);
+    const yearFilter = eq(expensesTable.budgetYearId, byid);
 
     const [expenseSum] = await db.select({ total: sql<string>`COALESCE(SUM(amount), 0)` })
       .from(expensesTable).where(and(userFilter, yearFilter, gte(expensesTable.date, startOfMonth), lte(expensesTable.date, endOfMonth)));
 
     const [incomeSum] = await db.select({ total: sql<string>`COALESCE(SUM(amount), 0)` })
-      .from(incomesTable).where(and(eq(incomesTable.userId, DEFAULT_USER_ID), eq(incomesTable.budgetYearId, DEFAULT_BUDGET_YEAR_ID), gte(incomesTable.date, startOfMonth), lte(incomesTable.date, endOfMonth)));
+      .from(incomesTable).where(and(eq(incomesTable.userId, DEFAULT_USER_ID), eq(incomesTable.budgetYearId, byid), gte(incomesTable.date, startOfMonth), lte(incomesTable.date, endOfMonth)));
 
     const [charitySum] = await db.select({ total: sql<string>`COALESCE(SUM(amount), 0)` })
-      .from(titheGivenTable).where(and(eq(titheGivenTable.userId, DEFAULT_USER_ID), eq(titheGivenTable.budgetYearId, DEFAULT_BUDGET_YEAR_ID), gte(titheGivenTable.date, startOfMonth), lte(titheGivenTable.date, endOfMonth)));
+      .from(titheGivenTable).where(and(eq(titheGivenTable.userId, DEFAULT_USER_ID), eq(titheGivenTable.budgetYearId, byid), gte(titheGivenTable.date, startOfMonth), lte(titheGivenTable.date, endOfMonth)));
 
     const [debtSum] = await db.select({ total: sql<string>`COALESCE(SUM(remaining_amount), 0)` })
-      .from(debtsTable).where(and(eq(debtsTable.userId, DEFAULT_USER_ID), eq(debtsTable.budgetYearId, DEFAULT_BUDGET_YEAR_ID), eq(debtsTable.status, "active")));
+      .from(debtsTable).where(and(eq(debtsTable.userId, DEFAULT_USER_ID), eq(debtsTable.budgetYearId, byid), eq(debtsTable.status, "active")));
 
     const [assetsSum] = await db.select({ total: sql<string>`COALESCE(SUM(current_amount), 0)` })
-      .from(assetsTable).where(and(eq(assetsTable.userId, DEFAULT_USER_ID), eq(assetsTable.budgetYearId, DEFAULT_BUDGET_YEAR_ID)));
+      .from(assetsTable).where(and(eq(assetsTable.userId, DEFAULT_USER_ID), eq(assetsTable.budgetYearId, byid)));
 
     const settingsRows = await db.select().from(systemSettingsTable).where(eq(systemSettingsTable.userId, DEFAULT_USER_ID));
     const settings = settingsRows[0];
@@ -55,7 +57,7 @@ router.get("/summary", async (req, res) => {
       categoryColor: sql<string>`COALESCE(c.color, '#94a3b8')`,
       total: sql<string>`COALESCE(SUM(e.amount), 0)`,
     }).from(sql`expenses e`).leftJoin(sql`categories c ON e.category_id = c.id`)
-      .where(sql`e.user_id = ${DEFAULT_USER_ID} AND e.budget_year_id = ${DEFAULT_BUDGET_YEAR_ID} AND e.date >= ${startOfMonth} AND e.date <= ${endOfMonth}`)
+      .where(sql`e.user_id = ${DEFAULT_USER_ID} AND e.budget_year_id = ${byid} AND e.date >= ${startOfMonth} AND e.date <= ${endOfMonth}`)
       .groupBy(sql`c.name, c.color`);
 
     const totalIncome = parseFloat(incomeSum.total);
@@ -80,6 +82,7 @@ router.get("/summary", async (req, res) => {
 /* ─── Annual dashboard ──────────────────────────────────────────── */
 router.get("/annual", async (req, res) => {
   try {
+    const byid = getBYID(req);
     const now = new Date();
     const year = parseInt((req.query.year as string) || String(now.getFullYear()));
     const startOfYear = `${year}-01-01`;
@@ -88,15 +91,15 @@ router.get("/annual", async (req, res) => {
     /* ── Totals ── */
     const [expTotal] = await db.select({ total: sql<string>`COALESCE(SUM(amount),0)` })
       .from(expensesTable)
-      .where(and(eq(expensesTable.userId, DEFAULT_USER_ID), eq(expensesTable.budgetYearId, DEFAULT_BUDGET_YEAR_ID), gte(expensesTable.date, startOfYear), lte(expensesTable.date, endOfYear)));
+      .where(and(eq(expensesTable.userId, DEFAULT_USER_ID), eq(expensesTable.budgetYearId, byid), gte(expensesTable.date, startOfYear), lte(expensesTable.date, endOfYear)));
 
     const [incTotal] = await db.select({ total: sql<string>`COALESCE(SUM(amount),0)` })
       .from(incomesTable)
-      .where(and(eq(incomesTable.userId, DEFAULT_USER_ID), eq(incomesTable.budgetYearId, DEFAULT_BUDGET_YEAR_ID), gte(incomesTable.date, startOfYear), lte(incomesTable.date, endOfYear)));
+      .where(and(eq(incomesTable.userId, DEFAULT_USER_ID), eq(incomesTable.budgetYearId, byid), gte(incomesTable.date, startOfYear), lte(incomesTable.date, endOfYear)));
 
     const [charTotal] = await db.select({ total: sql<string>`COALESCE(SUM(amount),0)` })
       .from(titheGivenTable)
-      .where(and(eq(titheGivenTable.userId, DEFAULT_USER_ID), eq(titheGivenTable.budgetYearId, DEFAULT_BUDGET_YEAR_ID), gte(titheGivenTable.date, startOfYear), lte(titheGivenTable.date, endOfYear)));
+      .where(and(eq(titheGivenTable.userId, DEFAULT_USER_ID), eq(titheGivenTable.budgetYearId, byid), gte(titheGivenTable.date, startOfYear), lte(titheGivenTable.date, endOfYear)));
 
     /* ── Settings (annual budget = monthlyBudget * 12) ── */
     const settingsRows = await db.select().from(systemSettingsTable).where(eq(systemSettingsTable.userId, DEFAULT_USER_ID));
@@ -109,14 +112,14 @@ router.get("/annual", async (req, res) => {
       month: sql<number>`EXTRACT(MONTH FROM date)::int`,
       total: sql<string>`COALESCE(SUM(amount),0)`,
     }).from(expensesTable)
-      .where(and(eq(expensesTable.userId, DEFAULT_USER_ID), eq(expensesTable.budgetYearId, DEFAULT_BUDGET_YEAR_ID), gte(expensesTable.date, startOfYear), lte(expensesTable.date, endOfYear)))
+      .where(and(eq(expensesTable.userId, DEFAULT_USER_ID), eq(expensesTable.budgetYearId, byid), gte(expensesTable.date, startOfYear), lte(expensesTable.date, endOfYear)))
       .groupBy(sql`EXTRACT(MONTH FROM date)`);
 
     const monthlyIncomes = await db.select({
       month: sql<number>`EXTRACT(MONTH FROM date)::int`,
       total: sql<string>`COALESCE(SUM(amount),0)`,
     }).from(incomesTable)
-      .where(and(eq(incomesTable.userId, DEFAULT_USER_ID), eq(incomesTable.budgetYearId, DEFAULT_BUDGET_YEAR_ID), gte(incomesTable.date, startOfYear), lte(incomesTable.date, endOfYear)))
+      .where(and(eq(incomesTable.userId, DEFAULT_USER_ID), eq(incomesTable.budgetYearId, byid), gte(incomesTable.date, startOfYear), lte(incomesTable.date, endOfYear)))
       .groupBy(sql`EXTRACT(MONTH FROM date)`);
 
     const HEB_MONTHS = ["ינו", "פבר", "מרץ", "אפר", "מאי", "יוני", "יולי", "אוג", "ספט", "אוק", "נוב", "דצמ"];
@@ -139,20 +142,20 @@ router.get("/annual", async (req, res) => {
       total: sql<string>`COALESCE(SUM(e.amount), 0)`,
     }).from(sql`expenses e`)
       .leftJoin(sql`categories c ON e.category_id = c.id`)
-      .where(sql`e.user_id = ${DEFAULT_USER_ID} AND e.budget_year_id = ${DEFAULT_BUDGET_YEAR_ID} AND e.date >= ${startOfYear} AND e.date <= ${endOfYear}`)
+      .where(sql`e.user_id = ${DEFAULT_USER_ID} AND e.budget_year_id = ${byid} AND e.date >= ${startOfYear} AND e.date <= ${endOfYear}`)
       .groupBy(sql`c.id, c.name, c.color`)
       .orderBy(sql`SUM(e.amount) DESC`);
 
     /* ── Fund status ── */
     const funds = await db.select().from(fundsTable)
-      .where(and(eq(fundsTable.userId, DEFAULT_USER_ID), eq(fundsTable.budgetYearId, DEFAULT_BUDGET_YEAR_ID), eq(fundsTable.isActive, true)))
+      .where(and(eq(fundsTable.userId, DEFAULT_USER_ID), eq(fundsTable.budgetYearId, byid), eq(fundsTable.isActive, true)))
       .orderBy(fundsTable.sortOrder);
 
     const fundExpenses = await db.select({
       fundId: expensesTable.fundId,
       total: sql<string>`COALESCE(SUM(amount), 0)`,
     }).from(expensesTable)
-      .where(and(eq(expensesTable.userId, DEFAULT_USER_ID), eq(expensesTable.budgetYearId, DEFAULT_BUDGET_YEAR_ID), gte(expensesTable.date, startOfYear), lte(expensesTable.date, endOfYear)))
+      .where(and(eq(expensesTable.userId, DEFAULT_USER_ID), eq(expensesTable.budgetYearId, byid), gte(expensesTable.date, startOfYear), lte(expensesTable.date, endOfYear)))
       .groupBy(expensesTable.fundId);
 
     const fundBudgetRows = await db.select().from(fundBudgetsTable)
@@ -177,7 +180,7 @@ router.get("/annual", async (req, res) => {
       return { ...fund, budgetAmount, actualAmount, remaining, usagePercent: Math.round(usagePercent), status };
     });
 
-    /* ── Anomalies: categories with > 80% of their peers ── */
+    /* ── Anomalies ── */
     const catTotals = categoryBreakdown.map(c => parseFloat(c.total));
     const avgSpend = catTotals.length ? catTotals.reduce((a, b) => a + b, 0) / catTotals.length : 0;
     const anomalies = categoryBreakdown

@@ -5,6 +5,7 @@ import { eq, desc, and, sum } from "drizzle-orm";
 const router = Router();
 const DEFAULT_USER_ID = 1;
 const DEFAULT_BUDGET_YEAR_ID = 1;
+function getBYID(req: any): number { const b = parseInt(String(req.query.bid)); return isNaN(b) ? DEFAULT_BUDGET_YEAR_ID : b; }
 
 function parseNum(v: string | null) { return v ? parseFloat(v) : 0; }
 
@@ -14,7 +15,7 @@ router.get("/", async (req, res) => {
     const { fundId } = req.query;
     const conditions: any[] = [
       eq(expensesTable.userId, DEFAULT_USER_ID),
-      eq(expensesTable.budgetYearId, DEFAULT_BUDGET_YEAR_ID),
+      eq(expensesTable.budgetYearId, getBYID(req)),
     ];
     if (fundId) conditions.push(eq(expensesTable.fundId, parseInt(String(fundId))));
 
@@ -58,7 +59,7 @@ router.get("/by-fund", async (req, res) => {
       .from(expensesTable)
       .where(and(
         eq(expensesTable.userId, DEFAULT_USER_ID),
-        eq(expensesTable.budgetYearId, DEFAULT_BUDGET_YEAR_ID),
+        eq(expensesTable.budgetYearId, getBYID(req)),
       ))
       .groupBy(expensesTable.fundId);
     res.json(rows.map(r => ({ fundId: r.fundId, total: parseNum(r.total ?? null) })));
@@ -74,7 +75,7 @@ router.get("/summary", async (req, res) => {
     const { fundId } = req.query;
     const conditions: any[] = [
       eq(expensesTable.userId, DEFAULT_USER_ID),
-      eq(expensesTable.budgetYearId, DEFAULT_BUDGET_YEAR_ID),
+      eq(expensesTable.budgetYearId, getBYID(req)),
     ];
     if (fundId) conditions.push(eq(expensesTable.fundId, parseInt(String(fundId))));
 
@@ -105,7 +106,7 @@ router.get("/summary", async (req, res) => {
 // POST /api/expenses
 router.post("/", async (req, res) => {
   try {
-    const raw = { ...req.body, userId: DEFAULT_USER_ID, budgetYearId: DEFAULT_BUDGET_YEAR_ID };
+    const raw = { ...req.body, userId: DEFAULT_USER_ID, budgetYearId: getBYID(req) };
     const body = Object.fromEntries(Object.entries(raw).filter(([_, v]) => v !== null && v !== ""));
     const parsed = insertExpenseSchema.safeParse(body);
     if (!parsed.success) {
@@ -124,7 +125,7 @@ router.post("/", async (req, res) => {
 router.put("/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-    const raw = { ...req.body, userId: DEFAULT_USER_ID, budgetYearId: DEFAULT_BUDGET_YEAR_ID };
+    const raw = { ...req.body, userId: DEFAULT_USER_ID, budgetYearId: getBYID(req) };
     const body = Object.fromEntries(Object.entries(raw).filter(([_, v]) => v !== null && v !== ""));
     const parsed = insertExpenseSchema.safeParse(body);
     if (!parsed.success) {

@@ -9,9 +9,8 @@ import { formatILS, formatILDate } from "@/lib/format";
 import { Plus, Edit2, Trash2, CreditCard } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { apiFetch } from "@/lib/api";
 
-const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
-const API = `${BASE}/api`;
 
 type Debt = {
   id: number; userId: number; name: string; type: string; totalAmount: number;
@@ -19,11 +18,6 @@ type Debt = {
   interestRate?: number; lenderBorrower?: string;
 };
 
-async function apiFetch(path: string, opts?: RequestInit) {
-  const r = await fetch(`${API}${path}`, { headers: { "Content-Type": "application/json" }, ...opts });
-  if (!r.ok) throw new Error(await r.text());
-  return r.status === 204 ? null : r.json();
-}
 
 export default function Debts() {
   const { toast } = useToast();

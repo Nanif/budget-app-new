@@ -12,7 +12,9 @@ import categoriesRouter from "./categories";
 import noteTabsRouter from "./noteTabs";
 import fundsRouter from "./funds";
 import budgetYearRouter from "./budget-year";
+import budgetYearsRouter from "./budgetYears";
 import walletRouter from "./wallet";
+import dashboardRouter from "./dashboard";
 
 const router = Router();
 
@@ -29,6 +31,8 @@ router.use("/categories", categoriesRouter);
 router.use("/note-tabs", noteTabsRouter);
 router.use("/funds", fundsRouter);
 router.use("/budget-year", budgetYearRouter);
+router.use("/budget-years", budgetYearsRouter);
 router.use("/wallet", walletRouter);
+router.use("/dashboard", dashboardRouter);
 
 export default router;
