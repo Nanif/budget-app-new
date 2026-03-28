@@ -105,9 +105,9 @@ export default function Settings() {
           </CardContent>
         </Card>
 
-        <div className="flex justify-end pt-4">
-          <Button type="submit" disabled={isSaving} className="rounded-xl px-8 py-6 text-lg font-bold shadow-lg gap-2">
-            <Save className="w-5 h-5" />{isSaving ? "שומר..." : "שמור הגדרות"}
+        <div className="flex justify-end pt-2">
+          <Button type="submit" disabled={isSaving} className="rounded-xl shadow-sm gap-2">
+            <Save className="w-4 h-4" />{isSaving ? "שומר..." : "שמור הגדרות"}
           </Button>
         </div>
       </form>
