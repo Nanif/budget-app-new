@@ -1,75 +1,64 @@
 import { Router } from "express";
-import { db, savingsTable, insertSavingSchema } from "@workspace/db";
-import { eq, desc } from "drizzle-orm";
+import { db, assetsTable, insertAssetSchema } from "@workspace/db";
+import { eq, desc, and } from "drizzle-orm";
 
 const router = Router();
-
-function formatSaving(e: typeof savingsTable.$inferSelect) {
-  return {
-    id: e.id,
-    name: e.name,
-    category: e.category,
-    type: e.type,
-    targetAmount: e.targetAmount ? parseFloat(e.targetAmount) : null,
-    currentAmount: parseFloat(e.currentAmount),
-    notes: e.notes,
-    createdAt: e.createdAt.toISOString(),
-  };
-}
+const DEFAULT_USER_ID = 1;
+const DEFAULT_BUDGET_YEAR_ID = 1;
 
 router.get("/", async (req, res) => {
   try {
-    const rows = await db.select().from(savingsTable).orderBy(desc(savingsTable.createdAt));
-    res.json(rows.map(formatSaving));
+    const rows = await db.select().from(assetsTable)
+      .where(and(eq(assetsTable.userId, DEFAULT_USER_ID), eq(assetsTable.budgetYearId, DEFAULT_BUDGET_YEAR_ID)))
+      .orderBy(desc(assetsTable.createdAt));
+    res.json(rows.map(r => ({
+      ...r,
+      currentAmount: parseFloat(r.currentAmount),
+      targetAmount: r.targetAmount ? parseFloat(r.targetAmount) : null,
+    })));
   } catch (err) {
-    req.log.error({ err }, "Failed to get savings");
-    res.status(500).json({ error: "Failed to get savings" });
+    req.log.error({ err }, "Failed to get assets");
+    res.status(500).json({ error: "Failed to get assets" });
   }
 });
 
 router.post("/", async (req, res) => {
   try {
-    const parsed = insertSavingSchema.safeParse(req.body);
-    if (!parsed.success) {
-      res.status(400).json({ error: "Invalid input", details: parsed.error.issues });
-      return;
-    }
-    const [created] = await db.insert(savingsTable).values(parsed.data).returning();
-    res.status(201).json(formatSaving(created));
+    const body = { ...req.body, userId: DEFAULT_USER_ID, budgetYearId: DEFAULT_BUDGET_YEAR_ID };
+    const parsed = insertAssetSchema.safeParse(body);
+    if (!parsed.success) { res.status(400).json({ error: "Invalid input", details: parsed.error.issues }); return; }
+    const [created] = await db.insert(assetsTable).values(parsed.data).returning();
+    res.status(201).json({ ...created, currentAmount: parseFloat(created.currentAmount), targetAmount: created.targetAmount ? parseFloat(created.targetAmount) : null });
   } catch (err) {
-    req.log.error({ err }, "Failed to create saving");
-    res.status(500).json({ error: "Failed to create saving" });
+    req.log.error({ err }, "Failed to create asset");
+    res.status(500).json({ error: "Failed to create asset" });
   }
 });
 
 router.put("/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-    const parsed = insertSavingSchema.safeParse(req.body);
-    if (!parsed.success) {
-      res.status(400).json({ error: "Invalid input", details: parsed.error.issues });
-      return;
-    }
-    const [updated] = await db.update(savingsTable).set(parsed.data).where(eq(savingsTable.id, id)).returning();
-    if (!updated) {
-      res.status(404).json({ error: "Not found" });
-      return;
-    }
-    res.json(formatSaving(updated));
+    const body = { ...req.body, userId: DEFAULT_USER_ID, budgetYearId: DEFAULT_BUDGET_YEAR_ID };
+    const parsed = insertAssetSchema.safeParse(body);
+    if (!parsed.success) { res.status(400).json({ error: "Invalid input", details: parsed.error.issues }); return; }
+    const [updated] = await db.update(assetsTable).set({ ...parsed.data, updatedAt: new Date() })
+      .where(and(eq(assetsTable.id, id), eq(assetsTable.userId, DEFAULT_USER_ID))).returning();
+    if (!updated) { res.status(404).json({ error: "Not found" }); return; }
+    res.json({ ...updated, currentAmount: parseFloat(updated.currentAmount), targetAmount: updated.targetAmount ? parseFloat(updated.targetAmount) : null });
   } catch (err) {
-    req.log.error({ err }, "Failed to update saving");
-    res.status(500).json({ error: "Failed to update saving" });
+    req.log.error({ err }, "Failed to update asset");
+    res.status(500).json({ error: "Failed to update asset" });
   }
 });
 
 router.delete("/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-    await db.delete(savingsTable).where(eq(savingsTable.id, id));
+    await db.delete(assetsTable).where(and(eq(assetsTable.id, id), eq(assetsTable.userId, DEFAULT_USER_ID)));
     res.status(204).send();
   } catch (err) {
-    req.log.error({ err }, "Failed to delete saving");
-    res.status(500).json({ error: "Failed to delete saving" });
+    req.log.error({ err }, "Failed to delete asset");
+    res.status(500).json({ error: "Failed to delete asset" });
   }
 });
 

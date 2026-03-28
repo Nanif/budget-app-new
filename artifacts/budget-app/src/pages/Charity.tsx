@@ -1,16 +1,4 @@
-import { useState } from "react";
-import { 
-  useGetCharityEntries, 
-  useCreateCharityEntry, 
-  useUpdateCharityEntry, 
-  useDeleteCharityEntry,
-  useGetSettings,
-  useGetDashboardSummary,
-  getGetCharityEntriesQueryKey,
-  getGetDashboardSummaryQueryKey,
-  type CharityEntry 
-} from "@workspace/api-client-react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useState, useEffect } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,44 +10,54 @@ import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 
+const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
+const API = `${BASE}/api`;
+
+type TitheEntry = {
+  id: number; userId: number; budgetYearId: number; amount: number;
+  recipient: string; description: string; date: string; isTithe: boolean;
+  tithePercent?: number; receiptNumber?: string;
+};
+type Settings = { tithePercentage: number; incomeBaseForTithe: number };
+type Summary = { totalCharity: number; totalIncome: number };
+
+async function apiFetch(path: string, opts?: RequestInit) {
+  const r = await fetch(`${API}${path}`, { headers: { "Content-Type": "application/json" }, ...opts });
+  if (!r.ok) throw new Error(await r.text());
+  return r.status === 204 ? null : r.json();
+}
+
 export default function Charity() {
-  const { data: entries, isLoading } = useGetCharityEntries();
-  const { data: settings } = useGetSettings();
-  const { data: summary } = useGetDashboardSummary();
-  const queryClient = useQueryClient();
   const { toast } = useToast();
-  
+  const [entries, setEntries] = useState<TitheEntry[]>([]);
+  const [settings, setSettings] = useState<Settings | null>(null);
+  const [summary, setSummary] = useState<Summary | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingItem, setEditingItem] = useState<CharityEntry | null>(null);
+  const [editingItem, setEditingItem] = useState<TitheEntry | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
-  const invalidate = () => {
-    queryClient.invalidateQueries({ queryKey: getGetCharityEntriesQueryKey() });
-    queryClient.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() });
+  const loadData = async () => {
+    setIsLoading(true);
+    try {
+      const [ent, st, sum] = await Promise.all([
+        apiFetch("/charity"), apiFetch("/settings"), apiFetch("/dashboard/summary"),
+      ]);
+      setEntries(ent); setSettings(st); setSummary(sum);
+    } catch { toast({ title: "שגיאה בטעינה", variant: "destructive" }); }
+    finally { setIsLoading(false); }
   };
 
-  const createMut = useCreateCharityEntry({ mutation: { onSuccess: invalidate }});
-  const updateMut = useUpdateCharityEntry({ mutation: { onSuccess: invalidate }});
-  const deleteMut = useDeleteCharityEntry({ mutation: { onSuccess: invalidate }});
+  useEffect(() => { loadData(); }, []);
 
-  const handleOpenAdd = () => {
-    setEditingItem(null);
-    setIsDialogOpen(true);
-  };
-
-  const handleOpenEdit = (item: CharityEntry) => {
-    setEditingItem(item);
-    setIsDialogOpen(true);
-  };
-
-  const handleDelete = async (id: number) => {
-    if (confirm("מחיקת רישום צדקה?")) {
-      await deleteMut.mutateAsync({ id });
-      toast({ title: "נמחק" });
-    }
-  };
+  const totalGiven = summary?.totalCharity || 0;
+  const incomeBase = settings?.incomeBaseForTithe || summary?.totalIncome || 0;
+  const titheTarget = incomeBase * ((settings?.tithePercentage || 10) / 100);
+  const progressPercent = titheTarget > 0 ? Math.min(100, (totalGiven / titheTarget) * 100) : 0;
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    setIsSaving(true);
     const formData = new FormData(e.currentTarget);
     const data = {
       amount: Number(formData.get("amount")),
@@ -68,31 +66,36 @@ export default function Charity() {
       date: formData.get("date") as string,
       isTithe: formData.get("isTithe") === "on",
     };
-
-    if (editingItem) {
-      await updateMut.mutateAsync({ id: editingItem.id, data });
-    } else {
-      await createMut.mutateAsync({ data });
-    }
-    setIsDialogOpen(false);
-    toast({ title: "נשמר בהצלחה" });
+    try {
+      if (editingItem) {
+        await apiFetch(`/charity/${editingItem.id}`, { method: "PUT", body: JSON.stringify(data) });
+      } else {
+        await apiFetch("/charity", { method: "POST", body: JSON.stringify(data) });
+      }
+      toast({ title: "נשמר בהצלחה" });
+      setIsDialogOpen(false);
+      await loadData();
+    } catch { toast({ title: "שגיאה", variant: "destructive" }); }
+    finally { setIsSaving(false); }
   };
 
-  // Calculations for Tithe (Ma'aser) Progress
-  const totalGiven = summary?.totalCharity || 0;
-  const incomeBase = settings?.incomeForTithe || summary?.totalIncome || 0;
-  const titheTarget = incomeBase * ((settings?.tithePercentage || 10) / 100);
-  const progressPercent = titheTarget > 0 ? Math.min(100, (totalGiven / titheTarget) * 100) : 0;
+  const handleDelete = async (id: number) => {
+    if (!confirm("מחיקת רישום צדקה?")) return;
+    try {
+      await apiFetch(`/charity/${id}`, { method: "DELETE" });
+      toast({ title: "נמחק" });
+      await loadData();
+    } catch { toast({ title: "שגיאה", variant: "destructive" }); }
+  };
 
   return (
     <div className="space-y-6">
-      <PageHeader 
-        title="צדקה ומעשרות" 
+      <PageHeader
+        title="צדקה ומעשרות"
         description="מעקב אחר תרומות ומעשר כספים"
         action={
-          <Button onClick={handleOpenAdd} className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-lg shadow-blue-600/20 gap-2">
-            <Plus className="w-4 h-4" />
-            הוסף תרומה
+          <Button onClick={() => { setEditingItem(null); setIsDialogOpen(true); }} className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-lg shadow-blue-600/20 gap-2">
+            <Plus className="w-4 h-4" />הוסף תרומה
           </Button>
         }
       />
@@ -130,40 +133,32 @@ export default function Charity() {
             <tbody className="divide-y divide-border/50">
               {isLoading ? (
                 <tr><td colSpan={6} className="px-6 py-8 text-center text-muted-foreground">טוען...</td></tr>
-              ) : entries?.length === 0 ? (
+              ) : entries.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-6 py-12 text-center text-muted-foreground">
                     <HeartHandshake className="w-12 h-12 mb-3 mx-auto text-muted-foreground/30" />
                     <p>לא נמצאו תרומות</p>
                   </td>
                 </tr>
-              ) : (
-                entries?.map((entry) => (
-                  <tr key={entry.id} className="hover:bg-muted/30 transition-colors group">
-                    <td className="px-6 py-4 whitespace-nowrap">{formatILDate(entry.date)}</td>
-                    <td className="px-6 py-4 font-medium">{entry.recipient}</td>
-                    <td className="px-6 py-4 text-muted-foreground">{entry.description}</td>
-                    <td className="px-6 py-4">
-                      {entry.isTithe ? (
-                        <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs font-medium">מעשר</span>
-                      ) : (
-                        <span className="bg-gray-100 text-gray-700 px-2 py-1 rounded text-xs font-medium">תרומה רגילה</span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 text-end font-bold text-blue-600" dir="ltr">{formatILS(entry.amount)}</td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button onClick={() => handleOpenEdit(entry)} className="text-muted-foreground hover:text-primary p-1">
-                          <Edit2 className="w-4 h-4" />
-                        </button>
-                        <button onClick={() => handleDelete(entry.id)} className="text-muted-foreground hover:text-destructive p-1">
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
+              ) : entries.map((entry) => (
+                <tr key={entry.id} className="hover:bg-muted/30 transition-colors group">
+                  <td className="px-6 py-4 whitespace-nowrap">{formatILDate(entry.date)}</td>
+                  <td className="px-6 py-4 font-medium">{entry.recipient}</td>
+                  <td className="px-6 py-4 text-muted-foreground">{entry.description}</td>
+                  <td className="px-6 py-4">
+                    {entry.isTithe
+                      ? <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs font-medium">מעשר</span>
+                      : <span className="bg-gray-100 text-gray-700 px-2 py-1 rounded text-xs font-medium">תרומה רגילה</span>}
+                  </td>
+                  <td className="px-6 py-4 text-end font-bold text-blue-600" dir="ltr">{formatILS(entry.amount)}</td>
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button onClick={() => { setEditingItem(entry); setIsDialogOpen(true); }} className="text-muted-foreground hover:text-primary p-1"><Edit2 className="w-4 h-4" /></button>
+                      <button onClick={() => handleDelete(entry.id)} className="text-muted-foreground hover:text-destructive p-1"><Trash2 className="w-4 h-4" /></button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
@@ -172,33 +167,31 @@ export default function Charity() {
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="sm:max-w-[425px]" dir="rtl">
           <form onSubmit={handleSubmit}>
-            <DialogHeader>
-              <DialogTitle>{editingItem ? "עריכת תרומה" : "הוספת תרומה חדשה"}</DialogTitle>
-            </DialogHeader>
+            <DialogHeader><DialogTitle>{editingItem ? "עריכת תרומה" : "הוספת תרומה חדשה"}</DialogTitle></DialogHeader>
             <div className="grid gap-4 py-6">
               <div className="grid gap-2">
-                <Label htmlFor="amount">סכום (₪)</Label>
-                <Input id="amount" name="amount" type="number" step="0.01" required defaultValue={editingItem?.amount} className="rounded-xl" dir="ltr" />
+                <Label>סכום (₪)</Label>
+                <Input name="amount" type="number" step="0.01" required defaultValue={editingItem?.amount} className="rounded-xl" dir="ltr" />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="recipient">למי נתרם?</Label>
-                <Input id="recipient" name="recipient" required defaultValue={editingItem?.recipient} className="rounded-xl" />
+                <Label>למי נתרם?</Label>
+                <Input name="recipient" required defaultValue={editingItem?.recipient} className="rounded-xl" />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="description">הערות / תיאור</Label>
-                <Input id="description" name="description" defaultValue={editingItem?.description} className="rounded-xl" />
+                <Label>הערות / תיאור</Label>
+                <Input name="description" defaultValue={editingItem?.description} className="rounded-xl" />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="date">תאריך</Label>
-                <Input id="date" name="date" type="date" required defaultValue={editingItem?.date.split('T')[0] || new Date().toISOString().split('T')[0]} className="rounded-xl" />
+                <Label>תאריך</Label>
+                <Input name="date" type="date" required defaultValue={editingItem?.date?.split('T')[0] || new Date().toISOString().split('T')[0]} className="rounded-xl" />
               </div>
               <div className="flex items-center gap-2 mt-2">
-                <input type="checkbox" id="isTithe" name="isTithe" defaultChecked={editingItem ? editingItem.isTithe : true} className="w-4 h-4 rounded text-blue-600 focus:ring-blue-600" />
+                <input type="checkbox" id="isTithe" name="isTithe" defaultChecked={editingItem ? editingItem.isTithe : true} className="w-4 h-4 rounded text-blue-600" />
                 <Label htmlFor="isTithe" className="cursor-pointer font-medium text-blue-900">זהו כסף מעשר</Label>
               </div>
             </div>
             <DialogFooter>
-              <Button type="submit" disabled={createMut.isPending || updateMut.isPending} className="rounded-xl bg-blue-600 hover:bg-blue-700 text-white">שמור</Button>
+              <Button type="submit" disabled={isSaving} className="rounded-xl bg-blue-600 hover:bg-blue-700 text-white">{isSaving ? "שומר..." : "שמור"}</Button>
             </DialogFooter>
           </form>
         </DialogContent>

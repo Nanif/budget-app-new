@@ -1,5 +1,4 @@
-import { useGetSettings, useUpdateSettings, getGetSettingsQueryKey, getGetDashboardSummaryQueryKey } from "@workspace/api-client-react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useState, useEffect } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,33 +7,48 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { useToast } from "@/hooks/use-toast";
 import { Save } from "lucide-react";
 
-export default function Settings() {
-  const { data: settings, isLoading } = useGetSettings();
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-  
-  const updateMut = useUpdateSettings({ 
-    mutation: { 
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: getGetSettingsQueryKey() });
-        queryClient.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() });
-        toast({ title: "ההגדרות נשמרו בהצלחה!" });
-      }
-    }
-  });
+const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
+const API = `${BASE}/api`;
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+type Settings = {
+  id: number; userId: number; currency: string; locale: string; userName: string;
+  monthlyBudget: number; tithePercentage: number; incomeBaseForTithe: number;
+  activeBudgetYearId?: number | null; dateFormat: string; firstDayOfWeek: number;
+  showDecimal: boolean; darkMode: boolean;
+};
+
+export default function Settings() {
+  const { toast } = useToast();
+  const [settings, setSettings] = useState<Settings | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    fetch(`${API}/settings`).then(r => r.json()).then(setSettings).finally(() => setIsLoading(false));
+  }, []);
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    setIsSaving(true);
     const formData = new FormData(e.currentTarget);
-    updateMut.mutate({
-      data: {
-        userName: formData.get("userName") as string,
-        currency: formData.get("currency") as string,
-        monthlyBudget: Number(formData.get("monthlyBudget")),
-        incomeForTithe: Number(formData.get("incomeForTithe")),
-        tithePercentage: Number(formData.get("tithePercentage")),
-      }
-    });
+    const data = {
+      userName: formData.get("userName") as string,
+      currency: "ILS",
+      monthlyBudget: Number(formData.get("monthlyBudget")),
+      incomeBaseForTithe: Number(formData.get("incomeBaseForTithe")),
+      tithePercentage: Number(formData.get("tithePercentage")),
+    };
+    try {
+      const updated = await fetch(`${API}/settings`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      }).then(r => r.json());
+      setSettings(updated);
+      toast({ title: "ההגדרות נשמרו בהצלחה!" });
+    } catch {
+      toast({ title: "שגיאה בשמירה", variant: "destructive" });
+    } finally { setIsSaving(false); }
   };
 
   if (isLoading) return <div className="p-8 text-center">טוען הגדרות...</div>;
@@ -68,8 +82,8 @@ export default function Settings() {
               <Input id="monthlyBudget" name="monthlyBudget" type="number" defaultValue={settings?.monthlyBudget} className="rounded-xl" dir="ltr" />
             </div>
             <div className="max-w-md grid gap-2">
-              <Label htmlFor="currency">מטבע ברירת מחדל</Label>
-              <Input id="currency" name="currency" defaultValue={settings?.currency || 'ILS'} readOnly disabled className="rounded-xl bg-muted" />
+              <Label>מטבע ברירת מחדל</Label>
+              <Input value="₪ שקל חדש (ILS)" readOnly disabled className="rounded-xl bg-muted" />
               <p className="text-xs text-muted-foreground">כרגע נתמך שקל חדש (₪) בלבד.</p>
             </div>
           </CardContent>
@@ -82,22 +96,21 @@ export default function Settings() {
           </CardHeader>
           <CardContent className="p-6 space-y-6">
             <div className="max-w-md grid gap-2">
-              <Label htmlFor="incomeForTithe">הכנסה חודשית לחישוב מעשר (₪)</Label>
-              <Input id="incomeForTithe" name="incomeForTithe" type="number" defaultValue={settings?.incomeForTithe} className="rounded-xl border-blue-200 focus-visible:ring-blue-500" dir="ltr" />
-              <p className="text-xs text-muted-foreground">הזן את משכורת הנטו שלך אם תרצה חישוב מעשר קבוע. אם מוגדר 0, המערכת תחשב לפי סך ההכנסות הרשומות בחודש.</p>
+              <Label htmlFor="incomeBaseForTithe">הכנסה חודשית לחישוב מעשר (₪)</Label>
+              <Input id="incomeBaseForTithe" name="incomeBaseForTithe" type="number" defaultValue={settings?.incomeBaseForTithe} className="rounded-xl border-blue-200 focus-visible:ring-blue-500" dir="ltr" />
+              <p className="text-xs text-muted-foreground">הזן את משכורת הנטו שלך. אם מוגדר 0, יחושב לפי סך ההכנסות הרשומות.</p>
             </div>
             <div className="max-w-md grid gap-2">
               <Label htmlFor="tithePercentage">אחוז הפרשה לצדקה (%)</Label>
-              <Input id="tithePercentage" name="tithePercentage" type="number" defaultValue={settings?.tithePercentage} className="rounded-xl border-blue-200 focus-visible:ring-blue-500" dir="ltr" />
+              <Input id="tithePercentage" name="tithePercentage" type="number" step="0.1" defaultValue={settings?.tithePercentage} className="rounded-xl border-blue-200 focus-visible:ring-blue-500" dir="ltr" />
               <p className="text-xs text-muted-foreground">בדרך כלל 10% (מעשר) או 20% (חומש).</p>
             </div>
           </CardContent>
         </Card>
 
         <div className="flex justify-end pt-4">
-          <Button type="submit" disabled={updateMut.isPending} className="rounded-xl px-8 py-6 text-lg font-bold shadow-lg gap-2">
-            <Save className="w-5 h-5" />
-            {updateMut.isPending ? "שומר..." : "שמור הגדרות"}
+          <Button type="submit" disabled={isSaving} className="rounded-xl px-8 py-6 text-lg font-bold shadow-lg gap-2">
+            <Save className="w-5 h-5" />{isSaving ? "שומר..." : "שמור הגדרות"}
           </Button>
         </div>
       </form>

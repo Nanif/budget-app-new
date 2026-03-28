@@ -1,25 +1,17 @@
 import { Router } from "express";
-import { db, charityTable, insertCharitySchema } from "@workspace/db";
-import { eq, desc } from "drizzle-orm";
+import { db, titheGivenTable, insertTitheGivenSchema } from "@workspace/db";
+import { eq, desc, and } from "drizzle-orm";
 
 const router = Router();
-
-function formatCharity(e: typeof charityTable.$inferSelect) {
-  return {
-    id: e.id,
-    amount: parseFloat(e.amount),
-    recipient: e.recipient,
-    description: e.description,
-    date: e.date,
-    isTithe: e.isTithe,
-    createdAt: e.createdAt.toISOString(),
-  };
-}
+const DEFAULT_USER_ID = 1;
+const DEFAULT_BUDGET_YEAR_ID = 1;
 
 router.get("/", async (req, res) => {
   try {
-    const rows = await db.select().from(charityTable).orderBy(desc(charityTable.date));
-    res.json(rows.map(formatCharity));
+    const rows = await db.select().from(titheGivenTable)
+      .where(and(eq(titheGivenTable.userId, DEFAULT_USER_ID), eq(titheGivenTable.budgetYearId, DEFAULT_BUDGET_YEAR_ID)))
+      .orderBy(desc(titheGivenTable.date));
+    res.json(rows.map(r => ({ ...r, amount: parseFloat(r.amount), tithePercent: r.tithePercent ? parseFloat(r.tithePercent) : null })));
   } catch (err) {
     req.log.error({ err }, "Failed to get charity entries");
     res.status(500).json({ error: "Failed to get charity entries" });
@@ -28,13 +20,11 @@ router.get("/", async (req, res) => {
 
 router.post("/", async (req, res) => {
   try {
-    const parsed = insertCharitySchema.safeParse(req.body);
-    if (!parsed.success) {
-      res.status(400).json({ error: "Invalid input", details: parsed.error.issues });
-      return;
-    }
-    const [created] = await db.insert(charityTable).values(parsed.data).returning();
-    res.status(201).json(formatCharity(created));
+    const body = { ...req.body, userId: DEFAULT_USER_ID, budgetYearId: DEFAULT_BUDGET_YEAR_ID };
+    const parsed = insertTitheGivenSchema.safeParse(body);
+    if (!parsed.success) { res.status(400).json({ error: "Invalid input", details: parsed.error.issues }); return; }
+    const [created] = await db.insert(titheGivenTable).values(parsed.data).returning();
+    res.status(201).json({ ...created, amount: parseFloat(created.amount) });
   } catch (err) {
     req.log.error({ err }, "Failed to create charity entry");
     res.status(500).json({ error: "Failed to create charity entry" });
@@ -44,17 +34,13 @@ router.post("/", async (req, res) => {
 router.put("/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-    const parsed = insertCharitySchema.safeParse(req.body);
-    if (!parsed.success) {
-      res.status(400).json({ error: "Invalid input", details: parsed.error.issues });
-      return;
-    }
-    const [updated] = await db.update(charityTable).set(parsed.data).where(eq(charityTable.id, id)).returning();
-    if (!updated) {
-      res.status(404).json({ error: "Not found" });
-      return;
-    }
-    res.json(formatCharity(updated));
+    const body = { ...req.body, userId: DEFAULT_USER_ID, budgetYearId: DEFAULT_BUDGET_YEAR_ID };
+    const parsed = insertTitheGivenSchema.safeParse(body);
+    if (!parsed.success) { res.status(400).json({ error: "Invalid input", details: parsed.error.issues }); return; }
+    const [updated] = await db.update(titheGivenTable).set({ ...parsed.data, updatedAt: new Date() })
+      .where(and(eq(titheGivenTable.id, id), eq(titheGivenTable.userId, DEFAULT_USER_ID))).returning();
+    if (!updated) { res.status(404).json({ error: "Not found" }); return; }
+    res.json({ ...updated, amount: parseFloat(updated.amount) });
   } catch (err) {
     req.log.error({ err }, "Failed to update charity entry");
     res.status(500).json({ error: "Failed to update charity entry" });
@@ -64,7 +50,7 @@ router.put("/:id", async (req, res) => {
 router.delete("/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-    await db.delete(charityTable).where(eq(charityTable.id, id));
+    await db.delete(titheGivenTable).where(and(eq(titheGivenTable.id, id), eq(titheGivenTable.userId, DEFAULT_USER_ID)));
     res.status(204).send();
   } catch (err) {
     req.log.error({ err }, "Failed to delete charity entry");
