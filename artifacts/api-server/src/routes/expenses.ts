@@ -29,6 +29,7 @@ router.get("/", async (req, res) => {
         description: expensesTable.description,
         date: expensesTable.date,
         paymentMethod: expensesTable.paymentMethod,
+        isRecurring: expensesTable.isRecurring,
         createdAt: expensesTable.createdAt,
         updatedAt: expensesTable.updatedAt,
         categoryName: categoriesTable.name,

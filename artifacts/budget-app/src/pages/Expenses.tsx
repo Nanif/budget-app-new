@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,7 +10,8 @@ import { cn } from "@/lib/utils";
 import {
   Plus, Pencil, Trash2, Search, X, ChevronDown, ChevronRight,
   Receipt, Loader2, Check, AlertTriangle, Filter, TrendingDown,
-  Tag, Wallet, CalendarDays, BarChart3,
+  Tag, Wallet, CalendarDays, BarChart3, RefreshCw, StickyNote,
+  ShieldAlert, CircleDollarSign,
 } from "lucide-react";
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
@@ -23,6 +24,7 @@ type Expense = {
   id: number; amount: number; description: string; date: string;
   paymentMethod: string; fundId: number | null; categoryId: number | null;
   categoryName?: string | null; categoryColor?: string | null;
+  isRecurring?: boolean;
 };
 type Fund     = { id: number; name: string; colorClass: string; fundBehavior: string };
 type Category = { id: number; name: string; color: string; icon: string; fundId: number | null };
@@ -69,9 +71,36 @@ function monthLabel(k: string) {
 }
 function todayStr() { return new Date().toISOString().split("T")[0]; }
 
-const EMPTY_FORM = {
-  description: "", amount: "", date: todayStr(),
-  paymentMethod: "cash", fundId: "", categoryId: "",
+/* form splits "description" → name + notes, and adds isRecurring */
+type ExpenseForm = {
+  name: string; notes: string; amount: string; date: string;
+  paymentMethod: string; fundId: string; categoryId: string; isRecurring: boolean;
+};
+function formToPayload(f: ExpenseForm) {
+  return {
+    description: f.name + (f.notes.trim() ? "\n\n" + f.notes.trim() : ""),
+    amount:       parseFloat(f.amount),
+    date:         f.date,
+    paymentMethod: f.paymentMethod,
+    fundId:       f.fundId ? parseInt(f.fundId) : null,
+    categoryId:   f.categoryId ? parseInt(f.categoryId) : null,
+    isRecurring:  f.isRecurring,
+  };
+}
+function expenseToForm(e: Expense): ExpenseForm {
+  const [name, ...rest] = (e.description || "").split("\n\n");
+  return {
+    name: name || "", notes: rest.join("\n\n"),
+    amount: String(e.amount), date: e.date,
+    paymentMethod: e.paymentMethod,
+    fundId: e.fundId ? String(e.fundId) : "",
+    categoryId: e.categoryId ? String(e.categoryId) : "",
+    isRecurring: e.isRecurring ?? false,
+  };
+}
+const EMPTY_FORM: ExpenseForm = {
+  name: "", notes: "", amount: "", date: todayStr(),
+  paymentMethod: "credit", fundId: "", categoryId: "", isRecurring: false,
 };
 
 /* ═══════════════════════════════════════════════════════════
@@ -97,7 +126,9 @@ export default function Expenses() {
   /* ── dialog ──────────────────────────────────────────────── */
   const [dialog,      setDialog]      = useState(false);
   const [editItem,    setEditItem]    = useState<Expense | null>(null);
-  const [form,        setForm]        = useState({ ...EMPTY_FORM });
+  const [form,        setForm]        = useState<ExpenseForm>({ ...EMPTY_FORM });
+  const [touched,     setTouched]     = useState<Set<string>>(new Set());
+  const [submitTried, setSubmitTried] = useState(false);
   const [saving,      setSaving]      = useState(false);
   const [deleteId,    setDeleteId]    = useState<number | null>(null);
   const [deleting,    setDeleting]    = useState(false);
@@ -179,33 +210,44 @@ export default function Expenses() {
   const openAdd = () => {
     setEditItem(null);
     setForm({ ...EMPTY_FORM });
+    setTouched(new Set());
+    setSubmitTried(false);
     setDialog(true);
   };
   const openEdit = (e: Expense) => {
     setEditItem(e);
-    setForm({
-      description: e.description, amount: String(e.amount),
-      date: e.date, paymentMethod: e.paymentMethod,
-      fundId: e.fundId ? String(e.fundId) : "",
-      categoryId: e.categoryId ? String(e.categoryId) : "",
-    });
+    setForm(expenseToForm(e));
+    setTouched(new Set());
+    setSubmitTried(false);
     setDialog(true);
   };
+  const setField = <K extends keyof ExpenseForm>(k: K, v: ExpenseForm[K]) => {
+    setForm(prev => {
+      const next = { ...prev, [k]: v };
+      /* reset category when fund changes */
+      if (k === "fundId") next.categoryId = "";
+      return next;
+    });
+    setTouched(prev => new Set(prev).add(k));
+  };
+  const touch = (k: string) => setTouched(prev => new Set(prev).add(k));
+
+  /* inline error helpers */
+  const showErr = (k: string) => submitTried || touched.has(k);
+  const errName   = showErr("name")   && !form.name.trim()          ? "שם ההוצאה הוא שדה חובה" : "";
+  const errAmount = showErr("amount") && (
+    !form.amount || isNaN(parseFloat(form.amount)) || parseFloat(form.amount) <= 0
+  ) ? "יש להזין סכום חיובי" : "";
+  const errFund   = showErr("fundId") && !form.fundId               ? "יש לבחור קופה" : "";
+  const errDate   = showErr("date")   && !form.date                 ? "תאריך הוא שדה חובה" : "";
+  const isValid   = !errName && !errAmount && !errFund && !errDate && form.name.trim() && form.amount && form.fundId && form.date;
+
   const saveExpense = async () => {
-    if (!form.amount || parseFloat(form.amount) <= 0) {
-      toast({ title: "סכום נדרש", variant: "destructive" }); return;
-    }
-    if (!form.date) { toast({ title: "תאריך נדרש", variant: "destructive" }); return; }
+    setSubmitTried(true);
+    if (!isValid) return;
     setSaving(true);
     try {
-      const payload: any = {
-        amount: parseFloat(form.amount),
-        description: form.description || "",
-        date: form.date,
-        paymentMethod: form.paymentMethod,
-        fundId: form.fundId ? parseInt(form.fundId) : null,
-        categoryId: form.categoryId ? parseInt(form.categoryId) : null,
-      };
+      const payload = formToPayload(form);
       if (editItem) {
         const updated = await apiFetch(`/expenses/${editItem.id}`, { method: "PUT", body: JSON.stringify(payload) });
         const parsed  = { ...updated, amount: parseFloat(updated.amount) };
@@ -452,107 +494,22 @@ export default function Expenses() {
       )}
 
       {/* ══ ADD / EDIT DIALOG ══════════════════════════════════ */}
-      <Dialog open={dialog} onOpenChange={setDialog}>
-        <DialogContent className="max-w-md rounded-2xl" dir="rtl">
-          <DialogHeader>
-            <DialogTitle className="text-xl font-bold">
-              {editItem ? "עריכת הוצאה" : "הוצאה חדשה"}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            {/* Amount */}
-            <div className="space-y-1.5">
-              <Label className="font-semibold">סכום (₪) *</Label>
-              <Input type="number" dir="ltr" value={form.amount}
-                onChange={e => setForm(p => ({ ...p, amount: e.target.value }))}
-                placeholder="0" className="rounded-xl text-lg font-bold" autoFocus />
-            </div>
-
-            {/* Description */}
-            <div className="space-y-1.5">
-              <Label className="font-semibold">תיאור</Label>
-              <Input value={form.description}
-                onChange={e => setForm(p => ({ ...p, description: e.target.value }))}
-                placeholder="תיאור ההוצאה..." className="rounded-xl" />
-            </div>
-
-            {/* Date + Payment */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label className="font-semibold">תאריך *</Label>
-                <Input type="date" dir="ltr" value={form.date}
-                  onChange={e => setForm(p => ({ ...p, date: e.target.value }))}
-                  className="rounded-xl" />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="font-semibold">אמצעי תשלום</Label>
-                <Select value={form.paymentMethod} onValueChange={v => setForm(p => ({ ...p, paymentMethod: v }))}>
-                  <SelectTrigger className="rounded-xl">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent dir="rtl">
-                    {Object.entries(PAYMENT_METHODS).map(([v, l]) => (
-                      <SelectItem key={v} value={v}>{l}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            {/* Fund */}
-            <div className="space-y-1.5">
-              <Label className="font-semibold">קופה</Label>
-              <Select value={form.fundId || "none"} onValueChange={v => setForm(p => ({ ...p, fundId: v === "none" ? "" : v, categoryId: "" }))}>
-                <SelectTrigger className="rounded-xl">
-                  <SelectValue placeholder="בחר קופה..." />
-                </SelectTrigger>
-                <SelectContent dir="rtl">
-                  <SelectItem value="none">ללא קופה</SelectItem>
-                  {funds.filter(f => f.fundBehavior !== "non_budget").map(f => (
-                    <SelectItem key={f.id} value={String(f.id)}>
-                      <span className="flex items-center gap-2">
-                        <span className="w-2.5 h-2.5 rounded-full inline-block" style={{ background: f.colorClass }} />
-                        {f.name}
-                      </span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Category */}
-            <div className="space-y-1.5">
-              <Label className="font-semibold">קטגוריה</Label>
-              <Select value={form.categoryId || "none"} onValueChange={v => setForm(p => ({ ...p, categoryId: v === "none" ? "" : v }))}>
-                <SelectTrigger className="rounded-xl">
-                  <SelectValue placeholder="בחר קטגוריה..." />
-                </SelectTrigger>
-                <SelectContent dir="rtl">
-                  <SelectItem value="none">ללא קטגוריה</SelectItem>
-                  {availableCats.map(c => (
-                    <SelectItem key={c.id} value={String(c.id)}>
-                      <span className="flex items-center gap-2">
-                        <span className="w-2.5 h-2.5 rounded-full inline-block" style={{ background: c.color }} />
-                        {c.name}
-                      </span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setDialog(false)} className="rounded-xl flex-1">
-              <X className="w-4 h-4 ml-1" /> ביטול
-            </Button>
-            <Button onClick={saveExpense} disabled={saving} className="rounded-xl flex-1">
-              {saving ? <Loader2 className="w-4 h-4 animate-spin ml-1" /> : <Check className="w-4 h-4 ml-1" />}
-              {editItem ? "שמור" : "הוסף"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ExpenseDialog
+        open={dialog}
+        onClose={() => setDialog(false)}
+        editItem={editItem}
+        form={form}
+        setField={setField}
+        touch={touch}
+        funds={funds}
+        availableCats={availableCats}
+        errName={errName}
+        errAmount={errAmount}
+        errFund={errFund}
+        errDate={errDate}
+        saving={saving}
+        onSave={saveExpense}
+      />
 
       {/* ══ DELETE CONFIRM ══════════════════════════════════════ */}
       <Dialog open={deleteId !== null} onOpenChange={() => setDeleteId(null)}>
@@ -575,6 +532,280 @@ export default function Expenses() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════
+   EXPENSE DIALOG — professional modal
+═══════════════════════════════════════════════════════════ */
+function FieldError({ msg }: { msg: string }) {
+  if (!msg) return null;
+  return (
+    <p className="flex items-center gap-1 text-xs text-rose-600 mt-1 animate-in slide-in-from-top-1 duration-150">
+      <ShieldAlert className="w-3 h-3 shrink-0" />{msg}
+    </p>
+  );
+}
+
+function ExpenseDialog({
+  open, onClose, editItem, form, setField, touch,
+  funds, availableCats,
+  errName, errAmount, errFund, errDate,
+  saving, onSave,
+}: {
+  open: boolean; onClose: () => void;
+  editItem: Expense | null;
+  form: ExpenseForm;
+  setField: <K extends keyof ExpenseForm>(k: K, v: ExpenseForm[K]) => void;
+  touch: (k: string) => void;
+  funds: Fund[]; availableCats: Category[];
+  errName: string; errAmount: string; errFund: string; errDate: string;
+  saving: boolean; onSave: () => void;
+}) {
+  const amountRef = useRef<HTMLInputElement>(null);
+  /* auto-focus amount when dialog opens */
+  useEffect(() => {
+    if (open) setTimeout(() => amountRef.current?.focus(), 80);
+  }, [open]);
+
+  const isEdit = !!editItem;
+
+  return (
+    <Dialog open={open} onOpenChange={v => !v && onClose()}>
+      <DialogContent
+        className="max-w-lg rounded-3xl p-0 overflow-hidden shadow-2xl border border-border/60"
+        dir="rtl"
+      >
+        {/* ── Header ────────────────────────────────────────────── */}
+        <div className="flex items-center gap-3 px-6 pt-6 pb-4 border-b border-border/40 bg-gradient-to-l from-teal-50/60 to-white">
+          <div className="w-10 h-10 rounded-2xl bg-teal-600 flex items-center justify-center shadow-sm shrink-0">
+            <Receipt className="w-5 h-5 text-white" />
+          </div>
+          <div>
+            <DialogTitle className="text-lg font-bold text-foreground leading-tight">
+              {isEdit ? "עריכת הוצאה" : "הוצאה חדשה"}
+            </DialogTitle>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {isEdit ? "ערוך את פרטי ההוצאה הקיימת" : "מלא את הפרטים להוספת הוצאה חדשה"}
+            </p>
+          </div>
+        </div>
+
+        {/* ── Body ──────────────────────────────────────────────── */}
+        <div className="px-6 py-5 space-y-5 max-h-[70vh] overflow-y-auto">
+
+          {/* Amount — large, prominent */}
+          <div>
+            <Label className="text-sm font-semibold flex items-center gap-1 mb-1.5">
+              <CircleDollarSign className="w-3.5 h-3.5 text-teal-600" />
+              סכום
+              <span className="text-rose-500">*</span>
+            </Label>
+            <div className="relative">
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xl font-bold text-muted-foreground select-none">₪</span>
+              <Input
+                ref={amountRef}
+                type="number"
+                dir="ltr"
+                min="0"
+                step="0.01"
+                value={form.amount}
+                onChange={e => setField("amount", e.target.value)}
+                onBlur={() => touch("amount")}
+                placeholder="0.00"
+                className={cn(
+                  "pr-9 text-2xl font-bold h-14 rounded-2xl tabular-nums text-left",
+                  errAmount ? "border-rose-400 focus-visible:ring-rose-300 bg-rose-50/40" : "border-border focus-visible:ring-teal-300"
+                )}
+              />
+            </div>
+            <FieldError msg={errAmount} />
+          </div>
+
+          {/* Name */}
+          <div>
+            <Label className="text-sm font-semibold flex items-center gap-1 mb-1.5">
+              שם ההוצאה
+              <span className="text-rose-500">*</span>
+            </Label>
+            <Input
+              value={form.name}
+              onChange={e => setField("name", e.target.value)}
+              onBlur={() => touch("name")}
+              placeholder="לדוגמה: קנייה בסופרמרקט..."
+              className={cn(
+                "rounded-2xl",
+                errName ? "border-rose-400 focus-visible:ring-rose-300 bg-rose-50/40" : "focus-visible:ring-teal-300"
+              )}
+            />
+            <FieldError msg={errName} />
+          </div>
+
+          {/* Date + Payment — row */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label className="text-sm font-semibold flex items-center gap-1 mb-1.5">
+                <CalendarDays className="w-3.5 h-3.5 text-teal-600" />
+                תאריך
+                <span className="text-rose-500">*</span>
+              </Label>
+              <Input
+                type="date"
+                dir="ltr"
+                value={form.date}
+                onChange={e => setField("date", e.target.value)}
+                onBlur={() => touch("date")}
+                className={cn(
+                  "rounded-2xl",
+                  errDate ? "border-rose-400 focus-visible:ring-rose-300 bg-rose-50/40" : "focus-visible:ring-teal-300"
+                )}
+              />
+              <FieldError msg={errDate} />
+            </div>
+            <div>
+              <Label className="text-sm font-semibold mb-1.5 block">אמצעי תשלום</Label>
+              <Select value={form.paymentMethod} onValueChange={v => setField("paymentMethod", v)}>
+                <SelectTrigger className="rounded-2xl focus:ring-teal-300">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent dir="rtl">
+                  {Object.entries(PAYMENT_METHODS).map(([v, l]) => (
+                    <SelectItem key={v} value={v}>{l}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Fund */}
+          <div>
+            <Label className="text-sm font-semibold flex items-center gap-1 mb-1.5">
+              <Wallet className="w-3.5 h-3.5 text-teal-600" />
+              קופה
+              <span className="text-rose-500">*</span>
+            </Label>
+            <Select
+              value={form.fundId || "__none__"}
+              onValueChange={v => setField("fundId", v === "__none__" ? "" : v)}
+            >
+              <SelectTrigger
+                className={cn(
+                  "rounded-2xl",
+                  errFund ? "border-rose-400 focus:ring-rose-300 bg-rose-50/40" : "focus:ring-teal-300"
+                )}
+                onBlur={() => touch("fundId")}
+              >
+                <SelectValue placeholder="בחר קופה..." />
+              </SelectTrigger>
+              <SelectContent dir="rtl">
+                {funds.map(f => (
+                  <SelectItem key={f.id} value={String(f.id)}>
+                    <span className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: f.colorClass }} />
+                      {f.name}
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <FieldError msg={errFund} />
+          </div>
+
+          {/* Category */}
+          <div>
+            <Label className="text-sm font-semibold flex items-center gap-1 mb-1.5">
+              <Tag className="w-3.5 h-3.5 text-teal-600" />
+              קטגוריה
+              <span className="text-xs font-normal text-muted-foreground mr-1">(אופציונלי)</span>
+            </Label>
+            <Select
+              value={form.categoryId || "__none__"}
+              onValueChange={v => setField("categoryId", v === "__none__" ? "" : v)}
+            >
+              <SelectTrigger className="rounded-2xl focus:ring-teal-300">
+                <SelectValue placeholder={form.fundId ? "בחר קטגוריה..." : "בחר קופה תחילה"} />
+              </SelectTrigger>
+              <SelectContent dir="rtl">
+                <SelectItem value="__none__">
+                  <span className="text-muted-foreground">ללא קטגוריה</span>
+                </SelectItem>
+                {availableCats.map(c => (
+                  <SelectItem key={c.id} value={String(c.id)}>
+                    <span className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: c.color }} />
+                      {c.name}
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {form.fundId && availableCats.length === 0 && (
+              <p className="text-xs text-muted-foreground mt-1">אין קטגוריות לקופה זו</p>
+            )}
+          </div>
+
+          {/* Notes */}
+          <div>
+            <Label className="text-sm font-semibold flex items-center gap-1 mb-1.5">
+              <StickyNote className="w-3.5 h-3.5 text-teal-600" />
+              הערות
+              <span className="text-xs font-normal text-muted-foreground mr-1">(אופציונלי)</span>
+            </Label>
+            <textarea
+              value={form.notes}
+              onChange={e => setField("notes", e.target.value)}
+              placeholder="הערות נוספות..."
+              rows={2}
+              className="w-full rounded-2xl border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-300 focus-visible:ring-offset-2 resize-none"
+            />
+          </div>
+
+          {/* Recurring checkbox */}
+          <label className="flex items-center gap-3 cursor-pointer group select-none">
+            <span
+              onClick={() => setField("isRecurring", !form.isRecurring)}
+              className={cn(
+                "w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition-colors",
+                form.isRecurring
+                  ? "bg-teal-600 border-teal-600"
+                  : "border-border group-hover:border-teal-400"
+              )}
+            >
+              {form.isRecurring && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
+            </span>
+            <div>
+              <span className="text-sm font-medium flex items-center gap-1.5">
+                <RefreshCw className="w-3.5 h-3.5 text-teal-600" />
+                הוצאה חוזרת / קבועה
+              </span>
+              <p className="text-xs text-muted-foreground">סמן אם הוצאה זו מתרחשת באופן קבוע</p>
+            </div>
+          </label>
+        </div>
+
+        {/* ── Footer ────────────────────────────────────────────── */}
+        <div className="flex items-center gap-3 px-6 py-4 border-t border-border/40 bg-muted/20">
+          <Button
+            variant="outline"
+            onClick={onClose}
+            className="rounded-2xl flex-1 h-10"
+          >
+            <X className="w-4 h-4 ml-1.5" /> ביטול
+          </Button>
+          <Button
+            onClick={onSave}
+            disabled={saving}
+            className="rounded-2xl flex-1 h-10 bg-teal-600 hover:bg-teal-700 text-white shadow-sm"
+          >
+            {saving
+              ? <Loader2 className="w-4 h-4 animate-spin ml-1.5" />
+              : <Check className="w-4 h-4 ml-1.5" />
+            }
+            {isEdit ? "שמור שינויים" : "הוסף הוצאה"}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
