@@ -50,9 +50,12 @@ A full Hebrew RTL personal budget management web app built around the user's spe
 - All API routes accept `?bid=X` (budget year ID) query param, defaulting to 1
 - Frontend: `src/lib/api.ts` exports `apiFetch()` — automatically appends `?bid=X` from module-level `_activeBid`
 - Frontend: `src/contexts/BudgetYearContext.tsx` stores list of years + active year, persists to `localStorage`
-- Frontend: `src/components/YearSwitcher.tsx` — dropdown + "create new year" dialog
-- `/api/budget-years` — CRUD for budget years (already had activate endpoint)
+  - Context exposes: `createYear`, `updateYear`, `deleteYear`, `activateYear`, `refreshYears`
+- Frontend: `src/components/YearSwitcher.tsx` — dropdown with per-year: edit (pencil), activate (star), delete (trash) buttons + create dialog
+- `/api/budget-years` — full CRUD: GET list, POST create, PUT update, DELETE delete, POST/:id/activate
 - `/api/budget-year?bid=X` — get/put settings for specific year
+- **ALL pages use `[activeBid]` in useEffect deps** so they re-fetch when year changes:
+  - Budget, Expenses, Incomes, Charity, Debts, Funds, Savings, AnnualExpenses, LargeExpenses, ExternalFunds, Dashboard, Home
 
 ### Key Architecture Decisions
 - **Single user**: All routes hardcode `DEFAULT_USER_ID = 1`

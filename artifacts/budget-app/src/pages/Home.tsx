@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { Link } from "wouter";
+import { useBudgetYear } from "@/contexts/BudgetYearContext";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -46,6 +47,7 @@ const GO_LINK       = "flex items-center gap-1 text-xs text-muted-foreground hov
 ───────────────────────────────────────────────────────────── */
 export default function Home() {
   const { toast } = useToast();
+  const { activeBid } = useBudgetYear();
 
   /* global data */
   const [income, setIncome]       = useState<IncomeSummary>({ totalIncome: 0, totalDeductions: 0, netIncome: 0 });
@@ -81,7 +83,7 @@ export default function Home() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [activeBid]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { load(); }, [load]);
 

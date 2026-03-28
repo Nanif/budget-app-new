@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { PageHeader } from "@/components/PageHeader";
+import { useBudgetYear } from "@/contexts/BudgetYearContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -125,6 +126,7 @@ function TitheProgressBar({ given, target }: { given: number; target: number }) 
 ═══════════════════════════════════════════════════════════ */
 export default function Charity() {
   const { toast } = useToast();
+  const { activeBid } = useBudgetYear();
 
   /* ── data ────────────────────────────────────────────────── */
   const [entries,       setEntries]       = useState<TitheEntry[]>([]);
@@ -169,7 +171,7 @@ export default function Charity() {
     } catch { toast({ title: "שגיאה בטעינה", variant: "destructive" }); }
     finally { setLoading(false); }
   };
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [activeBid]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* ── KPI calculations ─────────────────────────────────────── */
   const titheRate    = parseFloat(String(budgetYear.tithePercentage)) / 100 || 0.1;

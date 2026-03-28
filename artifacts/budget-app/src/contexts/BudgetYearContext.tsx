@@ -23,6 +23,8 @@ type BudgetYearContextType = {
   setViewedYear: (id: number) => void;
   createYear: (data: Partial<BudgetYear>) => Promise<BudgetYear>;
   updateYear: (id: number, data: Partial<BudgetYear>) => Promise<BudgetYear>;
+  deleteYear: (id: number) => Promise<void>;
+  activateYear: (id: number) => Promise<BudgetYear>;
   refreshYears: () => Promise<void>;
 };
 
@@ -100,6 +102,23 @@ export function BudgetYearProvider({ children }: { children: ReactNode }) {
     return updated;
   };
 
+  const deleteYear = async (id: number): Promise<void> => {
+    await rawFetch(`/budget-years/${id}`, { method: "DELETE" });
+    await refreshYears();
+    // If we deleted the currently viewed year, switch to another
+    const remaining = years.filter(y => y.id !== id);
+    if (remaining.length > 0 && activeBid === id) {
+      const newActive = remaining.find(y => y.isActive) || remaining[remaining.length - 1];
+      switchYear(newActive.id);
+    }
+  };
+
+  const activateYear = async (id: number): Promise<BudgetYear> => {
+    const activated: BudgetYear = await rawFetch(`/budget-years/${id}/activate`, { method: "POST" });
+    await refreshYears();
+    return activated;
+  };
+
   const activeYear = years.find(y => y.id === activeBid) || years[0] || null;
 
   return (
@@ -111,6 +130,8 @@ export function BudgetYearProvider({ children }: { children: ReactNode }) {
       setViewedYear: switchYear,
       createYear,
       updateYear,
+      deleteYear,
+      activateYear,
       refreshYears,
     }}>
       {children}

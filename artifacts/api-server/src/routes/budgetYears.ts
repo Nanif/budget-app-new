@@ -46,6 +46,21 @@ router.put("/:id", async (req, res) => {
   }
 });
 
+router.delete("/:id", async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const all = await db.select().from(budgetYearsTable).where(eq(budgetYearsTable.userId, DEFAULT_USER_ID));
+    if (all.length <= 1) { res.status(400).json({ error: "לא ניתן למחוק את שנת התקציב האחרונה" }); return; }
+    const [deleted] = await db.delete(budgetYearsTable)
+      .where(and(eq(budgetYearsTable.id, id), eq(budgetYearsTable.userId, DEFAULT_USER_ID))).returning();
+    if (!deleted) { res.status(404).json({ error: "Not found" }); return; }
+    res.json({ ok: true });
+  } catch (err: any) {
+    req.log.error({ err }, "Failed to delete budget year");
+    res.status(500).json({ error: "שגיאה במחיקה. ייתכן שיש נתונים המשויכים לשנה זו." });
+  }
+});
+
 router.post("/:id/activate", async (req, res) => {
   try {
     const id = parseInt(req.params.id);

@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { Link } from "wouter";
 import { PageHeader } from "@/components/PageHeader";
+import { useBudgetYear } from "@/contexts/BudgetYearContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -94,6 +95,7 @@ function parseFunds(raw: any[]): Fund[] {
 ═══════════════════════════════════════════════════════════ */
 export default function Budget() {
   const { toast } = useToast();
+  const { activeBid } = useBudgetYear();
 
   /* ── data ────────────────────────────────────────────────── */
   const [year,     setYear]     = useState<BudgetYear | null>(null);
@@ -137,7 +139,7 @@ export default function Budget() {
     } catch { toast({ title: "שגיאה בטעינה", variant: "destructive" }); }
     finally { setLoading(false); }
   };
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [activeBid]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* ── derived ─────────────────────────────────────────────── */
   const spendMap = useMemo(() => {

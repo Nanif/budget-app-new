@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { PageHeader } from "@/components/PageHeader";
+import { useBudgetYear } from "@/contexts/BudgetYearContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,6 +24,7 @@ function fmt(n: number) {
 
 export default function ExternalFunds() {
   const { toast } = useToast();
+  const { activeBid } = useBudgetYear();
   const [funds, setFunds] = useState<Fund[]>([]);
   const [expenses, setExpenses] = useState<Record<number, Expense[]>>({});
   const [totals, setTotals] = useState<Record<number, number>>({});
@@ -57,7 +59,7 @@ export default function ExternalFunds() {
       } catch { toast({ title: "שגיאה בטעינה", variant: "destructive" }); }
       finally { setLoading(false); }
     })();
-  }, []);
+  }, [activeBid]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const openCreate = (fundId: number) => {
     setEditExp(null);

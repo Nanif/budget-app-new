@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { PageHeader } from "@/components/PageHeader";
+import { useBudgetYear } from "@/contexts/BudgetYearContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,6 +34,7 @@ function fmt(n: number) {
 
 export default function AnnualExpenses() {
   const { toast } = useToast();
+  const { activeBid } = useBudgetYear();
   const [fund, setFund] = useState<Fund | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -62,7 +64,7 @@ export default function AnnualExpenses() {
       } catch { toast({ title: "שגיאה בטעינה", variant: "destructive" }); }
       finally { setLoading(false); }
     })();
-  }, []);
+  }, [activeBid]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadExpenses = async (fundId: number) => {
     const [exps, summ] = await Promise.all([

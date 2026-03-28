@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { PageHeader } from "@/components/PageHeader";
+import { useBudgetYear } from "@/contexts/BudgetYearContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -120,6 +121,7 @@ function getYear(d: string)  { return String(new Date(d).getFullYear()); }
 ═══════════════════════════════════════════════════════════ */
 export default function Incomes() {
   const { toast } = useToast();
+  const { activeBid } = useBudgetYear();
 
   /* ── data ────────────────────────────────────────────────── */
   const [entries,  setEntries]  = useState<Income[]>([]);
@@ -157,7 +159,7 @@ export default function Incomes() {
     } catch { toast({ title: "שגיאה בטעינה", variant: "destructive" }); }
     finally { setLoading(false); }
   };
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [activeBid]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* ── derived unique values for filters ───────────────────── */
   const uniqueSources = useMemo(() =>

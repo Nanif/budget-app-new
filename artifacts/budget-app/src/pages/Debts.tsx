@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useBudgetYear } from "@/contexts/BudgetYearContext";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,6 +22,7 @@ type Debt = {
 
 export default function Debts() {
   const { toast } = useToast();
+  const { activeBid } = useBudgetYear();
   const [debts, setDebts] = useState<Debt[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -34,7 +36,7 @@ export default function Debts() {
     finally { setIsLoading(false); }
   };
 
-  useEffect(() => { loadDebts(); }, []);
+  useEffect(() => { loadDebts(); }, [activeBid]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();

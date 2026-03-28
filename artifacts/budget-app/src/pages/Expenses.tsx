@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { PageHeader } from "@/components/PageHeader";
+import { useBudgetYear } from "@/contexts/BudgetYearContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -102,6 +103,7 @@ const EMPTY_FORM: ExpenseForm = {
 ═══════════════════════════════════════════════════════════ */
 export default function Expenses() {
   const { toast } = useToast();
+  const { activeBid } = useBudgetYear();
 
   /* ── data ────────────────────────────────────────────────── */
   const [expenses,   setExpenses]   = useState<Expense[]>([]);
@@ -145,7 +147,7 @@ export default function Expenses() {
     } catch { toast({ title: "שגיאה בטעינה", variant: "destructive" }); }
     finally { setLoading(false); }
   };
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [activeBid]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* ── lookup maps ─────────────────────────────────────────── */
   const fundMap = useMemo(() => Object.fromEntries(funds.map(f => [f.id, f])), [funds]);

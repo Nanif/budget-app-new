@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import { Card, CardContent } from "@/components/ui/card";
+import { useBudgetYear } from "@/contexts/BudgetYearContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -68,6 +69,7 @@ const DEFAULT_FORM: FormState = {
 
 export default function Funds() {
   const { toast } = useToast();
+  const { activeBid } = useBudgetYear();
   const [funds, setFunds] = useState<Fund[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showInactive, setShowInactive] = useState(false);
@@ -86,7 +88,7 @@ export default function Funds() {
     catch { toast({ title: "שגיאה בטעינת קופות", variant: "destructive" }); }
     finally { setIsLoading(false); }
   };
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [activeBid]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const openCreate = () => {
     setEditFund(null); setForm(DEFAULT_FORM); setFormErrors({}); setDialogOpen(true);

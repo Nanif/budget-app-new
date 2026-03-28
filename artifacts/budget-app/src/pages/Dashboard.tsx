@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { PageHeader } from "@/components/PageHeader";
+import { useBudgetYear } from "@/contexts/BudgetYearContext";
 import { formatILS } from "@/lib/format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Link } from "wouter";
@@ -57,16 +58,22 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 };
 
 export default function Dashboard() {
+  const { activeYear, activeBid } = useBudgetYear();
   const [data, setData] = useState<AnnualData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [selectedYear] = useState(new Date().getFullYear());
   const [activeFundIdx, setActiveFundIdx] = useState<number | null>(null);
+
+  const yearNum = (() => {
+    if (!activeYear) return new Date().getFullYear();
+    const m = activeYear.startDate?.match(/(\d{4})/);
+    return m ? parseInt(m[1]) : new Date().getFullYear();
+  })();
 
   useEffect(() => {
     setIsLoading(true);
-    apiFetch(`/dashboard/annual?year=${selectedYear}`)
+    apiFetch(`/dashboard/annual?year=${yearNum}`)
       .then(setData).finally(() => setIsLoading(false));
-  }, [selectedYear]);
+  }, [activeBid]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const kpiCards = [
     {
