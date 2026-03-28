@@ -14,6 +14,7 @@ import ExternalFunds from "@/pages/ExternalFunds";
 import Incomes from "@/pages/Incomes";
 import Charity from "@/pages/Charity";
 import Debts from "@/pages/Debts";
+import Expenses from "@/pages/Expenses";
 import Savings from "@/pages/Savings";
 import Notes from "@/pages/Notes";
 import Reminders from "@/pages/Reminders";
@@ -40,6 +41,7 @@ function Router() {
         <Route path="/annual" component={AnnualExpenses} />
         <Route path="/large" component={LargeExpenses} />
         <Route path="/external" component={ExternalFunds} />
+        <Route path="/expenses" component={Expenses} />
         <Route path="/incomes" component={Incomes} />
         <Route path="/charity" component={Charity} />
         <Route path="/debts" component={Debts} />
