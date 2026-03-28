@@ -20,8 +20,8 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 ## Project: ניהול תקציב אישי (Personal Budget Manager)
 
 A full Hebrew RTL personal budget management web app with 10 modules:
-1. דף בית (Home) - Welcome with overview stats
-2. דשבורד (Dashboard) - Budget charts and KPIs
+1. דף בית (Home) - Comprehensive home dashboard with 4 widgets: מעשרות, חובות, תזכורות, פתקים; quick-add for tasks & charity
+2. דשבורד (Dashboard) - Full annual budget dashboard: KPI cards, monthly area chart, fund status, category pie, annual summary, anomaly detection
 3. הוצאות (Expenses) - Full CRUD expense tracking
 4. הכנסות (Incomes) - Full CRUD income tracking
 5. צדקה ומעשרות (Charity) - Charitable giving tracker

@@ -12,6 +12,7 @@ import dashboardRouter from "./dashboard";
 import categoriesRouter from "./categories";
 import budgetYearsRouter from "./budgetYears";
 import noteTabsRouter from "./noteTabs";
+import fundsRouter from "./funds";
 
 const router = Router();
 
@@ -28,5 +29,6 @@ router.use("/dashboard", dashboardRouter);
 router.use("/categories", categoriesRouter);
 router.use("/budget-years", budgetYearsRouter);
 router.use("/note-tabs", noteTabsRouter);
+router.use("/funds", fundsRouter);
 
 export default router;
