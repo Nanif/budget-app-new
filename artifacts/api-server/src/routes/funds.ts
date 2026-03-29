@@ -1,11 +1,61 @@
 import { Router } from "express";
-import { db, fundsTable, insertFundSchema, categoriesTable } from "@workspace/db";
+import { db, fundsTable, insertFundSchema, expensesTable } from "@workspace/db";
 import { eq, and, asc, sql } from "drizzle-orm";
 
 const router = Router();
 const DEFAULT_USER_ID = 1;
 const DEFAULT_BUDGET_YEAR_ID = 1;
 function getBYID(req: any): number { const b = parseInt(String(req.query.bid)); return isNaN(b) ? DEFAULT_BUDGET_YEAR_ID : b; }
+
+/* ── GET summary (per-fund stats) ─────────────────────────────── */
+router.get("/summary", async (req, res) => {
+  try {
+    const byid = getBYID(req);
+    const funds = await db.select().from(fundsTable)
+      .where(and(eq(fundsTable.userId, DEFAULT_USER_ID), eq(fundsTable.budgetYearId, byid), eq(fundsTable.isActive, true)))
+      .orderBy(asc(fundsTable.displayOrder));
+
+    const spentRows = await db.select({
+      fundId: expensesTable.fundId,
+      total: sql<string>`COALESCE(SUM(amount), 0)`,
+    }).from(expensesTable)
+      .where(and(eq(expensesTable.userId, DEFAULT_USER_ID), eq(expensesTable.budgetYearId, byid)))
+      .groupBy(expensesTable.fundId);
+
+    const spentMap: Record<number, number> = {};
+    for (const r of spentRows) { if (r.fundId) spentMap[r.fundId] = parseFloat(r.total); }
+
+    const summary = funds.map(fund => {
+      const monthly = parseFloat(fund.monthlyAllocation);
+      const annual  = parseFloat(fund.annualAllocation);
+      const initial = parseFloat(fund.initialBalance);
+      let budgetAmount = 0;
+      if (fund.fundBehavior === "fixed_monthly" || fund.fundBehavior === "cash_monthly") {
+        budgetAmount = monthly * 12;
+      } else if (fund.fundBehavior === "annual_categorized" || fund.fundBehavior === "annual_large") {
+        budgetAmount = annual;
+      } else if (fund.fundBehavior === "non_budget") {
+        budgetAmount = initial;
+      }
+      const actualAmount = spentMap[fund.id] || 0;
+      const remaining    = budgetAmount - actualAmount;
+      const usagePercent = budgetAmount > 0 ? Math.min(100, (actualAmount / budgetAmount) * 100) : 0;
+      const status: "ok" | "warning" | "over" =
+        usagePercent >= 100 ? "over" : usagePercent >= 80 ? "warning" : "ok";
+      return {
+        id: fund.id, name: fund.name, colorClass: fund.colorClass,
+        fundBehavior: fund.fundBehavior, description: fund.description,
+        monthlyAllocation: monthly, annualAllocation: annual, initialBalance: initial,
+        budgetAmount, actualAmount, remaining,
+        usagePercent: Math.round(usagePercent), status,
+      };
+    });
+    res.json(summary);
+  } catch (err) {
+    req.log.error({ err }, "Failed to get fund summary");
+    res.status(500).json({ error: "Failed to get fund summary" });
+  }
+});
 
 /* ── GET all (active + inactive) ──────────────────────────────── */
 router.get("/", async (req, res) => {

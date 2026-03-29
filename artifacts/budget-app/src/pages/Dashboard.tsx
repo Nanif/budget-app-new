@@ -17,6 +17,12 @@ type BudgetYear    = { tithePercentage: number };
 type Tithe         = { id: number; amount: number; recipient: string; isTithe: boolean; date: string };
 type Debt          = { id: number; name: string; type: string; remainingAmount: number; dueDate: string | null; status: string };
 type Task          = { id: number; title: string; priority: string; status: string; dueDate: string | null };
+type FundSummary   = {
+  id: number; name: string; colorClass: string; fundBehavior: string; description: string;
+  monthlyAllocation: number; annualAllocation: number; initialBalance: number;
+  budgetAmount: number; actualAmount: number; remaining: number;
+  usagePercent: number; status: "ok" | "warning" | "over";
+};
 
 /* ── Helpers ────────────────────────────────────────────────── */
 function fmt(n: number) {
@@ -48,23 +54,26 @@ export default function DashboardPage() {
   const [tithes, setTithes]         = useState<Tithe[]>([]);
   const [debts, setDebts]           = useState<Debt[]>([]);
   const [tasks, setTasks]           = useState<Task[]>([]);
+  const [funds, setFunds]           = useState<FundSummary[]>([]);
   const [loading, setLoading]       = useState(true);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [inc, by, tth, dbs, tks] = await Promise.all([
+      const [inc, by, tth, dbs, tks, fnd] = await Promise.all([
         apiFetch("/incomes/summary"),
         apiFetch("/budget-year"),
         apiFetch("/charity"),
         apiFetch("/debts"),
         apiFetch("/reminders"),
+        apiFetch("/funds/summary"),
       ]);
       setIncome(inc);
       setBudgetYear(by);
       setTithes(tth);
       setDebts(dbs);
       setTasks(tks);
+      setFunds(fnd);
     } catch {
       toast({ title: "שגיאה בטעינה", variant: "destructive" });
     } finally {
@@ -79,58 +88,71 @@ export default function DashboardPage() {
   const titheLeft   = titheTarget - titheGiven;
   const tithePct    = titheTarget > 0 ? Math.min(100, (titheGiven / titheTarget) * 100) : 0;
 
+  const monthlyFunds   = funds.filter(f => f.fundBehavior === "fixed_monthly" || f.fundBehavior === "cash_monthly");
+  const annualFunds    = funds.filter(f => f.fundBehavior === "annual_categorized" || f.fundBehavior === "annual_large");
+  const nonBudgetFunds = funds.filter(f => f.fundBehavior === "non_budget");
+
   if (loading) {
     return (
-      <div className="grid grid-cols-3 gap-4 h-[calc(100vh-80px)]" dir="rtl">
-        {[1, 2, 3].map(i => (
-          <div key={i} className="bg-muted animate-pulse rounded-2xl h-full" />
-        ))}
+      <div className="space-y-4" dir="rtl">
+        <div className="grid grid-cols-3 gap-4 h-[calc(100vh-80px)]">
+          {[1, 2, 3].map(i => (
+            <div key={i} className="bg-muted animate-pulse rounded-2xl h-full" />
+          ))}
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="grid grid-cols-3 gap-4 h-[calc(100vh-80px)]" dir="rtl">
+    <div className="space-y-6" dir="rtl">
 
-      {/* ══ מעשרות ══════════════════════════════════════════════ */}
-      <TitheCard
-        income={income}
-        budgetYear={budgetYear}
-        tithes={tithes}
-        titheTarget={titheTarget}
-        titheGiven={titheGiven}
-        titheLeft={titheLeft}
-        tithePct={tithePct}
-        onAdd={async (payload) => {
-          const created = await apiFetch("/charity", { method: "POST", body: JSON.stringify(payload) });
-          setTithes(prev => [{ ...created, amount: parseFloat(String(created.amount)) }, ...prev]);
-        }}
-      />
+      {/* ══ 3 כרטיסים ראשיים ══════════════════════════════════ */}
+      <div className="grid grid-cols-3 gap-4 h-[calc(100vh-80px)]">
+        <TitheCard
+          income={income}
+          budgetYear={budgetYear}
+          tithes={tithes}
+          titheTarget={titheTarget}
+          titheGiven={titheGiven}
+          titheLeft={titheLeft}
+          tithePct={tithePct}
+          onAdd={async (payload) => {
+            const created = await apiFetch("/charity", { method: "POST", body: JSON.stringify(payload) });
+            setTithes(prev => [{ ...created, amount: parseFloat(String(created.amount)) }, ...prev]);
+          }}
+        />
+        <RemindersCard
+          tasks={tasks}
+          onToggle={async (id) => {
+            const updated = await apiFetch(`/reminders/${id}/toggle`, { method: "PATCH" });
+            setTasks(prev => prev.map(t => t.id === id ? updated : t));
+          }}
+          onAdd={async (title, priority) => {
+            const created = await apiFetch("/reminders", {
+              method: "POST",
+              body: JSON.stringify({ title, priority, status: "open", description: "" }),
+            });
+            setTasks(prev => [created, ...prev]);
+          }}
+        />
+        <DebtsCard
+          debts={debts}
+          onAdd={async (payload) => {
+            const created = await apiFetch("/debts", { method: "POST", body: JSON.stringify(payload) });
+            setDebts(prev => [created, ...prev]);
+          }}
+        />
+      </div>
 
-      {/* ══ תזכורות ════════════════════════════════════════════ */}
-      <RemindersCard
-        tasks={tasks}
-        onToggle={async (id) => {
-          const updated = await apiFetch(`/reminders/${id}/toggle`, { method: "PATCH" });
-          setTasks(prev => prev.map(t => t.id === id ? updated : t));
-        }}
-        onAdd={async (title, priority) => {
-          const created = await apiFetch("/reminders", {
-            method: "POST",
-            body: JSON.stringify({ title, priority, status: "open", description: "" }),
-          });
-          setTasks(prev => [created, ...prev]);
-        }}
-      />
-
-      {/* ══ חובות ══════════════════════════════════════════════ */}
-      <DebtsCard
-        debts={debts}
-        onAdd={async (payload) => {
-          const created = await apiFetch("/debts", { method: "POST", body: JSON.stringify(payload) });
-          setDebts(prev => [created, ...prev]);
-        }}
-      />
+      {/* ══ קופות ════════════════════════════════════════════= */}
+      {funds.length > 0 && (
+        <div className="space-y-5 pb-6">
+          <FundGroup title="קופות חודשיות" funds={monthlyFunds} />
+          <FundGroup title="קופות שנתיות" funds={annualFunds} />
+          <FundGroup title="קופות מחוץ לתקציב" funds={nonBudgetFunds} />
+        </div>
+      )}
 
     </div>
   );
@@ -508,6 +530,80 @@ function RemindersCard({ tasks, onToggle, onAdd }: {
           </button>
         )}
       </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════
+   FUND GROUP + FUND CARD
+═══════════════════════════════════════════════════════════ */
+function FundGroup({ title, funds }: { title: string; funds: FundSummary[] }) {
+  if (funds.length === 0) return null;
+  return (
+    <div>
+      <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-wider mb-3 px-0.5">{title}</h3>
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+        {funds.map(fund => <FundCard key={fund.id} fund={fund} />)}
+      </div>
+    </div>
+  );
+}
+
+function FundCard({ fund }: { fund: FundSummary }) {
+  const isMonthly   = fund.fundBehavior === "fixed_monthly" || fund.fundBehavior === "cash_monthly";
+  const isNonBudget = fund.fundBehavior === "non_budget";
+
+  const barColor =
+    fund.status === "over"    ? "bg-rose-500" :
+    fund.status === "warning" ? "bg-amber-500" :
+    "bg-emerald-500";
+
+  const remainColor =
+    fund.remaining < 0       ? "text-rose-600" :
+    fund.remaining === 0     ? "text-muted-foreground" :
+    "text-emerald-600";
+
+  return (
+    <div className="bg-card border border-border/60 rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow flex flex-col gap-3">
+      <div className="flex items-center gap-2">
+        <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: fund.colorClass }} />
+        <span className="font-semibold text-sm truncate">{fund.name}</span>
+      </div>
+
+      <div className="space-y-1.5 text-xs">
+        <div className="flex justify-between">
+          <span className="text-muted-foreground">{isNonBudget ? "יתרת פתיחה" : isMonthly ? "תקציב שנתי" : "תקציב"}</span>
+          <span className="font-medium tabular-nums">{fmt(fund.budgetAmount)}</span>
+        </div>
+        {isMonthly && (
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">חודשי</span>
+            <span className="font-medium tabular-nums">{fmt(fund.monthlyAllocation)}</span>
+          </div>
+        )}
+        <div className="flex justify-between">
+          <span className="text-muted-foreground">הוצאות בפועל</span>
+          <span className="font-medium tabular-nums">{fmt(fund.actualAmount)}</span>
+        </div>
+        <div className="flex justify-between border-t border-border/40 pt-1.5">
+          <span className="text-muted-foreground">{isNonBudget ? "יתרה" : "נותר"}</span>
+          <span className={cn("font-bold tabular-nums", remainColor)}>{fmt(fund.remaining)}</span>
+        </div>
+      </div>
+
+      {fund.budgetAmount > 0 && (
+        <div>
+          <div className="flex justify-between text-[10px] text-muted-foreground mb-1">
+            <span>{fund.usagePercent}%</span>
+            {fund.status === "over" && <span className="text-rose-500 font-medium">חריגה!</span>}
+            {fund.status === "warning" && <span className="text-amber-500 font-medium">קרוב לגבול</span>}
+          </div>
+          <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+            <div className={cn("h-full rounded-full transition-all", barColor)}
+              style={{ width: `${fund.usagePercent}%` }} />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
