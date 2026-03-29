@@ -7,6 +7,7 @@ import { BudgetYearProvider } from "@/contexts/BudgetYearContext";
 import NotFound from "@/pages/not-found";
 
 import Home from "@/pages/Home";
+import Dashboard from "@/pages/Dashboard";
 import Budget from "@/pages/Budget";
 import CashWallet from "@/pages/CashWallet";
 import FixedExpenses from "@/pages/FixedExpenses";
@@ -15,11 +16,8 @@ import LargeExpenses from "@/pages/LargeExpenses";
 import ExternalFunds from "@/pages/ExternalFunds";
 import Incomes from "@/pages/Incomes";
 import Charity from "@/pages/Charity";
-import Debts from "@/pages/Debts";
 import Expenses from "@/pages/Expenses";
 import Savings from "@/pages/Savings";
-import Notes from "@/pages/Notes";
-import Reminders from "@/pages/Reminders";
 import Settings from "@/pages/Settings";
 import Categories from "@/pages/Categories";
 
@@ -38,6 +36,7 @@ function Router() {
     <Layout>
       <Switch>
         <Route path="/" component={Home} />
+        <Route path="/dashboard" component={Dashboard} />
         <Route path="/budget" component={Budget} />
         <Route path="/cash" component={CashWallet} />
         <Route path="/fixed" component={FixedExpenses} />
@@ -47,10 +46,7 @@ function Router() {
         <Route path="/expenses" component={Expenses} />
         <Route path="/incomes" component={Incomes} />
         <Route path="/charity" component={Charity} />
-        <Route path="/debts" component={Debts} />
         <Route path="/savings" component={Savings} />
-        <Route path="/notes" component={Notes} />
-        <Route path="/reminders" component={Reminders} />
         <Route path="/settings" component={Settings} />
         <Route path="/categories" component={Categories} />
         <Route component={NotFound} />

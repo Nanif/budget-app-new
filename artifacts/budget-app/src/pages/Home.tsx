@@ -3,25 +3,21 @@ import { Link } from "wouter";
 import { useBudgetYear } from "@/contexts/BudgetYearContext";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { apiFetch } from "@/lib/api";
 import {
-  HeartHandshake, CreditCard, CheckSquare, StickyNote,
+  CreditCard, CheckSquare, StickyNote,
   ArrowLeft, Plus, Check, Circle, AlertCircle, Pin,
-  TrendingUp, TrendingDown, ChevronRight, Loader2,
+  TrendingUp, TrendingDown, Loader2,
   BookOpen,
 } from "lucide-react";
 
 
 /* ── Types ─────────────────────────────────────────────────── */
-type IncomeSummary = { totalIncome: number; totalDeductions: number; netIncome: number };
-type BudgetYear    = { tithePercentage: number };
-type Tithe         = { id: number; amount: number; recipient: string; isTithe: boolean; date: string };
-type Debt          = { id: number; name: string; type: string; remainingAmount: number; dueDate: string | null; status: string };
-type Task          = { id: number; title: string; priority: string; status: string; dueDate: string | null };
-type NoteTab       = { id: number; name: string; color: string };
-type Note          = { id: number; title: string; content: string; color: string; isPinned: boolean; tabId: number | null; tabName: string | null };
+type Debt    = { id: number; name: string; type: string; remainingAmount: number; dueDate: string | null; status: string };
+type Task    = { id: number; title: string; priority: string; status: string; dueDate: string | null };
+type NoteTab = { id: number; name: string; color: string };
+type Note    = { id: number; title: string; content: string; color: string; isPinned: boolean; tabId: number | null; tabName: string | null };
 
 /* ── Helpers ────────────────────────────────────────────────── */
 
@@ -50,30 +46,21 @@ export default function Home() {
   const { activeBid } = useBudgetYear();
 
   /* global data */
-  const [income, setIncome]       = useState<IncomeSummary>({ totalIncome: 0, totalDeductions: 0, netIncome: 0 });
-  const [budgetYear, setBudgetYear] = useState<BudgetYear>({ tithePercentage: 10 });
-  const [tithes, setTithes]       = useState<Tithe[]>([]);
-  const [debts, setDebts]         = useState<Debt[]>([]);
-  const [tasks, setTasks]         = useState<Task[]>([]);
-  const [tabs, setTabs]           = useState<NoteTab[]>([]);
-  const [notes, setNotes]         = useState<Note[]>([]);
-  const [loading, setLoading]     = useState(true);
+  const [debts, setDebts]     = useState<Debt[]>([]);
+  const [tasks, setTasks]     = useState<Task[]>([]);
+  const [tabs, setTabs]       = useState<NoteTab[]>([]);
+  const [notes, setNotes]     = useState<Note[]>([]);
+  const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [inc, by, tth, dbs, tks, nbs, nts] = await Promise.all([
-        apiFetch("/incomes/summary"),
-        apiFetch("/budget-year"),
-        apiFetch("/charity"),
+      const [dbs, tks, nbs, nts] = await Promise.all([
         apiFetch("/debts"),
         apiFetch("/reminders"),
         apiFetch("/note-tabs"),
         apiFetch("/notes"),
       ]);
-      setIncome(inc);
-      setBudgetYear(by);
-      setTithes(tth);
       setDebts(dbs);
       setTasks(tks);
       setTabs(nbs);
@@ -87,12 +74,6 @@ export default function Home() {
 
   useEffect(() => { load(); }, [load]);
 
-  /* derived */
-  const titheTarget  = income.netIncome * (budgetYear.tithePercentage / 100);
-  const titheGiven   = tithes.filter(t => t.isTithe).reduce((s, t) => s + t.amount, 0);
-  const titheLeft    = titheTarget - titheGiven;
-  const tithePct     = titheTarget > 0 ? Math.min(100, (titheGiven / titheTarget) * 100) : 0;
-
   const now = new Date();
   const MONTH_NAMES = ["ינואר","פברואר","מרץ","אפריל","מאי","יוני","יולי","אוגוסט","ספטמבר","אוקטובר","נובמבר","דצמבר"];
   const monthLabel = `${MONTH_NAMES[now.getMonth()]} ${now.getFullYear()}`;
@@ -105,16 +86,11 @@ export default function Home() {
           <h1 className="text-2xl font-display font-bold">שלום 👋</h1>
           <p className="text-muted-foreground text-sm mt-0.5">{monthLabel} — סקירת מצב</p>
         </div>
-        <Link href={`/budget`}>
-          <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-border/60 text-sm text-muted-foreground hover:text-foreground hover:border-primary/40 transition-all">
-            תכנון תקציב <ChevronRight className="w-3.5 h-3.5" />
-          </button>
-        </Link>
       </div>
 
       {loading ? (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {[1,2,3,4].map(i => (
+          {[1,2,3].map(i => (
             <div key={i} className="h-72 bg-muted animate-pulse rounded-2xl" />
           ))}
         </div>
@@ -122,24 +98,7 @@ export default function Home() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
           {/* ══════════════════════════════════════════════════
-              CARD 1 — מעשרות
-          ══════════════════════════════════════════════════ */}
-          <TitheCard
-            income={income}
-            budgetYear={budgetYear}
-            tithes={tithes}
-            titheTarget={titheTarget}
-            titheGiven={titheGiven}
-            titheLeft={titheLeft}
-            tithePct={tithePct}
-            onAdd={async (payload) => {
-              const created = await apiFetch("/charity", { method: "POST", body: JSON.stringify(payload) });
-              setTithes(prev => [{ ...created, amount: parseFloat(String(created.amount)) }, ...prev]);
-            }}
-          />
-
-          {/* ══════════════════════════════════════════════════
-              CARD 2 — חובות
+              CARD 1 — חובות
           ══════════════════════════════════════════════════ */}
           <DebtsCard
             debts={debts}
@@ -150,7 +109,7 @@ export default function Home() {
           />
 
           {/* ══════════════════════════════════════════════════
-              CARD 3 — תזכורות
+              CARD 2 — תזכורות
           ══════════════════════════════════════════════════ */}
           <RemindersCard
             tasks={tasks}
@@ -168,7 +127,7 @@ export default function Home() {
           />
 
           {/* ══════════════════════════════════════════════════
-              CARD 4 — פתקים
+              CARD 3 — פתקים
           ══════════════════════════════════════════════════ */}
           <NotesCard
             tabs={tabs}
@@ -189,116 +148,7 @@ export default function Home() {
 }
 
 /* ─────────────────────────────────────────────────────────────
-   CARD 1: מעשרות
-───────────────────────────────────────────────────────────── */
-function TitheCard({ income, budgetYear, tithes, titheTarget, titheGiven, titheLeft, tithePct, onAdd }: {
-  income: IncomeSummary; budgetYear: BudgetYear;
-  tithes: Tithe[]; titheTarget: number; titheGiven: number; titheLeft: number; tithePct: number;
-  onAdd: (p: any) => Promise<void>;
-}) {
-  const { toast } = useToast();
-  const [recipient, setRecipient] = useState("");
-  const [amount, setAmount]       = useState("");
-  const [saving, setSaving]       = useState(false);
-  const [open, setOpen]           = useState(false);
-
-  const handleAdd = async () => {
-    if (!recipient.trim() || !amount || parseFloat(amount) <= 0) {
-      toast({ title: "נמען וסכום נדרשים", variant: "destructive" }); return;
-    }
-    setSaving(true);
-    try {
-      await onAdd({ recipient: recipient.trim(), amount: parseFloat(amount), isTithe: true, date: new Date().toISOString().split("T")[0], description: "" });
-      setRecipient(""); setAmount(""); setOpen(false);
-      toast({ title: "מעשר נרשם ✓" });
-    } catch { toast({ title: "שגיאה", variant: "destructive" }); }
-    finally { setSaving(false); }
-  };
-
-  return (
-    <div className={SECTION_STYLE}>
-      <div className={SECTION_HEAD}>
-        <div className={SECTION_TITLE}>
-          <div className={ICON_WRAP("bg-violet-100")}>
-            <HeartHandshake className="w-4 h-4 text-violet-600" />
-          </div>
-          מעשרות
-        </div>
-        <Link href={`/charity`}>
-          <span className={GO_LINK}>לכל הצדקות <ArrowLeft className="w-3 h-3" /></span>
-        </Link>
-      </div>
-
-      <div className="px-5 pb-4 space-y-4 flex-1">
-        {/* Stats grid */}
-        <div className="grid grid-cols-2 gap-2">
-          {[
-            { label: "הכנסה נטו", value: fmt(income.netIncome), color: "text-foreground" },
-            { label: `יעד (${budgetYear.tithePercentage}%)`, value: fmt(titheTarget), color: "text-violet-600" },
-            { label: "נתרם", value: fmt(titheGiven), color: "text-emerald-600" },
-            { label: titheLeft > 0 ? "נותר לתת" : "עודף", value: fmt(Math.abs(titheLeft)), color: titheLeft > 0 ? "text-rose-500" : "text-emerald-600" },
-          ].map(s => (
-            <div key={s.label} className="bg-muted/40 rounded-xl p-3">
-              <p className="text-xs text-muted-foreground">{s.label}</p>
-              <p className={cn("font-bold mt-0.5", s.color)}>{s.value}</p>
-            </div>
-          ))}
-        </div>
-
-        {/* Progress */}
-        <div>
-          <div className="flex justify-between text-xs text-muted-foreground mb-1.5">
-            <span>התקדמות</span>
-            <span className="font-semibold">{Math.round(tithePct)}%</span>
-          </div>
-          <div className="h-2.5 bg-muted rounded-full overflow-hidden">
-            <div className={cn("h-full rounded-full transition-all", tithePct >= 100 ? "bg-emerald-500" : "bg-violet-500")}
-              style={{ width: `${tithePct}%` }} />
-          </div>
-        </div>
-
-        {/* Recent 2 */}
-        {tithes.length > 0 && (
-          <div className="space-y-1.5">
-            {tithes.slice(0, 2).map(t => (
-              <div key={t.id} className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground truncate">{t.recipient}</span>
-                <span className="font-semibold text-violet-600 tabular-nums mr-2">{fmt(t.amount)}</span>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Quick-add */}
-      <div className="border-t border-border/50 px-4 py-3">
-        {open ? (
-          <div className="flex gap-2 items-center">
-            <Input value={recipient} onChange={e => setRecipient(e.target.value)}
-              placeholder="נמען..." className="rounded-lg h-8 text-sm flex-1" autoFocus />
-            <Input value={amount} onChange={e => setAmount(e.target.value)}
-              type="number" placeholder="₪" dir="ltr" className="rounded-lg h-8 text-sm w-20" />
-            <button onClick={handleAdd} disabled={saving}
-              className="p-1.5 rounded-lg bg-violet-600 text-white hover:bg-violet-700 transition-colors">
-              {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
-            </button>
-            <button onClick={() => setOpen(false)} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground transition-colors">
-              <span className="text-xs">ביטול</span>
-            </button>
-          </div>
-        ) : (
-          <button onClick={() => setOpen(true)}
-            className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-violet-600 transition-colors w-full">
-            <Plus className="w-4 h-4" /> רשום מעשר חדש
-          </button>
-        )}
-      </div>
-    </div>
-  );
-}
-
-/* ─────────────────────────────────────────────────────────────
-   CARD 2: חובות
+   CARD 1: חובות
 ───────────────────────────────────────────────────────────── */
 function DebtsCard({ debts, onAdd }: { debts: Debt[]; onAdd: (p: any) => Promise<void> }) {
   const { toast } = useToast();

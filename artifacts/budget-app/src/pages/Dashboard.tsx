@@ -1,482 +1,512 @@
-import { useState, useEffect } from "react";
-import { PageHeader } from "@/components/PageHeader";
-import { useBudgetYear } from "@/contexts/BudgetYearContext";
-import { formatILS } from "@/lib/format";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useState, useEffect, useCallback } from "react";
 import { Link } from "wouter";
+import { useBudgetYear } from "@/contexts/BudgetYearContext";
 import { cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
+import { Input } from "@/components/ui/input";
 import { apiFetch } from "@/lib/api";
 import {
-  TrendingUp, TrendingDown, Wallet, PiggyBank, HeartHandshake, CreditCard,
-  AlertTriangle, ChevronLeft, Coins, Target, ArrowLeft, BarChart3,
+  HeartHandshake, CreditCard, CheckSquare,
+  ArrowLeft, Plus, Check, Circle, AlertCircle,
+  TrendingUp, TrendingDown, Loader2,
 } from "lucide-react";
-import {
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, Legend,
-} from "recharts";
 
-type MonthlyPoint = { month: string; monthNum: number; income: number; expenses: number; budget: number };
-type CategoryBreakdown = { categoryName: string; categoryColor: string; total: number };
-type FundStatus = {
-  id: number; name: string; color: string; icon: string;
-  budgetAmount: number; actualAmount: number; remaining: number;
-  usagePercent: number; status: "ok" | "warning" | "over";
-};
-type AnnualData = {
-  year: number; annualBudget: number; totalIncome: number; totalExpenses: number;
-  totalCharity: number; annualBalance: number; savingsRate: number;
-  monthlyData: MonthlyPoint[];
-  categoryBreakdown: CategoryBreakdown[];
-  fundStatus: FundStatus[];
-  anomalies: CategoryBreakdown[];
-};
+/* ── Types ─────────────────────────────────────────────────── */
+type IncomeSummary = { totalIncome: number; totalDeductions: number; netIncome: number };
+type BudgetYear    = { tithePercentage: number };
+type Tithe         = { id: number; amount: number; recipient: string; isTithe: boolean; date: string };
+type Debt          = { id: number; name: string; type: string; remainingAmount: number; dueDate: string | null; status: string };
+type Task          = { id: number; title: string; priority: string; status: string; dueDate: string | null };
 
-const STATUS_COLORS = { ok: "bg-emerald-500", warning: "bg-amber-500", over: "bg-rose-500" };
-const STATUS_TEXT = { ok: "תקין", warning: "קרוב לחריגה", over: "חריגה!" };
-const STATUS_BG = { ok: "bg-emerald-50 border-emerald-100", warning: "bg-amber-50 border-amber-100", over: "bg-rose-50 border-rose-100" };
-const STATUS_LABEL_COLOR = { ok: "text-emerald-700", warning: "text-amber-700", over: "text-rose-700" };
-const PIE_COLORS = ["#0d9488","#0ea5e9","#f59e0b","#f43f5e","#8b5cf6","#10b981","#ec4899","#6366f1","#84cc16","#f97316"];
+/* ── Helpers ────────────────────────────────────────────────── */
+function fmt(n: number) {
+  return new Intl.NumberFormat("he-IL", { style: "currency", currency: "ILS", maximumFractionDigits: 0 }).format(n);
+}
 
-const Skeleton = ({ className }: { className?: string }) => (
-  <div className={cn("animate-pulse bg-muted rounded-2xl", className)} />
-);
-
-const CustomTooltip = ({ active, payload, label }: any) => {
-  if (!active || !payload?.length) return null;
-  return (
-    <div className="bg-white border border-border/50 rounded-xl shadow-lg p-3 text-sm" dir="rtl">
-      <p className="font-bold text-foreground mb-2">{label}</p>
-      {payload.map((p: any) => (
-        <div key={p.name} className="flex items-center gap-2 text-xs">
-          <div className="w-2 h-2 rounded-full" style={{ background: p.color }} />
-          <span className="text-muted-foreground">{p.name}:</span>
-          <span className="font-semibold" dir="ltr">{formatILS(p.value)}</span>
-        </div>
-      ))}
-    </div>
-  );
+const PRIORITY_LABEL: Record<string, string> = { high: "דחוף", medium: "רגיל", low: "נמוך" };
+const PRIORITY_COLOR: Record<string, string> = {
+  high:   "text-rose-600 bg-rose-50 border-rose-200",
+  medium: "text-amber-600 bg-amber-50 border-amber-200",
+  low:    "text-slate-500 bg-slate-50 border-slate-200",
 };
 
-export default function Dashboard() {
-  const { activeYear, activeBid } = useBudgetYear();
-  const [data, setData] = useState<AnnualData | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [activeFundIdx, setActiveFundIdx] = useState<number | null>(null);
+const SECTION_STYLE = "bg-card rounded-2xl border border-border/60 flex flex-col overflow-hidden shadow-sm hover:shadow-md transition-shadow h-full";
+const SECTION_HEAD  = "flex items-center justify-between px-5 pt-5 pb-3 shrink-0";
+const SECTION_TITLE = "flex items-center gap-2 font-display font-bold text-base";
+const ICON_WRAP     = (bg: string) => `w-8 h-8 rounded-xl ${bg} flex items-center justify-center shrink-0`;
+const GO_LINK       = "flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors";
 
-  const yearNum = (() => {
-    if (!activeYear) return new Date().getFullYear();
-    const m = activeYear.startDate?.match(/(\d{4})/);
-    return m ? parseInt(m[1]) : new Date().getFullYear();
-  })();
+/* ═══════════════════════════════════════════════════════════
+   MAIN COMPONENT
+═══════════════════════════════════════════════════════════ */
+export default function DashboardPage() {
+  const { toast } = useToast();
+  const { activeBid } = useBudgetYear();
 
-  useEffect(() => {
-    setIsLoading(true);
-    apiFetch(`/dashboard/annual?year=${yearNum}`)
-      .then(setData).finally(() => setIsLoading(false));
+  const [income, setIncome]         = useState<IncomeSummary>({ totalIncome: 0, totalDeductions: 0, netIncome: 0 });
+  const [budgetYear, setBudgetYear] = useState<BudgetYear>({ tithePercentage: 10 });
+  const [tithes, setTithes]         = useState<Tithe[]>([]);
+  const [debts, setDebts]           = useState<Debt[]>([]);
+  const [tasks, setTasks]           = useState<Task[]>([]);
+  const [loading, setLoading]       = useState(true);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [inc, by, tth, dbs, tks] = await Promise.all([
+        apiFetch("/incomes/summary"),
+        apiFetch("/budget-year"),
+        apiFetch("/charity"),
+        apiFetch("/debts"),
+        apiFetch("/reminders"),
+      ]);
+      setIncome(inc);
+      setBudgetYear(by);
+      setTithes(tth);
+      setDebts(dbs);
+      setTasks(tks);
+    } catch {
+      toast({ title: "שגיאה בטעינה", variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
   }, [activeBid]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const kpiCards = [
-    {
-      title: "תקציב שנתי", value: data?.annualBudget,
-      icon: <Target className="w-5 h-5" />, color: "text-indigo-600",
-      bg: "bg-indigo-50 border-indigo-100", iconBg: "bg-indigo-100",
-      sub: "תקציב מתוכנן לשנה",
-    },
-    {
-      title: "הכנסות בפועל", value: data?.totalIncome,
-      icon: <TrendingUp className="w-5 h-5" />, color: "text-emerald-600",
-      bg: "bg-emerald-50 border-emerald-100", iconBg: "bg-emerald-100",
-      sub: data ? `${data.savingsRate}% שיעור חיסכון` : "",
-    },
-    {
-      title: "הוצאות בפועל", value: data?.totalExpenses,
-      icon: <TrendingDown className="w-5 h-5" />, color: "text-rose-600",
-      bg: "bg-rose-50 border-rose-100", iconBg: "bg-rose-100",
-      sub: data?.annualBudget
-        ? `${Math.round((data.totalExpenses / data.annualBudget) * 100)}% מהתקציב`
-        : "מסך ההוצאות השנתיות",
-    },
-    {
-      title: "פער / איזון", value: data?.annualBalance,
-      icon: <Wallet className="w-5 h-5" />,
-      color: (data?.annualBalance ?? 0) >= 0 ? "text-primary" : "text-rose-600",
-      bg: (data?.annualBalance ?? 0) >= 0 ? "bg-primary/5 border-primary/20" : "bg-rose-50 border-rose-100",
-      iconBg: (data?.annualBalance ?? 0) >= 0 ? "bg-primary/10" : "bg-rose-100",
-      sub: (data?.annualBalance ?? 0) >= 0 ? "מצב חיובי" : "חריגה מהתקציב",
-    },
-  ];
+  useEffect(() => { load(); }, [load]);
 
-  const hasMonthlyData = data?.monthlyData.some(m => m.income > 0 || m.expenses > 0);
-  const hasFunds = (data?.fundStatus.length ?? 0) > 0;
-  const hasCategories = (data?.categoryBreakdown.length ?? 0) > 0;
+  const titheTarget = income.netIncome * (budgetYear.tithePercentage / 100);
+  const titheGiven  = tithes.filter(t => t.isTithe).reduce((s, t) => s + t.amount, 0);
+  const titheLeft   = titheTarget - titheGiven;
+  const tithePct    = titheTarget > 0 ? Math.min(100, (titheGiven / titheTarget) * 100) : 0;
 
-  const pieData = (data?.categoryBreakdown || []).slice(0, 8).map((c, i) => ({
-    name: c.categoryName, value: c.total, color: c.categoryColor || PIE_COLORS[i % PIE_COLORS.length],
-  }));
+  if (loading) {
+    return (
+      <div className="grid grid-cols-3 gap-4 h-[calc(100vh-80px)]" dir="rtl">
+        {[1, 2, 3].map(i => (
+          <div key={i} className="bg-muted animate-pulse rounded-2xl h-full" />
+        ))}
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-8">
-      <PageHeader title={`דשבורד תקציבי ${selectedYear}`} description="תמונת מצב שנתית מלאה של הכנסות, הוצאות וקופות" />
+    <div className="grid grid-cols-3 gap-4 h-[calc(100vh-80px)]" dir="rtl">
 
-      {/* ─── KPI Cards ───────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
-        {isLoading
-          ? [1,2,3,4].map(i => <Skeleton key={i} className="h-36" />)
-          : kpiCards.map((kpi, i) => (
-            <div key={i} className={cn("rounded-2xl border p-5 space-y-3 hover:shadow-md transition-shadow", kpi.bg)}>
-              <div className="flex items-center justify-between">
-                <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center", kpi.iconBg, kpi.color)}>
-                  {kpi.icon}
-                </div>
-                <span className={cn("text-xs font-semibold px-2 py-1 rounded-full", kpi.iconBg, kpi.color)}>
-                  {selectedYear}
-                </span>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground font-medium">{kpi.title}</p>
-                <p className={cn("text-2xl font-display font-bold mt-0.5", kpi.color)} dir="ltr">
-                  {formatILS(kpi.value)}
-                </p>
-              </div>
-              {kpi.sub && <p className="text-xs text-muted-foreground">{kpi.sub}</p>}
+      {/* ══ מעשרות ══════════════════════════════════════════════ */}
+      <TitheCard
+        income={income}
+        budgetYear={budgetYear}
+        tithes={tithes}
+        titheTarget={titheTarget}
+        titheGiven={titheGiven}
+        titheLeft={titheLeft}
+        tithePct={tithePct}
+        onAdd={async (payload) => {
+          const created = await apiFetch("/charity", { method: "POST", body: JSON.stringify(payload) });
+          setTithes(prev => [{ ...created, amount: parseFloat(String(created.amount)) }, ...prev]);
+        }}
+      />
+
+      {/* ══ תזכורות ════════════════════════════════════════════ */}
+      <RemindersCard
+        tasks={tasks}
+        onToggle={async (id) => {
+          const updated = await apiFetch(`/reminders/${id}/toggle`, { method: "PATCH" });
+          setTasks(prev => prev.map(t => t.id === id ? updated : t));
+        }}
+        onAdd={async (title, priority) => {
+          const created = await apiFetch("/reminders", {
+            method: "POST",
+            body: JSON.stringify({ title, priority, status: "open", description: "" }),
+          });
+          setTasks(prev => [created, ...prev]);
+        }}
+      />
+
+      {/* ══ חובות ══════════════════════════════════════════════ */}
+      <DebtsCard
+        debts={debts}
+        onAdd={async (payload) => {
+          const created = await apiFetch("/debts", { method: "POST", body: JSON.stringify(payload) });
+          setDebts(prev => [created, ...prev]);
+        }}
+      />
+
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════
+   CARD: מעשרות
+═══════════════════════════════════════════════════════════ */
+function TitheCard({ income, budgetYear, tithes, titheTarget, titheGiven, titheLeft, tithePct, onAdd }: {
+  income: IncomeSummary; budgetYear: BudgetYear;
+  tithes: Tithe[]; titheTarget: number; titheGiven: number; titheLeft: number; tithePct: number;
+  onAdd: (p: any) => Promise<void>;
+}) {
+  const { toast } = useToast();
+  const [recipient, setRecipient] = useState("");
+  const [amount, setAmount]       = useState("");
+  const [saving, setSaving]       = useState(false);
+  const [open, setOpen]           = useState(false);
+
+  const handleAdd = async () => {
+    if (!recipient.trim() || !amount || parseFloat(amount) <= 0) {
+      toast({ title: "נמען וסכום נדרשים", variant: "destructive" }); return;
+    }
+    setSaving(true);
+    try {
+      await onAdd({ recipient: recipient.trim(), amount: parseFloat(amount), isTithe: true, date: new Date().toISOString().split("T")[0], description: "" });
+      setRecipient(""); setAmount(""); setOpen(false);
+      toast({ title: "מעשר נרשם ✓" });
+    } catch { toast({ title: "שגיאה", variant: "destructive" }); }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <div className={SECTION_STYLE}>
+      <div className={SECTION_HEAD}>
+        <div className={SECTION_TITLE}>
+          <div className={ICON_WRAP("bg-violet-100")}>
+            <HeartHandshake className="w-4 h-4 text-violet-600" />
+          </div>
+          מעשרות
+        </div>
+        <Link href="/charity">
+          <span className={GO_LINK}>לכל הצדקות <ArrowLeft className="w-3 h-3" /></span>
+        </Link>
+      </div>
+
+      <div className="px-5 pb-4 space-y-4 flex-1 overflow-y-auto">
+        <div className="grid grid-cols-2 gap-2">
+          {[
+            { label: "הכנסה נטו", value: fmt(income.netIncome), color: "text-foreground" },
+            { label: `יעד (${budgetYear.tithePercentage}%)`, value: fmt(titheTarget), color: "text-violet-600" },
+            { label: "נתרם", value: fmt(titheGiven), color: "text-emerald-600" },
+            { label: titheLeft > 0 ? "נותר לתת" : "עודף", value: fmt(Math.abs(titheLeft)), color: titheLeft > 0 ? "text-rose-500" : "text-emerald-600" },
+          ].map(s => (
+            <div key={s.label} className="bg-muted/40 rounded-xl p-3">
+              <p className="text-xs text-muted-foreground">{s.label}</p>
+              <p className={cn("font-bold mt-0.5", s.color)}>{s.value}</p>
             </div>
           ))}
-      </div>
-
-      {/* ─── Monthly Chart ───────────────────────────────────────── */}
-      <Card className="shadow-sm border-border/50">
-        <CardHeader className="border-b border-border/50 bg-muted/30 flex flex-row items-center justify-between">
-          <div>
-            <CardTitle className="text-lg font-bold">הכנסות והוצאות לפי חודש</CardTitle>
-            <p className="text-sm text-muted-foreground mt-0.5">מגמה שנתית — {selectedYear}</p>
-          </div>
-          <div className="flex items-center gap-4 text-xs text-muted-foreground">
-            <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-emerald-400 inline-block"/> הכנסות</span>
-            <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-rose-400 inline-block"/> הוצאות</span>
-            {data?.annualBudget ? <span className="flex items-center gap-1.5"><span className="w-3 h-1 bg-dashed border-dashed border-indigo-400 border-t-2 inline-block w-5"/> תקציב</span> : null}
-          </div>
-        </CardHeader>
-        <CardContent className="p-6 h-[300px]" dir="ltr">
-          {isLoading ? <Skeleton className="h-full" /> : !hasMonthlyData ? (
-            <div className="h-full flex flex-col items-center justify-center text-muted-foreground gap-2" dir="rtl">
-              <BarChart3 className="w-10 h-10 opacity-30" />
-              <p className="text-sm">אין נתוני גרף לשנה זו עדיין</p>
-            </div>
-          ) : (
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={data?.monthlyData} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="incomeGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.15} />
-                    <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-                  </linearGradient>
-                  <linearGradient id="expenseGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#f43f5e" stopOpacity={0.15} />
-                    <stop offset="95%" stopColor="#f43f5e" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-                <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: "#9ca3af", fontSize: 12 }} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fill: "#9ca3af", fontSize: 11 }} tickFormatter={v => `₪${(v/1000).toFixed(0)}k`} />
-                <Tooltip content={<CustomTooltip />} />
-                <Area type="monotone" dataKey="income" name="הכנסות" stroke="#10b981" strokeWidth={2.5} fill="url(#incomeGrad)" dot={false} activeDot={{ r: 5, fill: "#10b981" }} />
-                <Area type="monotone" dataKey="expenses" name="הוצאות" stroke="#f43f5e" strokeWidth={2.5} fill="url(#expenseGrad)" dot={false} activeDot={{ r: 5, fill: "#f43f5e" }} />
-              </AreaChart>
-            </ResponsiveContainer>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* ─── Fund Status + Category Pie ─────────────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Fund Status Overview — 2/3 width */}
-        <div className="lg:col-span-2 space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-lg font-bold">מצב קופות</h2>
-              <p className="text-sm text-muted-foreground">ניצול תקציב לפי קופה</p>
-            </div>
-            <Link href="/savings" className="text-sm font-medium text-primary hover:underline flex items-center gap-1">
-              ניהול קופות <ArrowLeft className="w-4 h-4" />
-            </Link>
-          </div>
-
-          {isLoading ? (
-            <div className="space-y-3">{[1,2,3].map(i => <Skeleton key={i} className="h-20" />)}</div>
-          ) : !hasFunds ? (
-            <Card className="border-dashed border-2 border-muted-foreground/20">
-              <CardContent className="p-8 text-center text-muted-foreground space-y-3">
-                <Coins className="w-12 h-12 mx-auto opacity-30" />
-                <p className="font-medium">לא הוגדרו קופות עדיין</p>
-                <p className="text-sm">הגדר קופות תקציביות כדי לעקוב אחר ביצועים</p>
-                <Link href="/savings" className="inline-flex items-center gap-1 text-sm text-primary font-medium hover:underline">
-                  צור קופה ראשונה <ChevronLeft className="w-4 h-4" />
-                </Link>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="space-y-3">
-              {data!.fundStatus.map((fund, i) => (
-                <button key={fund.id} className={cn(
-                  "w-full text-right rounded-2xl border p-4 hover:shadow-md transition-all",
-                  activeFundIdx === i ? "ring-2 ring-primary/30 shadow-md" : "hover:border-border",
-                  STATUS_BG[fund.status]
-                )} onClick={() => setActiveFundIdx(activeFundIdx === i ? null : i)}>
-                  <div className="flex items-center gap-4">
-                    {/* Color indicator */}
-                    <div className="w-1.5 h-12 rounded-full shrink-0" style={{ background: fund.color }} />
-
-                    {/* Fund name & badge */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1.5">
-                        <p className="font-bold text-sm truncate">{fund.name}</p>
-                        <span className={cn("text-[10px] font-bold px-1.5 py-0.5 rounded-full", STATUS_LABEL_COLOR[fund.status],
-                          fund.status === "ok" ? "bg-emerald-100" : fund.status === "warning" ? "bg-amber-100" : "bg-rose-100"
-                        )}>{STATUS_TEXT[fund.status]}</span>
-                      </div>
-
-                      {/* Progress bar */}
-                      <div className="flex items-center gap-3">
-                        <div className="flex-1 h-2 bg-white/80 rounded-full overflow-hidden border border-black/5">
-                          <div
-                            className={cn("h-full rounded-full transition-all duration-500", STATUS_COLORS[fund.status])}
-                            style={{ width: `${fund.usagePercent}%` }}
-                          />
-                        </div>
-                        <span className={cn("text-xs font-bold w-10 text-left shrink-0", STATUS_LABEL_COLOR[fund.status])}>
-                          {fund.usagePercent}%
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Stats */}
-                    <div className="flex gap-5 shrink-0 text-left">
-                      <div>
-                        <p className="text-[10px] text-muted-foreground mb-0.5">תקציב</p>
-                        <p className="text-sm font-bold text-foreground" dir="ltr">{formatILS(fund.budgetAmount)}</p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] text-muted-foreground mb-0.5">בוצע</p>
-                        <p className="text-sm font-bold text-foreground" dir="ltr">{formatILS(fund.actualAmount)}</p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] text-muted-foreground mb-0.5">נותר</p>
-                        <p className={cn("text-sm font-bold", fund.remaining >= 0 ? "text-emerald-600" : "text-rose-600")} dir="ltr">
-                          {fund.remaining >= 0 ? formatILS(fund.remaining) : `-${formatILS(Math.abs(fund.remaining))}`}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Expanded detail */}
-                  {activeFundIdx === i && (
-                    <div className="mt-3 pt-3 border-t border-black/5 flex justify-between items-center text-xs text-muted-foreground">
-                      <span>
-                        {fund.budgetAmount > 0
-                          ? `נוצלו ${formatILS(fund.actualAmount)} מתוך ${formatILS(fund.budgetAmount)}`
-                          : "לא הוגדר תקציב לקופה זו"}
-                      </span>
-                      <Link href="/savings" className="text-primary font-medium hover:underline flex items-center gap-0.5">
-                        פירוט מלא <ArrowLeft className="w-3 h-3" />
-                      </Link>
-                    </div>
-                  )}
-                </button>
-              ))}
-            </div>
-          )}
         </div>
 
-        {/* Category Pie — 1/3 width */}
-        <div className="space-y-4">
-          <div>
-            <h2 className="text-lg font-bold">התפלגות הוצאות</h2>
-            <p className="text-sm text-muted-foreground">לפי קטגוריה — שנתי</p>
+        <div>
+          <div className="flex justify-between text-xs text-muted-foreground mb-1.5">
+            <span>התקדמות</span>
+            <span className="font-semibold">{Math.round(tithePct)}%</span>
           </div>
-          <Card className="shadow-sm border-border/50">
-            <CardContent className="p-4 h-[290px]" dir="ltr">
-              {isLoading ? <Skeleton className="h-full" /> : !hasCategories ? (
-                <div className="h-full flex items-center justify-center text-muted-foreground text-sm" dir="rtl">אין נתונים</div>
-              ) : (
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie data={pieData} cx="50%" cy="42%" innerRadius={55} outerRadius={80} paddingAngle={3} dataKey="value" stroke="none">
-                      {pieData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
-                    </Pie>
-                    <Tooltip formatter={(v: number) => formatILS(v)} contentStyle={{ borderRadius: "10px", border: "none", boxShadow: "0 4px 20px rgba(0,0,0,0.1)", fontSize: "12px" }} />
-                    <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: "11px", paddingTop: "8px" }} formatter={(value) => <span dir="rtl">{value}</span>} />
-                  </PieChart>
-                </ResponsiveContainer>
-              )}
-            </CardContent>
-          </Card>
+          <div className="h-2.5 bg-muted rounded-full overflow-hidden">
+            <div className={cn("h-full rounded-full transition-all", tithePct >= 100 ? "bg-emerald-500" : "bg-violet-500")}
+              style={{ width: `${tithePct}%` }} />
+          </div>
+        </div>
+
+        {tithes.length > 0 && (
+          <div className="space-y-1.5">
+            {tithes.map(t => (
+              <div key={t.id} className="flex items-center justify-between text-sm py-1 border-b border-border/30 last:border-0">
+                <span className="text-muted-foreground truncate">{t.recipient}</span>
+                <span className="font-semibold text-violet-600 tabular-nums mr-2">{fmt(t.amount)}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {tithes.length === 0 && (
+          <p className="text-sm text-muted-foreground text-center py-4">אין רשומות מעשר עדיין</p>
+        )}
+      </div>
+
+      <div className="border-t border-border/50 px-4 py-3 shrink-0">
+        {open ? (
+          <div className="flex gap-2 items-center">
+            <Input value={recipient} onChange={e => setRecipient(e.target.value)}
+              placeholder="נמען..." className="rounded-lg h-8 text-sm flex-1" autoFocus />
+            <Input value={amount} onChange={e => setAmount(e.target.value)}
+              type="number" placeholder="₪" dir="ltr" className="rounded-lg h-8 text-sm w-20" />
+            <button onClick={handleAdd} disabled={saving}
+              className="p-1.5 rounded-lg bg-violet-600 text-white hover:bg-violet-700 transition-colors">
+              {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+            </button>
+            <button onClick={() => setOpen(false)} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground transition-colors">
+              <span className="text-xs">ביטול</span>
+            </button>
+          </div>
+        ) : (
+          <button onClick={() => setOpen(true)}
+            className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-violet-600 transition-colors w-full">
+            <Plus className="w-4 h-4" /> רשום מעשר חדש
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════
+   CARD: חובות
+═══════════════════════════════════════════════════════════ */
+function DebtsCard({ debts, onAdd }: { debts: Debt[]; onAdd: (p: any) => Promise<void> }) {
+  const { toast } = useToast();
+  const [open, setOpen]     = useState(false);
+  const [name, setName]     = useState("");
+  const [amount, setAmount] = useState("");
+  const [type, setType]     = useState<"i_owe" | "owed_to_me">("i_owe");
+  const [saving, setSaving] = useState(false);
+
+  const activeDebts = debts.filter(d => d.status === "active");
+  const iOwe        = activeDebts.filter(d => d.type === "i_owe");
+  const owedToMe    = activeDebts.filter(d => d.type === "owed_to_me");
+  const totalIOwe   = iOwe.reduce((s, d) => s + d.remainingAmount, 0);
+  const totalOwed   = owedToMe.reduce((s, d) => s + d.remainingAmount, 0);
+
+  const handleAdd = async () => {
+    if (!name.trim() || !amount || parseFloat(amount) <= 0) {
+      toast({ title: "שם וסכום נדרשים", variant: "destructive" }); return;
+    }
+    setSaving(true);
+    try {
+      const amt = parseFloat(amount);
+      await onAdd({ name: name.trim(), type, totalAmount: amt, remainingAmount: amt, interestRate: 0, status: "active", notes: "" });
+      setName(""); setAmount(""); setOpen(false);
+      toast({ title: "חוב נרשם ✓" });
+    } catch { toast({ title: "שגיאה", variant: "destructive" }); }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <div className={SECTION_STYLE}>
+      <div className={SECTION_HEAD}>
+        <div className={SECTION_TITLE}>
+          <div className={ICON_WRAP("bg-rose-100")}>
+            <CreditCard className="w-4 h-4 text-rose-600" />
+          </div>
+          חובות
         </div>
       </div>
 
-      {/* ─── Fund Cards Grid ──────────────────────────────────────── */}
-      {!isLoading && hasFunds && (
-        <div className="space-y-4">
-          <div>
-            <h2 className="text-lg font-bold">כרטיסי קופות</h2>
-            <p className="text-sm text-muted-foreground">מבט מפורט על כל קופה</p>
+      <div className="px-5 pb-4 space-y-4 flex-1 overflow-y-auto">
+        <div className="grid grid-cols-2 gap-2">
+          <div className="bg-rose-50 border border-rose-100 rounded-xl p-3">
+            <div className="flex items-center gap-1.5 mb-1">
+              <TrendingDown className="w-3.5 h-3.5 text-rose-500" />
+              <p className="text-xs text-rose-700 font-medium">אני חייב</p>
+            </div>
+            <p className="font-bold text-rose-600 text-lg">{fmt(totalIOwe)}</p>
+            <p className="text-xs text-muted-foreground">{iOwe.length} חובות</p>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-            {data!.fundStatus.map(fund => {
-              const pct = fund.usagePercent;
-              const isOver = fund.status === "over";
-              return (
-                <div key={fund.id} className={cn(
-                  "rounded-2xl border p-5 space-y-4 hover:shadow-lg transition-all group cursor-pointer",
-                  STATUS_BG[fund.status]
-                )}>
-                  {/* Header */}
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-sm text-base"
-                        style={{ background: fund.color }}>
-                        <Coins className="w-5 h-5" />
-                      </div>
-                      <div>
-                        <p className="font-bold text-sm">{fund.name}</p>
-                        <span className={cn("text-[10px] font-bold", STATUS_LABEL_COLOR[fund.status])}>
-                          {STATUS_TEXT[fund.status]}
-                        </span>
-                      </div>
-                    </div>
-                    <span className={cn("text-lg font-display font-black", STATUS_LABEL_COLOR[fund.status])}>
-                      {pct}%
-                    </span>
-                  </div>
-
-                  {/* Progress */}
-                  <div className="h-2.5 bg-white/70 rounded-full overflow-hidden border border-black/5">
-                    <div
-                      className={cn("h-full rounded-full transition-all duration-700", STATUS_COLORS[fund.status])}
-                      style={{ width: `${Math.min(pct, 100)}%` }}
-                    />
-                  </div>
-
-                  {/* Metrics */}
-                  <div className="grid grid-cols-3 gap-1 text-center">
-                    {[
-                      { label: "תקציב", value: fund.budgetAmount, color: "text-foreground" },
-                      { label: "בוצע", value: fund.actualAmount, color: "text-foreground" },
-                      { label: "נותר", value: Math.abs(fund.remaining), color: isOver ? "text-rose-600" : "text-emerald-600" },
-                    ].map(m => (
-                      <div key={m.label} className="bg-white/50 rounded-lg py-2 px-1">
-                        <p className="text-[9px] text-muted-foreground font-medium">{m.label}</p>
-                        <p className={cn("text-xs font-bold mt-0.5", m.color)} dir="ltr">{formatILS(m.value)}</p>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Action */}
-                  <Link href="/savings" className="flex items-center justify-center gap-1 text-xs font-medium text-muted-foreground hover:text-primary transition-colors group-hover:text-primary">
-                    פתח פירוט <ArrowLeft className="w-3.5 h-3.5" />
-                  </Link>
-                </div>
-              );
-            })}
+          <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3">
+            <div className="flex items-center gap-1.5 mb-1">
+              <TrendingUp className="w-3.5 h-3.5 text-emerald-500" />
+              <p className="text-xs text-emerald-700 font-medium">חייבים לי</p>
+            </div>
+            <p className="font-bold text-emerald-600 text-lg">{fmt(totalOwed)}</p>
+            <p className="text-xs text-muted-foreground">{owedToMe.length} חובות</p>
           </div>
         </div>
-      )}
 
-      {/* ─── Annual Summary + Anomalies ─────────────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-
-        {/* Annual Summary */}
-        <Card className="shadow-sm border-border/50">
-          <CardHeader className="border-b border-border/50 bg-muted/30">
-            <CardTitle className="text-lg font-bold flex items-center gap-2">
-              <PiggyBank className="w-5 h-5 text-primary" /> סיכום שנתי {selectedYear}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-5 space-y-0 divide-y divide-border/50">
-            {isLoading ? <Skeleton className="h-48" /> : [
-              { label: "סך הכנסות", value: data!.totalIncome, color: "text-emerald-600", icon: <TrendingUp className="w-4 h-4" /> },
-              { label: "סך הוצאות", value: data!.totalExpenses, color: "text-rose-600", icon: <TrendingDown className="w-4 h-4" /> },
-              { label: "מעשרות ותרומות", value: data!.totalCharity, color: "text-blue-600", icon: <HeartHandshake className="w-4 h-4" /> },
-              { label: "תקציב שנתי", value: data!.annualBudget, color: "text-indigo-600", icon: <Target className="w-4 h-4" /> },
-              { label: "פער / איזון", value: data!.annualBalance, color: data!.annualBalance >= 0 ? "text-emerald-700" : "text-rose-700", icon: <Wallet className="w-4 h-4" />, bold: true },
-            ].map((row, i) => (
-              <div key={i} className={cn("flex items-center justify-between py-3", row.bold && "bg-muted/30 rounded-lg px-2 -mx-2 mt-1")}>
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <span className={row.color}>{row.icon}</span>
-                  <span className={row.bold ? "font-bold text-foreground" : ""}>{row.label}</span>
+        {activeDebts.length === 0 ? (
+          <p className="text-sm text-muted-foreground text-center py-3">אין חובות פעילים</p>
+        ) : (
+          <div className="space-y-1.5">
+            {activeDebts.map(d => (
+              <div key={d.id} className="flex items-center justify-between text-sm py-1 border-b border-border/30 last:border-0">
+                <div className="flex items-center gap-2">
+                  <span className={cn("w-2 h-2 rounded-full shrink-0", d.type === "i_owe" ? "bg-rose-400" : "bg-emerald-400")} />
+                  <span className="truncate max-w-[130px]">{d.name}</span>
                 </div>
-                <span className={cn("font-bold", row.color, row.bold && "text-lg")} dir="ltr">
-                  {formatILS(row.value)}
+                <span className={cn("font-semibold tabular-nums", d.type === "i_owe" ? "text-rose-600" : "text-emerald-600")}>
+                  {fmt(d.remainingAmount)}
                 </span>
               </div>
             ))}
-            {!isLoading && (
-              <div className="pt-4">
-                <div className="flex items-center justify-between text-sm mb-2">
-                  <span className="text-muted-foreground">שיעור חיסכון</span>
-                  <span className={cn("font-bold", (data?.savingsRate ?? 0) >= 20 ? "text-emerald-600" : (data?.savingsRate ?? 0) >= 0 ? "text-amber-600" : "text-rose-600")}>
-                    {data?.savingsRate}%
-                  </span>
-                </div>
-                <div className="h-2 bg-muted rounded-full overflow-hidden">
-                  <div
-                    className={cn("h-full rounded-full", (data?.savingsRate ?? 0) >= 20 ? "bg-emerald-500" : (data?.savingsRate ?? 0) >= 0 ? "bg-amber-500" : "bg-rose-500")}
-                    style={{ width: `${Math.min(100, Math.max(0, data?.savingsRate ?? 0))}%` }}
-                  />
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">יעד מומלץ: 20%+</p>
+          </div>
+        )}
+      </div>
+
+      <div className="border-t border-border/50 px-4 py-3 shrink-0">
+        {open ? (
+          <div className="space-y-2">
+            <div className="flex gap-1.5">
+              {[{ v: "i_owe", l: "אני חייב" }, { v: "owed_to_me", l: "חייבים לי" }].map(t => (
+                <button key={t.v} onClick={() => setType(t.v as any)}
+                  className={cn("flex-1 text-xs py-1.5 rounded-lg border font-medium transition-colors",
+                    type === t.v ? "bg-foreground text-background border-foreground" : "border-border text-muted-foreground"
+                  )}>
+                  {t.l}
+                </button>
+              ))}
+            </div>
+            <div className="flex gap-2 items-center">
+              <Input value={name} onChange={e => setName(e.target.value)}
+                placeholder="שם..." className="rounded-lg h-8 text-sm flex-1" autoFocus />
+              <Input value={amount} onChange={e => setAmount(e.target.value)}
+                type="number" placeholder="₪" dir="ltr" className="rounded-lg h-8 text-sm w-20" />
+              <button onClick={handleAdd} disabled={saving}
+                className="p-1.5 rounded-lg bg-rose-600 text-white hover:bg-rose-700 transition-colors">
+                {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+              </button>
+              <button onClick={() => setOpen(false)} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground transition-colors text-xs">ביטול</button>
+            </div>
+          </div>
+        ) : (
+          <button onClick={() => setOpen(true)}
+            className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-rose-600 transition-colors w-full">
+            <Plus className="w-4 h-4" /> הוסף חוב חדש
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════
+   CARD: תזכורות
+═══════════════════════════════════════════════════════════ */
+function RemindersCard({ tasks, onToggle, onAdd }: {
+  tasks: Task[]; onToggle: (id: number) => Promise<void>; onAdd: (title: string, priority: string) => Promise<void>;
+}) {
+  const { toast } = useToast();
+  const [open, setOpen]         = useState(false);
+  const [title, setTitle]       = useState("");
+  const [priority, setPriority] = useState("medium");
+  const [saving, setSaving]     = useState(false);
+  const [toggling, setToggling] = useState<number | null>(null);
+
+  const openTasks = tasks.filter(t => t.status !== "done");
+  const high      = openTasks.filter(t => t.priority === "high");
+  const others    = openTasks.filter(t => t.priority !== "high");
+  const doneTasks = tasks.filter(t => t.status === "done");
+
+  const handleToggle = async (id: number) => {
+    setToggling(id);
+    try { await onToggle(id); }
+    catch { toast({ title: "שגיאה", variant: "destructive" }); }
+    finally { setToggling(null); }
+  };
+
+  const handleAdd = async () => {
+    if (!title.trim()) { toast({ title: "כותרת נדרשת", variant: "destructive" }); return; }
+    setSaving(true);
+    try {
+      await onAdd(title.trim(), priority);
+      setTitle(""); setOpen(false);
+      toast({ title: "משימה נוצרה ✓" });
+    } catch { toast({ title: "שגיאה", variant: "destructive" }); }
+    finally { setSaving(false); }
+  };
+
+  const TaskRow = ({ task }: { task: Task }) => (
+    <div className={cn("flex items-start gap-2.5 py-1.5 border-b border-border/30 last:border-0",
+      task.status === "done" && "opacity-50"
+    )}>
+      <button onClick={() => handleToggle(task.id)} disabled={toggling === task.id}
+        className="mt-0.5 shrink-0 transition-colors">
+        {toggling === task.id
+          ? <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+          : task.status === "done"
+            ? <Check className="w-4 h-4 text-emerald-500" />
+            : <Circle className="w-4 h-4 text-muted-foreground hover:text-primary" />
+        }
+      </button>
+      <div className="flex-1 min-w-0">
+        <p className={cn("text-sm leading-snug", task.status === "done" && "line-through")}>{task.title}</p>
+        {task.dueDate && (
+          <p className="text-xs text-muted-foreground mt-0.5">{new Date(task.dueDate).toLocaleDateString("he-IL")}</p>
+        )}
+      </div>
+      {task.priority !== "medium" && (
+        <span className={cn("text-[10px] px-1.5 py-0.5 rounded-full font-medium border shrink-0 mt-0.5", PRIORITY_COLOR[task.priority])}>
+          {PRIORITY_LABEL[task.priority]}
+        </span>
+      )}
+    </div>
+  );
+
+  return (
+    <div className={SECTION_STYLE}>
+      <div className={SECTION_HEAD}>
+        <div className={SECTION_TITLE}>
+          <div className={ICON_WRAP("bg-amber-100")}>
+            <CheckSquare className="w-4 h-4 text-amber-600" />
+          </div>
+          תזכורות ומשימות
+        </div>
+      </div>
+
+      <div className="px-5 pb-4 space-y-3 flex-1 overflow-y-auto">
+        <div className="flex items-center gap-3 text-sm shrink-0">
+          <span className="flex items-center gap-1.5">
+            <AlertCircle className="w-3.5 h-3.5 text-rose-500" />
+            <span className="font-semibold text-rose-600">{high.length}</span>
+            <span className="text-muted-foreground">דחופות</span>
+          </span>
+          <span className="text-border">·</span>
+          <span className="flex items-center gap-1.5">
+            <Circle className="w-3.5 h-3.5 text-amber-500" />
+            <span className="font-semibold">{others.length}</span>
+            <span className="text-muted-foreground">שאר</span>
+          </span>
+          <span className="text-border">·</span>
+          <span className="flex items-center gap-1.5">
+            <Check className="w-3.5 h-3.5 text-emerald-500" />
+            <span className="font-semibold">{tasks.filter(t => t.status === "done").length}</span>
+            <span className="text-muted-foreground">הושלמו</span>
+          </span>
+        </div>
+
+        {openTasks.length === 0 && doneTasks.length === 0 ? (
+          <p className="text-sm text-muted-foreground text-center py-4">אין משימות עדיין</p>
+        ) : (
+          <div>
+            {high.length > 0 && (
+              <div className="mb-1">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-rose-500 mb-1">דחוף</p>
+                {high.map(t => <TaskRow key={t.id} task={t} />)}
               </div>
             )}
-          </CardContent>
-        </Card>
+            {others.map(t => <TaskRow key={t.id} task={t} />)}
+            {doneTasks.length > 0 && openTasks.length < 5 && (
+              <div className="mt-1">
+                {doneTasks.map(t => <TaskRow key={t.id} task={t} />)}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
 
-        {/* Anomalies */}
-        <Card className="shadow-sm border-border/50">
-          <CardHeader className="border-b border-border/50 bg-muted/30">
-            <CardTitle className="text-lg font-bold flex items-center gap-2">
-              <AlertTriangle className="w-5 h-5 text-amber-500" /> זיהוי חריגות
-            </CardTitle>
-            <p className="text-sm text-muted-foreground mt-0.5">קטגוריות עם הוצאות גבוהות מהממוצע</p>
-          </CardHeader>
-          <CardContent className="p-5">
-            {isLoading ? <Skeleton className="h-48" /> :
-              !data?.anomalies.length ? (
-                <div className="text-center py-10 space-y-2">
-                  <div className="w-14 h-14 rounded-full bg-emerald-100 flex items-center justify-center mx-auto">
-                    <TrendingDown className="w-6 h-6 text-emerald-600" />
-                  </div>
-                  <p className="font-semibold text-emerald-700">אין חריגות!</p>
-                  <p className="text-sm text-muted-foreground">ההוצאות מאוזנות בין הקטגוריות</p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {data.anomalies.map((a, i) => (
-                    <div key={i} className="flex items-center gap-4 p-3 rounded-xl bg-amber-50 border border-amber-100">
-                      <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: a.categoryColor }} />
-                      <div className="flex-1">
-                        <p className="font-semibold text-sm">{a.categoryName}</p>
-                        <div className="flex items-center gap-2 mt-1">
-                          <div className="flex-1 h-1.5 bg-amber-100 rounded-full overflow-hidden">
-                            <div className="h-full bg-amber-500 rounded-full" style={{ width: "75%" }} />
-                          </div>
-                          <span className="text-[10px] text-amber-600 font-bold">גבוה</span>
-                        </div>
-                      </div>
-                      <div className="text-left">
-                        <p className="font-bold text-rose-600 text-sm" dir="ltr">{formatILS(a.total)}</p>
-                        <p className="text-[10px] text-muted-foreground">השנה</p>
-                      </div>
-                    </div>
-                  ))}
-                  <div className="pt-2 border-t border-border/50">
-                    <p className="text-xs text-muted-foreground text-center">
-                      חריגות מוצגות עבור קטגוריות ב-150%+ מעל הממוצע
-                    </p>
-                  </div>
-                </div>
-              )
-            }
-          </CardContent>
-        </Card>
+      <div className="border-t border-border/50 px-4 py-3 shrink-0">
+        {open ? (
+          <div className="space-y-2">
+            <div className="flex gap-1.5">
+              {[{ v: "high", l: "דחוף" }, { v: "medium", l: "רגיל" }, { v: "low", l: "נמוך" }].map(p => (
+                <button key={p.v} onClick={() => setPriority(p.v)}
+                  className={cn("flex-1 text-xs py-1.5 rounded-lg border font-medium transition-colors",
+                    priority === p.v ? "bg-foreground text-background border-foreground" : "border-border text-muted-foreground"
+                  )}>
+                  {p.l}
+                </button>
+              ))}
+            </div>
+            <div className="flex gap-2 items-center">
+              <Input value={title} onChange={e => setTitle(e.target.value)}
+                placeholder="משימה חדשה..." className="rounded-lg h-8 text-sm flex-1" autoFocus
+                onKeyDown={e => e.key === "Enter" && handleAdd()} />
+              <button onClick={handleAdd} disabled={saving}
+                className="p-1.5 rounded-lg bg-amber-500 text-white hover:bg-amber-600 transition-colors">
+                {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+              </button>
+              <button onClick={() => setOpen(false)} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground transition-colors text-xs">ביטול</button>
+            </div>
+          </div>
+        ) : (
+          <button onClick={() => setOpen(true)}
+            className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-amber-600 transition-colors w-full">
+            <Plus className="w-4 h-4" /> הוסף משימה
+          </button>
+        )}
       </div>
     </div>
   );

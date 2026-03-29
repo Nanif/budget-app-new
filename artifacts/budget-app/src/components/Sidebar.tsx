@@ -2,7 +2,7 @@ import { Link, useLocation } from "wouter";
 import {
   Home, CalendarDays, Wallet, ShoppingBag, Calendar, PiggyBank,
   Landmark, HeartHandshake, CreditCard, StickyNote, CheckSquare,
-  Settings, Tag, Receipt, Scale, ListChecks,
+  Settings, Tag, Receipt, Scale, ListChecks, LayoutDashboard,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { YearSwitcher } from "@/components/YearSwitcher";
@@ -16,6 +16,7 @@ type NavItem = {
 
 const NAV_ITEMS: NavItem[] = [
   { href: "/", label: "דף בית", icon: Home },
+  { href: "/dashboard", label: "דשבורד", icon: LayoutDashboard },
   { href: "/budget", label: "תכנון תקציב", icon: CalendarDays, section: "קופות" },
   { href: "/cash", label: "קופת שוטף", icon: Wallet, section: "קופות" },
   { href: "/fixed", label: "קבועות", icon: ListChecks, section: "קופות" },
@@ -25,10 +26,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/expenses", label: "הוצאות", icon: Receipt, section: "מעקב פיננסי" },
   { href: "/incomes", label: "הכנסות", icon: Landmark, section: "מעקב פיננסי" },
   { href: "/charity", label: "צדקה ומעשרות", icon: HeartHandshake, section: "מעקב פיננסי" },
-  { href: "/debts", label: "חובות", icon: CreditCard, section: "מעקב פיננסי" },
   { href: "/savings", label: "חובות ונכסים", icon: Scale, section: "מעקב פיננסי" },
-  { href: "/notes", label: "פתקים", icon: StickyNote, section: "כלים" },
-  { href: "/reminders", label: "תזכורות ומשימות", icon: CheckSquare, section: "כלים" },
   { href: "/categories", label: "קטגוריות", icon: Tag, section: "הגדרות" },
   { href: "/settings", label: "הגדרות מערכת", icon: Settings, section: "הגדרות" },
 ];
