@@ -32,8 +32,8 @@ const PRIORITY_COLOR: Record<string, string> = {
   low:    "text-slate-500 bg-slate-50 border-slate-200",
 };
 
-const SECTION_STYLE = "bg-card rounded-2xl border border-border/60 flex flex-col overflow-hidden shadow-sm hover:shadow-md transition-shadow";
-const SECTION_HEAD  = "flex items-center justify-between px-5 pt-5 pb-3";
+const SECTION_STYLE = "bg-card rounded-2xl border border-border/60 flex flex-col overflow-hidden shadow-sm hover:shadow-md transition-shadow h-full";
+const SECTION_HEAD  = "flex items-center justify-between px-5 pt-5 pb-3 shrink-0";
 const SECTION_TITLE = "flex items-center gap-2 font-display font-bold text-base";
 const ICON_WRAP     = (bg: string) => `w-8 h-8 rounded-xl ${bg} flex items-center justify-center shrink-0`;
 const GO_LINK       = "flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors";
@@ -74,75 +74,57 @@ export default function Home() {
 
   useEffect(() => { load(); }, [load]);
 
-  const now = new Date();
-  const MONTH_NAMES = ["ינואר","פברואר","מרץ","אפריל","מאי","יוני","יולי","אוגוסט","ספטמבר","אוקטובר","נובמבר","דצמבר"];
-  const monthLabel = `${MONTH_NAMES[now.getMonth()]} ${now.getFullYear()}`;
+  if (loading) {
+    return (
+      <div className="grid grid-cols-3 gap-4 h-[calc(100vh-80px)]" dir="rtl">
+        {[1, 2, 3].map(i => (
+          <div key={i} className="bg-muted animate-pulse rounded-2xl h-full" />
+        ))}
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-5" dir="rtl">
-      {/* ── Header ─────────────────────────────────────────── */}
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-2xl font-display font-bold">שלום 👋</h1>
-          <p className="text-muted-foreground text-sm mt-0.5">{monthLabel} — סקירת מצב</p>
-        </div>
-      </div>
+    <div className="grid grid-cols-3 gap-4 h-[calc(100vh-80px)]" dir="rtl">
 
-      {loading ? (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {[1,2,3].map(i => (
-            <div key={i} className="h-72 bg-muted animate-pulse rounded-2xl" />
-          ))}
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      {/* ══ חובות ══════════════════════════════════════════════ */}
+      <DebtsCard
+        debts={debts}
+        onAdd={async (payload) => {
+          const created = await apiFetch("/debts", { method: "POST", body: JSON.stringify(payload) });
+          setDebts(prev => [created, ...prev]);
+        }}
+      />
 
-          {/* ══════════════════════════════════════════════════
-              CARD 1 — חובות
-          ══════════════════════════════════════════════════ */}
-          <DebtsCard
-            debts={debts}
-            onAdd={async (payload) => {
-              const created = await apiFetch("/debts", { method: "POST", body: JSON.stringify(payload) });
-              setDebts(prev => [created, ...prev]);
-            }}
-          />
+      {/* ══ תזכורות ════════════════════════════════════════════ */}
+      <RemindersCard
+        tasks={tasks}
+        onToggle={async (id) => {
+          const updated = await apiFetch(`/reminders/${id}/toggle`, { method: "PATCH" });
+          setTasks(prev => prev.map(t => t.id === id ? updated : t));
+        }}
+        onAdd={async (title, priority) => {
+          const created = await apiFetch("/reminders", {
+            method: "POST",
+            body: JSON.stringify({ title, priority, status: "open", description: "" }),
+          });
+          setTasks(prev => [created, ...prev]);
+        }}
+      />
 
-          {/* ══════════════════════════════════════════════════
-              CARD 2 — תזכורות
-          ══════════════════════════════════════════════════ */}
-          <RemindersCard
-            tasks={tasks}
-            onToggle={async (id) => {
-              const updated = await apiFetch(`/reminders/${id}/toggle`, { method: "PATCH" });
-              setTasks(prev => prev.map(t => t.id === id ? updated : t));
-            }}
-            onAdd={async (title, priority) => {
-              const created = await apiFetch("/reminders", {
-                method: "POST",
-                body: JSON.stringify({ title, priority, status: "open", description: "" }),
-              });
-              setTasks(prev => [created, ...prev]);
-            }}
-          />
+      {/* ══ פתקים ══════════════════════════════════════════════ */}
+      <NotesCard
+        tabs={tabs}
+        notes={notes}
+        onAdd={async (title, content, tabId) => {
+          const created = await apiFetch("/notes", {
+            method: "POST",
+            body: JSON.stringify({ title, content, tabId, color: "#fef9c3", isPinned: false, sortOrder: 0 }),
+          });
+          setNotes(prev => [{ ...created, tabName: tabs.find(t => t.id === tabId)?.name ?? null }, ...prev]);
+        }}
+      />
 
-          {/* ══════════════════════════════════════════════════
-              CARD 3 — פתקים
-          ══════════════════════════════════════════════════ */}
-          <NotesCard
-            tabs={tabs}
-            notes={notes}
-            onAdd={async (title, content, tabId) => {
-              const created = await apiFetch("/notes", {
-                method: "POST",
-                body: JSON.stringify({ title, content, tabId, color: "#fef9c3", isPinned: false, sortOrder: 0 }),
-              });
-              setNotes(prev => [{ ...created, tabName: tabs.find(t => t.id === tabId)?.name ?? null }, ...prev]);
-            }}
-          />
-
-        </div>
-      )}
     </div>
   );
 }
@@ -192,7 +174,7 @@ function DebtsCard({ debts, onAdd }: { debts: Debt[]; onAdd: (p: any) => Promise
         </Link>
       </div>
 
-      <div className="px-5 pb-4 space-y-4 flex-1">
+      <div className="px-5 pb-4 space-y-4 flex-1 overflow-y-auto">
         {/* Totals */}
         <div className="grid grid-cols-2 gap-2">
           <div className="bg-rose-50 border border-rose-100 rounded-xl p-3">
@@ -237,7 +219,7 @@ function DebtsCard({ debts, onAdd }: { debts: Debt[]; onAdd: (p: any) => Promise
       </div>
 
       {/* Quick-add */}
-      <div className="border-t border-border/50 px-4 py-3">
+      <div className="border-t border-border/50 px-4 py-3 shrink-0">
         {open ? (
           <div className="space-y-2">
             <div className="flex gap-1.5">
@@ -350,7 +332,7 @@ function RemindersCard({ tasks, onToggle, onAdd }: {
         </Link>
       </div>
 
-      <div className="px-5 pb-4 space-y-3 flex-1">
+      <div className="px-5 pb-4 space-y-3 flex-1 overflow-y-auto">
         {/* Summary counts */}
         <div className="flex items-center gap-3 text-sm">
           <span className="flex items-center gap-1.5">
@@ -396,7 +378,7 @@ function RemindersCard({ tasks, onToggle, onAdd }: {
       </div>
 
       {/* Quick-add */}
-      <div className="border-t border-border/50 px-4 py-3">
+      <div className="border-t border-border/50 px-4 py-3 shrink-0">
         {open ? (
           <div className="space-y-2">
             <div className="flex gap-1.5">
@@ -482,7 +464,7 @@ function NotesCard({ tabs, notes, onAdd }: {
         </Link>
       </div>
 
-      <div className="px-5 flex-1 space-y-3 pb-4">
+      <div className="px-5 flex-1 space-y-3 pb-4 overflow-y-auto">
         {/* Tabs */}
         {tabs.length > 0 && (
           <div className="flex gap-1.5 flex-wrap">
@@ -534,7 +516,7 @@ function NotesCard({ tabs, notes, onAdd }: {
       </div>
 
       {/* Quick-add */}
-      <div className="border-t border-border/50 px-4 py-3">
+      <div className="border-t border-border/50 px-4 py-3 shrink-0">
         {open ? (
           <div className="space-y-2">
             <Input value={noteTitle} onChange={e => setNoteTitle(e.target.value)}
