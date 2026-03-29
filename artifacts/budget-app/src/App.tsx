@@ -11,9 +11,6 @@ import Dashboard from "@/pages/Dashboard";
 import Budget from "@/pages/Budget";
 import CashWallet from "@/pages/CashWallet";
 import FixedExpenses from "@/pages/FixedExpenses";
-import AnnualExpenses from "@/pages/AnnualExpenses";
-import LargeExpenses from "@/pages/LargeExpenses";
-import ExternalFunds from "@/pages/ExternalFunds";
 import Incomes from "@/pages/Incomes";
 import Charity from "@/pages/Charity";
 import Expenses from "@/pages/Expenses";
@@ -40,9 +37,6 @@ function Router() {
         <Route path="/budget" component={Budget} />
         <Route path="/cash" component={CashWallet} />
         <Route path="/fixed" component={FixedExpenses} />
-        <Route path="/annual" component={AnnualExpenses} />
-        <Route path="/large" component={LargeExpenses} />
-        <Route path="/external" component={ExternalFunds} />
         <Route path="/expenses" component={Expenses} />
         <Route path="/incomes" component={Incomes} />
         <Route path="/charity" component={Charity} />
