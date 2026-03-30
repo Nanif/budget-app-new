@@ -268,7 +268,7 @@ function WalletMonthCard({ fundName, monthLabel, monthlyTarget, totals, transact
                       : <ArrowUpRight  className="w-3.5 h-3.5 text-rose-400 shrink-0" />
                     }
                     <span className="truncate text-xs text-muted-foreground">
-                      {tx.description || (tx.type === "deposit" ? "הפקדה" : "משיכה")}
+                      {tx.description || (tx.type === "deposit" ? "ניתן" : "נלקח")}
                     </span>
                   </div>
                   <div className="flex items-center gap-3 shrink-0">
@@ -465,7 +465,7 @@ function FundCard({ fund, activeBid }: { fund: FundSummary; activeBid: number })
           const raw: WalletTx[] = d.transactions ?? [];
           setTxns(raw.slice(0, 8).map(t => ({
             id: t.id,
-            label: t.description || (t.type === "deposit" ? "הפקדה" : "משיכה"),
+            label: t.description || (t.type === "deposit" ? "ניתן" : "נלקח"),
             amount: t.amount,
             date: t.date,
             sign: t.type === "deposit" ? "+" : "-",

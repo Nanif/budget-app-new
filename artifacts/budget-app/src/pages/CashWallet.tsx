@@ -71,7 +71,7 @@ function TxRow({
           )}>
             {isDeposit ? <ArrowDownLeft className="w-3.5 h-3.5" /> : <ArrowUpRight className="w-3.5 h-3.5" />}
           </span>
-          <span className="truncate">{tx.description || (isDeposit ? "הפקדה" : "משיכה")}</span>
+          <span className="truncate">{tx.description || (isDeposit ? "ניתן" : "נלקח")}</span>
         </span>
       </td>
       <td className={cn("py-3 px-4 text-sm font-bold tabular-nums text-right",
@@ -157,8 +157,8 @@ function YearMonthGrid({
           <tr className="border-b border-border/60 bg-muted/40">
             <th className="py-2.5 px-4 text-xs font-semibold text-muted-foreground text-right">חודש</th>
             <th className="py-2.5 px-4 text-xs font-semibold text-muted-foreground text-right">יעד</th>
-            <th className="py-2.5 px-4 text-xs font-semibold text-muted-foreground text-right">הופקד</th>
-            <th className="py-2.5 px-4 text-xs font-semibold text-muted-foreground text-right">הוצא</th>
+            <th className="py-2.5 px-4 text-xs font-semibold text-muted-foreground text-right">ניתן</th>
+            <th className="py-2.5 px-4 text-xs font-semibold text-muted-foreground text-right">נלקח</th>
             <th className="py-2.5 px-4 text-xs font-semibold text-muted-foreground text-right">יתרה</th>
             <th className="py-2.5 px-4 text-xs font-semibold text-muted-foreground text-right w-24">התקדמות</th>
           </tr>
@@ -362,11 +362,11 @@ export default function CashWallet() {
           fundId: fund.id,
           type: txType,
           amount: parseFloat(form.amount),
-          description: form.description || (txType === "deposit" ? "הפקדה לקופה" : "משיכה מהקופה"),
+          description: form.description || (txType === "deposit" ? "ניתן" : "נלקח"),
           date: form.date || new Date().toISOString().split("T")[0],
         }),
       });
-      toast({ title: txType === "deposit" ? "הפקדה נרשמה ✓" : "משיכה נרשמה ✓" });
+      toast({ title: txType === "deposit" ? "ניתן נרשם ✓" : "נלקח נרשם ✓" });
       setDialogOpen(false);
       await Promise.all([loadMonth(), loadYearSummary()]);
       setAllTx([]);
@@ -416,7 +416,7 @@ export default function CashWallet() {
     <div className="space-y-6" dir="rtl">
       <PageHeader
         title={fund ? `קופת שוטף — ${fund.name}` : "קופת שוטף"}
-        description="מעטפת מזומן — הפקדות, משיכות ומעקב שנתי"
+        description="מעטפת מזומן — ניתן, נלקח ומעקב שנתי"
       >
         <div className="flex gap-2">
           <Button
@@ -424,7 +424,7 @@ export default function CashWallet() {
             className="rounded-xl gap-1.5 h-9 text-sm"
             disabled={!fund}
           >
-            <ArrowDownLeft className="w-4 h-4" /> הפקדה
+            <ArrowDownLeft className="w-4 h-4" /> ניתן
           </Button>
           <Button
             onClick={() => openDialog("withdrawal")}
@@ -432,7 +432,7 @@ export default function CashWallet() {
             className="rounded-xl gap-1.5 h-9 text-sm border-rose-200 text-rose-600 hover:bg-rose-50"
             disabled={!fund}
           >
-            <ArrowUpRight className="w-4 h-4" /> משיכה
+            <ArrowUpRight className="w-4 h-4" /> נלקח
           </Button>
         </div>
       </PageHeader>
@@ -456,27 +456,27 @@ export default function CashWallet() {
               color="text-foreground"
             />
             <KpiCard
-              label="הועבר השנה"
+              label="ניתן השנה"
               value={fmt(yearDeposits)}
               sub={annualBudget > 0 ? `${Math.round((yearDeposits / annualBudget) * 100)}% מהיעד` : undefined}
               color="text-emerald-600"
             />
             <KpiCard
-              label="שאמור הועבר"
+              label="שאמור לתת"
               value={fmt(shouldHaveDeposited)}
               sub={`עד חודש ${monthsElapsed} (${MONTH_NAMES[monthsElapsed - 1] ?? "—"})`}
               color="text-blue-600"
             />
             <KpiCard
-              label={transferGap > 0 ? "נותר להעביר" : "הועבר כנדרש ✓"}
+              label={transferGap > 0 ? "נותר לתת" : "ניתן כנדרש ✓"}
               value={fmt(Math.abs(transferGap))}
-              sub={transferGap > 0 ? "פיגור ביחס ליעד" : transferGap < 0 ? "הועבר יותר מהיעד" : "עמידה מלאה"}
+              sub={transferGap > 0 ? "פיגור ביחס ליעד" : transferGap < 0 ? "ניתן יותר מהיעד" : "עמידה מלאה"}
               color={transferGap > 0 ? "text-amber-600" : "text-emerald-600"}
             />
             <KpiCard
               label="יתרה בקופה"
               value={fmt(balanceInFund)}
-              sub={yearWithdrawals > 0 ? `${fmt(yearWithdrawals)} הוצא` : "טרם הוצא"}
+              sub={yearWithdrawals > 0 ? `${fmt(yearWithdrawals)} נלקח` : "טרם נלקח"}
               color={balanceInFund >= 0 ? "text-primary" : "text-rose-600"}
             />
           </div>
@@ -521,7 +521,7 @@ export default function CashWallet() {
                 {/* Progress bar */}
                 <div>
                   <div className="flex justify-between items-center mb-1.5">
-                    <span className="text-xs text-muted-foreground">הפקדות מהיעד</span>
+                    <span className="text-xs text-muted-foreground">ניתן מהיעד</span>
                     <span className="text-xs font-bold tabular-nums">{Math.round(monthPct)}%</span>
                   </div>
                   <div className="h-3 bg-muted rounded-full overflow-hidden">
@@ -538,9 +538,9 @@ export default function CashWallet() {
                 <div className="space-y-3 text-sm">
                   {[
                     { label: "יעד חודשי", val: fmt(monthlyAlloc), cls: "text-foreground" },
-                    { label: "הופקד", val: fmt(monthDeposits), cls: "text-emerald-600" },
-                    { label: "נותר להפקיד", val: fmt(monthRemaining), cls: monthRemaining > 0 ? "text-amber-600" : "text-muted-foreground" },
-                    { label: "הוצא (משיכות)", val: fmt(monthWithdrawals), cls: "text-rose-500" },
+                    { label: "ניתן", val: fmt(monthDeposits), cls: "text-emerald-600" },
+                    { label: "נותר לתת", val: fmt(monthRemaining), cls: monthRemaining > 0 ? "text-amber-600" : "text-muted-foreground" },
+                    { label: "נלקח", val: fmt(monthWithdrawals), cls: "text-rose-500" },
                     { label: "יתרה חודש", val: fmt(monthBalance), cls: monthBalance >= 0 ? "text-primary font-bold" : "text-rose-600 font-bold" },
                   ].map(s => (
                     <div key={s.label} className="flex justify-between items-center">
@@ -553,7 +553,7 @@ export default function CashWallet() {
                 {monthDeposits > monthlyAlloc && monthlyAlloc > 0 && (
                   <div className="flex items-start gap-1.5 text-amber-600 text-xs bg-amber-50 rounded-xl p-2.5">
                     <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-                    <span>הופקד יותר מהיעד החודשי</span>
+                    <span>ניתן יותר מהיעד החודשי</span>
                   </div>
                 )}
               </CardContent>
@@ -636,10 +636,10 @@ export default function CashWallet() {
             <span>{allTx.length} תנועות</span>
             <span className="flex gap-4">
               <span className="text-emerald-600 font-medium">
-                הפקדות: {fmt(allTx.filter(t => t.type === "deposit").reduce((s, t) => s + t.amount, 0))}
+                ניתן: {fmt(allTx.filter(t => t.type === "deposit").reduce((s, t) => s + t.amount, 0))}
               </span>
               <span className="text-rose-500 font-medium">
-                משיכות: {fmt(allTx.filter(t => t.type === "withdrawal").reduce((s, t) => s + t.amount, 0))}
+                נלקח: {fmt(allTx.filter(t => t.type === "withdrawal").reduce((s, t) => s + t.amount, 0))}
               </span>
             </span>
           </div>
@@ -652,8 +652,8 @@ export default function CashWallet() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               {txType === "deposit"
-                ? <><ArrowDownLeft className="w-5 h-5 text-emerald-600" /> הפקדה לקופה</>
-                : <><ArrowUpRight className="w-5 h-5 text-rose-600" /> משיכה מהקופה</>
+                ? <><ArrowDownLeft className="w-5 h-5 text-emerald-600" /> ניתן לקופה</>
+                : <><ArrowUpRight className="w-5 h-5 text-rose-600" /> נלקח מהקופה</>
               }
             </DialogTitle>
           </DialogHeader>
@@ -685,7 +685,7 @@ export default function CashWallet() {
               <Input
                 value={form.description}
                 onChange={e => setForm(p => ({ ...p, description: e.target.value }))}
-                placeholder={txType === "deposit" ? "הפקדה לקופה..." : "לאיזה צורך?"}
+                placeholder={txType === "deposit" ? "ניתן לקופה..." : "לאיזה צורך?"}
                 className="rounded-xl"
                 onKeyDown={e => e.key === "Enter" && handleSave()}
               />

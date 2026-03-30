@@ -225,11 +225,11 @@ export function QuickActions() {
           fundId:      cf.fundId ? parseInt(cf.fundId) : null,
           type:        cf.type,
           amount:      parseFloat(cf.amount),
-          description: cf.description.trim() || (cf.type === "deposit" ? "הפקדה לקופה" : "משיכה מהקופה"),
+          description: cf.description.trim() || (cf.type === "deposit" ? "ניתן" : "נלקח"),
           date:        cf.date || today(),
         }),
       });
-      toast({ title: cf.type === "deposit" ? "הפקדה נרשמה ✓" : "משיכה נרשמה ✓" });
+      toast({ title: cf.type === "deposit" ? "ניתן נרשם ✓" : "נלקח נרשם ✓" });
       close();
     } catch { toast({ title: "שגיאה בשמירה", variant: "destructive" }); }
     finally { setSaving(false); }
@@ -710,16 +710,16 @@ export function QuickActions() {
         <DialogContent className="max-w-sm rounded-2xl" dir="rtl">
           <div className="flex items-center gap-2 pt-2 pb-1">
             {cf.type === "deposit"
-              ? <><ArrowDownLeft className="w-5 h-5 text-emerald-600" /><DialogTitle>הפקדה לקופה</DialogTitle></>
-              : <><ArrowUpRight className="w-5 h-5 text-rose-600" /><DialogTitle>משיכה מהקופה</DialogTitle></>
+              ? <><ArrowDownLeft className="w-5 h-5 text-emerald-600" /><DialogTitle>ניתן לקופה</DialogTitle></>
+              : <><ArrowUpRight className="w-5 h-5 text-rose-600" /><DialogTitle>נלקח מהקופה</DialogTitle></>
             }
           </div>
           <div className="space-y-4 py-1">
             {/* Type toggle */}
             <div className="grid grid-cols-2 gap-2 p-1 bg-muted/60 rounded-2xl">
               {([
-                { v: "deposit"    as const, label: "הפקדה", cls: "bg-emerald-600" },
-                { v: "withdrawal" as const, label: "משיכה",  cls: "bg-rose-600"   },
+                { v: "deposit"    as const, label: "ניתן", cls: "bg-emerald-600" },
+                { v: "withdrawal" as const, label: "נלקח", cls: "bg-rose-600"   },
               ]).map(t => (
                 <button
                   key={t.v}
@@ -760,7 +760,7 @@ export function QuickActions() {
               <Input
                 value={cf.description}
                 onChange={e => setCf(p => ({ ...p, description: e.target.value }))}
-                placeholder={cf.type === "deposit" ? "הפקדה לקופה..." : "לאיזה צורך?"}
+                placeholder={cf.type === "deposit" ? "ניתן לקופה..." : "לאיזה צורך?"}
                 className="rounded-xl"
                 onKeyDown={e => e.key === "Enter" && saveCash()}
               />
