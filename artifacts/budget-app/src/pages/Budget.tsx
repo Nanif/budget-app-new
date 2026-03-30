@@ -402,18 +402,25 @@ export default function Budget() {
           </DialogHeader>
           <div className="space-y-5 py-2 max-h-[70vh] overflow-y-auto">
             <div className="space-y-1.5">
-              <Label className="font-semibold">שם הקופה *</Label>
+              <Label className="font-semibold flex items-center gap-2">
+                שם הקופה *
+                {editFund?.isDefault && (
+                  <span className="text-[10px] bg-muted text-muted-foreground px-2 py-0.5 rounded-full font-normal">קבועה — לא ניתן לשינוי</span>
+                )}
+              </Label>
               <Input value={fundForm.name} onChange={e => setFundForm(p => ({ ...p, name: e.target.value }))}
-                placeholder='למשל: שוטף, מעגל השנה...' className="rounded-xl" />
+                placeholder='למשל: שוטף, מעגל השנה...' className="rounded-xl"
+                disabled={!!editFund?.isDefault} />
             </div>
             <div className="space-y-2">
               <Label className="font-semibold">סוג הקופה *</Label>
               <div className="space-y-1.5">
                 {BEHAVIOR_OPTIONS.map(opt => (
                   <button key={opt.value} type="button"
-                    onClick={() => setFundForm(p => ({ ...p, fundBehavior: opt.value }))}
+                    onClick={() => !editFund?.isDefault && setFundForm(p => ({ ...p, fundBehavior: opt.value }))}
                     className={cn("w-full text-right px-4 py-3 rounded-xl border-2 transition-all flex items-start gap-3",
-                      fundForm.fundBehavior === opt.value ? "border-primary bg-primary/5" : "border-border hover:border-primary/30"
+                      fundForm.fundBehavior === opt.value ? "border-primary bg-primary/5" : "border-border hover:border-primary/30",
+                      editFund?.isDefault && "opacity-60 cursor-not-allowed pointer-events-none"
                     )}>
                     <div className={cn("w-3 h-3 rounded-full mt-1 shrink-0",
                       fundForm.fundBehavior === opt.value ? "bg-primary" : "bg-muted")} />
