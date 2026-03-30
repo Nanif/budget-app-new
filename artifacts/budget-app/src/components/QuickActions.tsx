@@ -17,7 +17,7 @@ type Category = { id: number; name: string; fundId: number | null };
 const EXPENSE_BEHAVIORS = new Set([
   "expense_monthly", "annual_categorized", "annual_large", "annual", "expense_non_budget",
 ]);
-const CASH_BEHAVIORS = new Set(["cash_monthly", "non_budget", "cash_annual"]);
+const CASH_BEHAVIORS = new Set(["cash_monthly"]);
 
 const today = () => new Date().toISOString().split("T")[0];
 
