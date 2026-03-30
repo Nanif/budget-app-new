@@ -73,13 +73,11 @@ router.get("/", async (req, res) => {
  */
 router.get("/latest", async (req, res) => {
   try {
-    const byid = getBYID(req);
-
-    // Get all assets for this user + year
+    // Get all assets for this user (global — not scoped to budget year)
     const assets = await db
       .select({ id: assetsTable.id })
       .from(assetsTable)
-      .where(and(eq(assetsTable.userId, UID), eq(assetsTable.budgetYearId, byid)));
+      .where(eq(assetsTable.userId, UID));
 
     const result = await Promise.all(
       assets.map(async (asset) => {
