@@ -11,7 +11,7 @@ import { useBudgetYear } from "@/contexts/BudgetYearContext";
 import { useCashCurrentMonth, defaultDateForMonth } from "@/hooks/useCashCurrentMonth";
 import {
   ArrowDownLeft, ArrowUpRight, Loader2, Wallet,
-  ChevronLeft, ChevronRight, AlertCircle, List, Check, Trash2, Pin,
+  List, Check, Trash2, Pin,
 } from "lucide-react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
@@ -39,20 +39,7 @@ const fmt = (n: number) =>
   new Intl.NumberFormat("he-IL", { style: "currency", currency: "ILS", maximumFractionDigits: 0 }).format(n);
 
 const MONTH_NAMES = ["ינואר","פברואר","מרץ","אפריל","מאי","יוני","יולי","אוגוסט","ספטמבר","אוקטובר","נובמבר","דצמבר"];
-const toMonthStr = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-const mlabel = (s: string) => { const [y, m] = s.split("-"); return `${MONTH_NAMES[+m - 1]} ${y}`; };
 
-function KpiCard({
-  label, value, sub, color, accent,
-}: { label: string; value: string; sub?: string; color: string; accent?: string }) {
-  return (
-    <div className={cn("rounded-2xl border border-border/60 p-4 bg-card space-y-1", accent)}>
-      <p className={cn("text-xl font-display font-bold tabular-nums leading-tight", color)}>{value}</p>
-      <p className="text-xs text-muted-foreground font-medium">{label}</p>
-      {sub && <p className="text-[11px] text-muted-foreground/70">{sub}</p>}
-    </div>
-  );
-}
 
 function TxRow({
   tx, showMonthYear, onDelete,
@@ -256,7 +243,7 @@ export default function CashWallet() {
   const { activeYear } = useBudgetYear();
   const now = new Date();
 
-  const { currentMonth, setCurrentMonth } = useCashCurrentMonth();
+  const { currentMonth } = useCashCurrentMonth();
   const [month, setMonth] = useState(currentMonth);
   const [fund, setFund] = useState<Fund | null>(null);
   const [monthData, setMonthData] = useState<WalletData | null>(null);
@@ -334,15 +321,6 @@ export default function CashWallet() {
     finally { setAllTxLoading(false); }
   };
 
-  const prevMonth = () => {
-    const [y, m] = month.split("-").map(Number);
-    setMonth(toMonthStr(new Date(y, m - 2, 1)));
-  };
-  const nextMonth = () => {
-    const [y, m] = month.split("-").map(Number);
-    setMonth(toMonthStr(new Date(y, m, 1)));
-  };
-
   const openDialog = (type: "deposit" | "withdrawal") => {
     setTxType(type);
     setForm({ amount: "", description: "", date: defaultDateForMonth(currentMonth) });
@@ -392,25 +370,8 @@ export default function CashWallet() {
   };
 
   const monthlyAlloc = fund?.monthlyAllocation ?? 0;
-  const annualBudget = monthlyAlloc * 12;
   const [selYear, selMonth] = month.split("-").map(Number);
   const selMonthLabel = `${MONTH_NAMES[selMonth - 1]} ${selYear}`;
-
-  const yearDeposits = yearSummary.reduce((s, r) => s + r.deposits, 0);
-  const yearWithdrawals = yearSummary.reduce((s, r) => s + r.withdrawals, 0);
-  const balanceInFund = yearDeposits - yearWithdrawals;
-
-  const monthsElapsed = budgetYear < now.getFullYear() ? 12
-    : budgetYear > now.getFullYear() ? 0
-    : now.getMonth() + 1;
-  const shouldHaveDeposited = monthsElapsed * monthlyAlloc;
-  const transferGap = shouldHaveDeposited - yearDeposits;
-
-  const monthDeposits = monthData?.totals.deposits ?? 0;
-  const monthWithdrawals = monthData?.totals.withdrawals ?? 0;
-  const monthBalance = monthDeposits - monthWithdrawals;
-  const monthRemaining = Math.max(0, monthlyAlloc - monthDeposits);
-  const monthPct = monthlyAlloc > 0 ? Math.min(100, (monthDeposits / monthlyAlloc) * 100) : 0;
 
   return (
     <div className="space-y-6" dir="rtl">
@@ -447,152 +408,10 @@ export default function CashWallet() {
         </Card>
       ) : (
         <>
-          {/* ── Annual KPI bar ─────────────────────────────────── */}
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-            <KpiCard
-              label="תקציב שנתי"
-              value={fmt(annualBudget)}
-              sub={`${fmt(monthlyAlloc)} / חודש`}
-              color="text-foreground"
-            />
-            <KpiCard
-              label="ניתן השנה"
-              value={fmt(yearDeposits)}
-              sub={annualBudget > 0 ? `${Math.round((yearDeposits / annualBudget) * 100)}% מהיעד` : undefined}
-              color="text-emerald-600"
-            />
-            <KpiCard
-              label="שאמור לתת"
-              value={fmt(shouldHaveDeposited)}
-              sub={`עד חודש ${monthsElapsed} (${MONTH_NAMES[monthsElapsed - 1] ?? "—"})`}
-              color="text-blue-600"
-            />
-            <KpiCard
-              label={transferGap > 0 ? "נותר לתת" : "ניתן כנדרש ✓"}
-              value={fmt(Math.abs(transferGap))}
-              sub={transferGap > 0 ? "פיגור ביחס ליעד" : transferGap < 0 ? "ניתן יותר מהיעד" : "עמידה מלאה"}
-              color={transferGap > 0 ? "text-amber-600" : "text-emerald-600"}
-            />
-            <KpiCard
-              label="יתרה בקופה"
-              value={fmt(balanceInFund)}
-              sub={yearWithdrawals > 0 ? `${fmt(yearWithdrawals)} נלקח` : "טרם נלקח"}
-              color={balanceInFund >= 0 ? "text-primary" : "text-rose-600"}
-            />
-          </div>
-
-          {/* ── Monthly view ───────────────────────────────────── */}
-          <div className="grid md:grid-cols-[280px_1fr] gap-4">
-
-            {/* Month status card */}
-            <Card className="rounded-2xl">
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <button
-                    onClick={prevMonth}
-                    className="p-1.5 rounded-lg hover:bg-muted transition-colors"
-                  >
-                    <ChevronRight className="w-4 h-4" />
-                  </button>
-                  <div className="text-center">
-                    <p className="text-sm font-semibold">{selMonthLabel}</p>
-                    {month === currentMonth ? (
-                      <span className="inline-flex items-center gap-1 text-[10px] text-emerald-600 font-medium mt-0.5">
-                        <Pin className="w-2.5 h-2.5" /> חודש נוכחי
-                      </span>
-                    ) : (
-                      <button
-                        onClick={() => { setCurrentMonth(month); }}
-                        className="inline-flex items-center gap-1 text-[10px] text-muted-foreground hover:text-primary transition-colors mt-0.5"
-                      >
-                        <Pin className="w-2.5 h-2.5" /> הגדר כחודש נוכחי
-                      </button>
-                    )}
-                  </div>
-                  <button
-                    onClick={nextMonth}
-                    className="p-1.5 rounded-lg hover:bg-muted transition-colors"
-                  >
-                    <ChevronLeft className="w-4 h-4" />
-                  </button>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-5">
-                {/* Progress bar */}
-                <div>
-                  <div className="flex justify-between items-center mb-1.5">
-                    <span className="text-xs text-muted-foreground">ניתן מהיעד</span>
-                    <span className="text-xs font-bold tabular-nums">{Math.round(monthPct)}%</span>
-                  </div>
-                  <div className="h-3 bg-muted rounded-full overflow-hidden">
-                    <div
-                      className={cn("h-full rounded-full transition-all duration-500",
-                        monthPct >= 100 ? "bg-emerald-500" : monthPct >= 60 ? "bg-primary" : "bg-amber-400"
-                      )}
-                      style={{ width: `${monthPct}%` }}
-                    />
-                  </div>
-                </div>
-
-                {/* Stats list */}
-                <div className="space-y-3 text-sm">
-                  {[
-                    { label: "יעד חודשי", val: fmt(monthlyAlloc), cls: "text-foreground" },
-                    { label: "ניתן", val: fmt(monthDeposits), cls: "text-emerald-600" },
-                    { label: "נותר לתת", val: fmt(monthRemaining), cls: monthRemaining > 0 ? "text-amber-600" : "text-muted-foreground" },
-                    { label: "נלקח", val: fmt(monthWithdrawals), cls: "text-rose-500" },
-                    { label: "יתרה חודש", val: fmt(monthBalance), cls: monthBalance >= 0 ? "text-primary font-bold" : "text-rose-600 font-bold" },
-                  ].map(s => (
-                    <div key={s.label} className="flex justify-between items-center">
-                      <span className="text-muted-foreground">{s.label}</span>
-                      <span className={cn("tabular-nums font-medium", s.cls)}>{s.val}</span>
-                    </div>
-                  ))}
-                </div>
-
-                {monthDeposits > monthlyAlloc && monthlyAlloc > 0 && (
-                  <div className="flex items-start gap-1.5 text-amber-600 text-xs bg-amber-50 rounded-xl p-2.5">
-                    <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-                    <span>ניתן יותר מהיעד החודשי</span>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Monthly transactions */}
-            <Card className="rounded-2xl overflow-hidden">
-              <CardHeader className="pb-2 flex flex-row items-center justify-between">
-                <CardTitle className="text-sm">תנועות — {selMonthLabel}</CardTitle>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={openAllTx}
-                  className="rounded-xl gap-1.5 text-xs h-7 px-2.5"
-                >
-                  <List className="w-3.5 h-3.5" /> כל התנועות
-                </Button>
-              </CardHeader>
-              <CardContent className="p-0">
-                {loading ? (
-                  <div className="space-y-2 p-4">
-                    {[1, 2, 3].map(i => (
-                      <div key={i} className="h-11 bg-muted animate-pulse rounded-xl" />
-                    ))}
-                  </div>
-                ) : (
-                  <TxTable
-                    transactions={monthData?.transactions ?? []}
-                    onDelete={id => setDeleteId(id)}
-                  />
-                )}
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* ── Annual summary grid ─────────────────────────────── */}
+          {/* ── Monthly summary grid ────────────────────────────── */}
           <Card className="rounded-2xl overflow-hidden">
             <CardHeader>
-              <CardTitle className="text-sm">סיכום חודשי שנתי — {budgetYear}</CardTitle>
+              <CardTitle className="text-sm">חודשים — {budgetYear}</CardTitle>
             </CardHeader>
             <CardContent className="p-0">
               <YearMonthGrid
@@ -603,6 +422,35 @@ export default function CashWallet() {
                 currentMonth={currentMonth}
                 onSelectMonth={setMonth}
               />
+            </CardContent>
+          </Card>
+
+          {/* ── Transactions list ───────────────────────────────── */}
+          <Card className="rounded-2xl overflow-hidden">
+            <CardHeader className="pb-2 flex flex-row items-center justify-between">
+              <CardTitle className="text-sm">תנועות — {selMonthLabel}</CardTitle>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={openAllTx}
+                className="rounded-xl gap-1.5 text-xs h-7 px-2.5"
+              >
+                <List className="w-3.5 h-3.5" /> כל התנועות
+              </Button>
+            </CardHeader>
+            <CardContent className="p-0">
+              {loading ? (
+                <div className="space-y-2 p-4">
+                  {[1, 2, 3].map(i => (
+                    <div key={i} className="h-11 bg-muted animate-pulse rounded-xl" />
+                  ))}
+                </div>
+              ) : (
+                <TxTable
+                  transactions={monthData?.transactions ?? []}
+                  onDelete={id => setDeleteId(id)}
+                />
+              )}
             </CardContent>
           </Card>
         </>
@@ -691,16 +539,6 @@ export default function CashWallet() {
               />
             </div>
 
-            {/* Quick hint */}
-            {txType === "deposit" && monthRemaining > 0 && (
-              <button
-                type="button"
-                onClick={() => setForm(p => ({ ...p, amount: String(monthRemaining) }))}
-                className="w-full text-xs text-primary bg-primary/8 rounded-xl py-2 hover:bg-primary/14 transition-colors"
-              >
-                מלא יעד חודשי: {fmt(monthRemaining)}
-              </button>
-            )}
           </div>
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setDialogOpen(false)} className="rounded-xl flex-1">
