@@ -59,10 +59,10 @@ router.get("/summary", async (req, res) => {
 
 /* ── default funds seeded for every new budget year ─────────── */
 const DEFAULT_FUNDS = [
-  { name: "קופת שוטף",             fundBehavior: "cash_monthly",       colorClass: "#f59e0b", monthlyAllocation: "0", annualAllocation: "0", initialBalance: "0", includeInBudget: true,  displayOrder: 0 },
-  { name: "קופת קבועות",           fundBehavior: "fixed_monthly",      colorClass: "#3b82f6", monthlyAllocation: "0", annualAllocation: "0", initialBalance: "0", includeInBudget: true,  displayOrder: 1 },
-  { name: "קופת משכנתא וחובות",    fundBehavior: "fixed_monthly",      colorClass: "#8b5cf6", monthlyAllocation: "0", annualAllocation: "0", initialBalance: "0", includeInBudget: true,  displayOrder: 2 },
-  { name: "קופת מעגל שנה",         fundBehavior: "annual_categorized", colorClass: "#10b981", monthlyAllocation: "0", annualAllocation: "0", initialBalance: "0", includeInBudget: true,  displayOrder: 3 },
+  { name: "קופת שוטף",             fundBehavior: "cash_monthly",       colorClass: "#f59e0b", monthlyAllocation: "0", annualAllocation: "0", initialBalance: "0", includeInBudget: true,  displayOrder: 0, isDefault: true },
+  { name: "קופת קבועות",           fundBehavior: "fixed_monthly",      colorClass: "#3b82f6", monthlyAllocation: "0", annualAllocation: "0", initialBalance: "0", includeInBudget: true,  displayOrder: 1, isDefault: true },
+  { name: "קופת משכנתא וחובות",    fundBehavior: "fixed_monthly",      colorClass: "#8b5cf6", monthlyAllocation: "0", annualAllocation: "0", initialBalance: "0", includeInBudget: true,  displayOrder: 2, isDefault: true },
+  { name: "קופת מעגל שנה",         fundBehavior: "annual_categorized", colorClass: "#10b981", monthlyAllocation: "0", annualAllocation: "0", initialBalance: "0", includeInBudget: true,  displayOrder: 3, isDefault: true },
 ];
 
 async function seedDefaultFunds(byid: number) {
@@ -174,6 +174,12 @@ router.patch("/reorder", async (req, res) => {
 router.delete("/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
+    const [fund] = await db.select({ isDefault: fundsTable.isDefault })
+      .from(fundsTable).where(and(eq(fundsTable.id, id), eq(fundsTable.userId, DEFAULT_USER_ID)));
+    if (fund?.isDefault) {
+      res.status(403).json({ error: "לא ניתן למחוק קופה ברירת מחדל" });
+      return;
+    }
     await db.update(fundsTable).set({ isActive: false, updatedAt: new Date() })
       .where(and(eq(fundsTable.id, id), eq(fundsTable.userId, DEFAULT_USER_ID)));
     res.status(204).send();

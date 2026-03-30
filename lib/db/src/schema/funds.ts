@@ -22,6 +22,7 @@ export const fundsTable = pgTable("funds", {
   colorClass: text("color_class").notNull().default("#6366f1"),
   includeInBudget: boolean("include_in_budget").notNull().default(true),
   isActive: boolean("is_active").notNull().default(true),
+  isDefault: boolean("is_default").notNull().default(false),
   displayOrder: integer("display_order").notNull().default(0),
   monthlyAllocation: numeric("monthly_allocation", { precision: 12, scale: 2 }).notNull().default("0"),
   annualAllocation: numeric("annual_allocation", { precision: 12, scale: 2 }).notNull().default("0"),

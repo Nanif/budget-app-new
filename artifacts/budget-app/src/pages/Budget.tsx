@@ -29,7 +29,7 @@ type BudgetYear = { id: number; name: string; totalBudget: number; tithePercenta
 type Fund = {
   id: number; name: string; fundBehavior: string; colorClass: string;
   monthlyAllocation: number; annualAllocation: number; initialBalance: number;
-  includeInBudget: boolean; isActive: boolean; displayOrder: number;
+  includeInBudget: boolean; isActive: boolean; displayOrder: number; isDefault: boolean;
 };
 type MonthEntry = { month: string; entryType: string; total: number };
 type IncomeSummary = { totalIncome: number; totalDeductions: number; netIncome: number; monthly: MonthEntry[] };
@@ -779,10 +779,12 @@ function FundCard({ fund, spent, onEdit, onDelete, dimmed = false }: {
           </div>
         </div>
         <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
-          <button onClick={onDelete}
-            className="p-1.5 rounded-lg hover:bg-rose-50 text-muted-foreground hover:text-rose-600 transition-colors">
-            <Trash2 className="w-3.5 h-3.5" />
-          </button>
+          {!fund.isDefault && (
+            <button onClick={onDelete}
+              className="p-1.5 rounded-lg hover:bg-rose-50 text-muted-foreground hover:text-rose-600 transition-colors">
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          )}
           <button onClick={onEdit}
             className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors">
             <Pencil className="w-3.5 h-3.5" />
