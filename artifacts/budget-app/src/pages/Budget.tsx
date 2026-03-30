@@ -147,6 +147,7 @@ export default function Budget() {
   const [totalExp, setTotalExp]         = useState(0);
   const [loading,  setLoading]          = useState(true);
   const [fixedData, setFixedData]       = useState<FixedItemsData>({ fund: null, items: [], totals: { monthly: 0, annual: 0 } });
+  const [fixedOpen, setFixedOpen]       = useState(false);
 
   /* ── year edit ───────────────────────────────────────────── */
   const [yearEdit,   setYearEdit]   = useState(false);
@@ -359,16 +360,10 @@ export default function Budget() {
             onEdit={openEditFund}
             onDelete={f => setDeleteFund(f)}
             onAdd={openCreateFund}
+            fixedFundId={fixedData.fund?.id}
+            fixedBudget={fixedData.totals.monthly * 12}
+            onOpenFixed={() => setFixedOpen(true)}
           />
-
-          {/* ══ טבלת הוצאות קבועות ══════════════════════════════ */}
-          {fixedData.fund && (
-            <FixedItemsTable
-              data={fixedData}
-              activeBid={activeBid}
-              onReload={load}
-            />
-          )}
 
           {/* ══ שנתי ═════════════════════════════════════════════ */}
           <FundSection
@@ -454,6 +449,17 @@ export default function Budget() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* ══ Fixed Items Dialog ═══════════════════════════════════ */}
+      {fixedData.fund && (
+        <FixedItemsDialog
+          open={fixedOpen}
+          onClose={() => setFixedOpen(false)}
+          data={fixedData}
+          activeBid={activeBid}
+          onReload={load}
+        />
+      )}
 
       {/* ══ Fund Dialog ══════════════════════════════════════════ */}
       <Dialog open={fundDialog} onOpenChange={setFundDialog}>
@@ -872,10 +878,11 @@ function AnomalySection({ anomalies, onEdit }: {
 /* ═══════════════════════════════════════════════════════════
    FUND CARD
 ═══════════════════════════════════════════════════════════ */
-function FundCard({ fund, spent, onEdit, onDelete, dimmed = false }: {
+function FundCard({ fund, spent, onEdit, onDelete, dimmed = false, fixedBudget, onOpenFixed }: {
   fund: Fund; spent: number; onEdit: () => void; onDelete: () => void; dimmed?: boolean;
+  fixedBudget?: number; onOpenFixed?: () => void;
 }) {
-  const budget    = fundBudget(fund);
+  const budget    = fixedBudget !== undefined ? fixedBudget : fundBudget(fund);
   const remaining = budget - spent;
   const pct       = budget > 0 ? Math.min(150, (spent / budget) * 100) : 0;
   const status    = utilStatus(pct);
@@ -912,6 +919,13 @@ function FundCard({ fund, spent, onEdit, onDelete, dimmed = false }: {
           </div>
         </div>
         <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+          {onOpenFixed && (
+            <button onClick={onOpenFixed}
+              className="flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-medium transition-colors">
+              <ListChecks className="w-3 h-3" />
+              רשימת קבועות
+            </button>
+          )}
           {!fund.isDefault && (
             <button onClick={onDelete}
               className="p-1.5 rounded-lg hover:bg-rose-50 text-muted-foreground hover:text-rose-600 transition-colors">
@@ -937,7 +951,7 @@ function FundCard({ fund, spent, onEdit, onDelete, dimmed = false }: {
         <div className="bg-muted/40 rounded-xl py-2 px-1">
           <p className="text-[10px] text-muted-foreground">תקציב</p>
           <p className="text-xs font-bold mt-0.5">{fmt(budget, true)}</p>
-          {monthly && <p className="text-[9px] text-muted-foreground">{fmt(fund.monthlyAllocation, true)}/חודש</p>}
+          {monthly && <p className="text-[9px] text-muted-foreground">{fmt(budget / 12, true)}/חודש</p>}
         </div>
         <div className="bg-muted/40 rounded-xl py-2 px-1">
           <p className="text-[10px] text-muted-foreground">בוצע</p>
@@ -971,10 +985,13 @@ function FundCard({ fund, spent, onEdit, onDelete, dimmed = false }: {
 /* ═══════════════════════════════════════════════════════════
    FUND SECTION
 ═══════════════════════════════════════════════════════════ */
-function FundSection({ title, funds, spendMap, onEdit, onDelete, onAdd, dimmed = false }: {
+function FundSection({ title, funds, spendMap, onEdit, onDelete, onAdd, dimmed = false,
+  fixedFundId, fixedBudget, onOpenFixed,
+}: {
   title: string; funds: Fund[]; spendMap: Record<number, number>;
   onEdit: (f: Fund) => void; onDelete: (f: Fund) => void;
   onAdd: () => void; dimmed?: boolean;
+  fixedFundId?: number; fixedBudget?: number; onOpenFixed?: () => void;
 }) {
   const sorted = [...funds].sort((a, b) => a.displayOrder - b.displayOrder);
   return (
@@ -995,6 +1012,8 @@ function FundSection({ title, funds, spendMap, onEdit, onDelete, onAdd, dimmed =
               onEdit={() => onEdit(fund)}
               onDelete={() => onDelete(fund)}
               dimmed={dimmed}
+              fixedBudget={fund.id === fixedFundId ? fixedBudget : undefined}
+              onOpenFixed={fund.id === fixedFundId ? onOpenFixed : undefined}
             />
           ))}
         </div>
@@ -1004,24 +1023,36 @@ function FundSection({ title, funds, spendMap, onEdit, onDelete, onAdd, dimmed =
 }
 
 /* ═══════════════════════════════════════════════════════════
-   FIXED ITEMS TABLE
+   FIXED ITEMS DIALOG
 ═══════════════════════════════════════════════════════════ */
-function FixedItemsTable({ data, activeBid, onReload }: {
+function FixedItemsDialog({ open, onClose, data, activeBid, onReload }: {
+  open: boolean; onClose: () => void;
   data: FixedItemsData; activeBid: number; onReload: () => void;
 }) {
   const { toast } = useToast();
   const { fund, items, totals } = data;
 
-  const [addOpen,   setAddOpen]   = useState(false);
-  const [editItem,  setEditItem]  = useState<FixedItem | null>(null);
-  const [form,      setForm]      = useState({ name: "", monthlyAmount: "", notes: "" });
-  const [saving,    setSaving]    = useState(false);
+  const [addOpen,    setAddOpen]    = useState(false);
+  const [editItem,   setEditItem]   = useState<FixedItem | null>(null);
+  const [form,       setForm]       = useState({ name: "", monthlyAmount: "", notes: "" });
+  const [saving,     setSaving]     = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
-
-  const gap = (fund?.monthlyAllocation ?? 0) - totals.monthly;
 
   const openAdd  = () => { setForm({ name: "", monthlyAmount: "", notes: "" }); setEditItem(null); setAddOpen(true); };
   const openEdit = (item: FixedItem) => { setForm({ name: item.name, monthlyAmount: String(item.monthlyAmount), notes: item.notes ?? "" }); setEditItem(item); setAddOpen(true); };
+
+  const syncFundBudget = async (newMonthly: number) => {
+    if (!fund) return;
+    await apiFetch(`/funds/${fund.id}`, {
+      method: "PUT",
+      body: JSON.stringify({
+        name: fund.name, fundBehavior: fund.fundBehavior, colorClass: fund.colorClass,
+        description: "", includeInBudget: fund.includeInBudget,
+        monthlyAllocation: newMonthly, annualAllocation: fund.annualAllocation,
+        initialBalance: fund.initialBalance, isActive: fund.isActive, displayOrder: fund.displayOrder,
+      }),
+    });
+  };
 
   const handleSave = async () => {
     if (!form.name.trim() || !form.monthlyAmount || parseFloat(form.monthlyAmount) <= 0) {
@@ -1029,12 +1060,15 @@ function FixedItemsTable({ data, activeBid, onReload }: {
     }
     setSaving(true);
     try {
-      const payload = { name: form.name.trim(), monthlyAmount: parseFloat(form.monthlyAmount), notes: form.notes.trim(), fundId: fund!.id };
+      const newAmount = parseFloat(form.monthlyAmount);
+      const payload = { name: form.name.trim(), monthlyAmount: newAmount, notes: form.notes.trim(), fundId: fund!.id };
       if (editItem) {
         await apiFetch(`/fixed-items/${editItem.id}`, { method: "PUT", body: JSON.stringify(payload) });
+        await syncFundBudget(totals.monthly - editItem.monthlyAmount + newAmount);
         toast({ title: "פריט עודכן" });
       } else {
         await apiFetch(`/fixed-items?bid=${activeBid}`, { method: "POST", body: JSON.stringify(payload) });
+        await syncFundBudget(totals.monthly + newAmount);
         toast({ title: "פריט נוסף" });
       }
       setAddOpen(false); setEditItem(null);
@@ -1044,9 +1078,11 @@ function FixedItemsTable({ data, activeBid, onReload }: {
   };
 
   const handleDelete = async (id: number) => {
+    const item = items.find(i => i.id === id);
     setDeletingId(id);
     try {
       await apiFetch(`/fixed-items/${id}`, { method: "DELETE" });
+      await syncFundBudget(totals.monthly - (item?.monthlyAmount ?? 0));
       toast({ title: "פריט נמחק" });
       onReload();
     } catch { toast({ title: "שגיאה במחיקה", variant: "destructive" }); }
@@ -1054,120 +1090,115 @@ function FixedItemsTable({ data, activeBid, onReload }: {
   };
 
   return (
-    <div className="bg-card rounded-2xl border border-border/60 overflow-hidden shadow-sm">
-      {/* Header */}
-      <div className="flex items-center justify-between px-5 py-4 border-b border-border/50">
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center"
-            style={{ background: `${fund?.colorClass ?? "#64748b"}22` }}>
-            <ListChecks className="w-4 h-4" style={{ color: fund?.colorClass ?? "#64748b" }} />
+    <Dialog open={open} onOpenChange={o => !o && onClose()}>
+      <DialogContent className="max-w-2xl rounded-2xl p-0 overflow-hidden" dir="rtl">
+        <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-border/50 gap-3">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0"
+              style={{ background: `${fund?.colorClass ?? "#64748b"}22` }}>
+              <ListChecks className="w-4 h-4" style={{ color: fund?.colorClass ?? "#64748b" }} />
+            </div>
+            <div>
+              <DialogTitle className="text-base font-bold leading-tight">רשימת קבועות — {fund?.name}</DialogTitle>
+              <p className="text-[11px] text-muted-foreground mt-0.5">
+                סכום הרשימה קובע את תקציב הקופה אוטומטית
+              </p>
+            </div>
           </div>
-          <div>
-            <p className="font-semibold text-sm">הוצאות קבועות — {fund?.name}</p>
-            <p className="text-[11px] text-muted-foreground">טבלת עזר • הסכום הכולל = תקציב חודשי</p>
-          </div>
-        </div>
-        <button onClick={openAdd}
-          className="flex items-center gap-1.5 text-xs bg-primary text-primary-foreground px-3 py-1.5 rounded-xl hover:bg-primary/90 transition-colors">
-          <Plus className="w-3.5 h-3.5" /> הוסף פריט
-        </button>
-      </div>
-
-      {/* Add / Edit form */}
-      {addOpen && (
-        <div className="px-5 py-3 bg-muted/30 border-b border-border/40 flex items-center gap-3">
-          <Input
-            value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))}
-            placeholder="שם ההוצאה..." className="flex-1 h-8 text-sm rounded-lg"
-            autoFocus
-          />
-          <Input
-            value={form.monthlyAmount} onChange={e => setForm(p => ({ ...p, monthlyAmount: e.target.value }))}
-            type="number" placeholder="₪ לחודש" dir="ltr" className="w-28 h-8 text-sm rounded-lg"
-          />
-          <Input
-            value={form.notes} onChange={e => setForm(p => ({ ...p, notes: e.target.value }))}
-            placeholder="הערות (אופציונלי)" className="w-40 h-8 text-sm rounded-lg"
-          />
-          <button onClick={handleSave} disabled={saving}
-            className="p-1.5 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">
-            {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
-          </button>
-          <button onClick={() => { setAddOpen(false); setEditItem(null); }}
-            className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground transition-colors">
-            <X className="w-3.5 h-3.5" />
+          <button onClick={openAdd}
+            className="flex items-center gap-1.5 text-xs bg-primary text-primary-foreground px-3 py-1.5 rounded-xl hover:bg-primary/90 transition-colors shrink-0">
+            <Plus className="w-3.5 h-3.5" /> הוסף פריט
           </button>
         </div>
-      )}
 
-      {/* Table */}
-      {items.length === 0 && !addOpen ? (
-        <p className="text-center text-sm text-muted-foreground py-8">
-          אין פריטים עדיין — לחץ "הוסף פריט" להתחיל
-        </p>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-[11px] text-muted-foreground border-b border-border/40">
-                <th className="text-right font-medium px-5 py-2.5">שם ההוצאה</th>
-                <th className="text-right font-medium px-4 py-2.5">הערות</th>
-                <th className="text-left font-medium px-5 py-2.5 tabular-nums">לחודש</th>
-                <th className="text-left font-medium px-5 py-2.5 tabular-nums">לשנה</th>
-                <th className="px-3 py-2.5 w-16" />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border/30">
-              {items.map(item => (
-                <tr key={item.id} className="hover:bg-muted/20 transition-colors group">
-                  <td className="px-5 py-2.5 font-medium">{item.name}</td>
-                  <td className="px-4 py-2.5 text-muted-foreground text-xs">{item.notes || "—"}</td>
-                  <td className="px-5 py-2.5 tabular-nums text-left">{fmt(item.monthlyAmount)}</td>
-                  <td className="px-5 py-2.5 tabular-nums text-muted-foreground text-left">{fmt(item.monthlyAmount * 12)}</td>
-                  <td className="px-3 py-2.5">
-                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity justify-end">
-                      <button onClick={() => openEdit(item)}
-                        className="p-1 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors">
-                        <Pencil className="w-3 h-3" />
-                      </button>
-                      <button onClick={() => handleDelete(item.id)} disabled={deletingId === item.id}
-                        className="p-1 rounded-lg hover:bg-rose-50 text-muted-foreground hover:text-rose-600 transition-colors">
-                        {deletingId === item.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
-                      </button>
-                    </div>
-                  </td>
+        <div className="max-h-[60vh] overflow-y-auto">
+          {/* Add / Edit form */}
+          {addOpen && (
+            <div className="px-5 py-3 bg-muted/30 border-b border-border/40 flex items-center gap-3">
+              <Input
+                value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))}
+                placeholder="שם ההוצאה..." className="flex-1 h-8 text-sm rounded-lg"
+                autoFocus
+              />
+              <Input
+                value={form.monthlyAmount} onChange={e => setForm(p => ({ ...p, monthlyAmount: e.target.value }))}
+                type="number" placeholder="₪ לחודש" dir="ltr" className="w-28 h-8 text-sm rounded-lg"
+              />
+              <Input
+                value={form.notes} onChange={e => setForm(p => ({ ...p, notes: e.target.value }))}
+                placeholder="הערות (אופציונלי)" className="w-36 h-8 text-sm rounded-lg"
+              />
+              <button onClick={handleSave} disabled={saving}
+                className="p-1.5 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">
+                {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+              </button>
+              <button onClick={() => { setAddOpen(false); setEditItem(null); }}
+                className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground transition-colors">
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
+
+          {/* Table */}
+          {items.length === 0 && !addOpen ? (
+            <p className="text-center text-sm text-muted-foreground py-10">
+              אין פריטים עדיין — לחץ "הוסף פריט" להתחיל
+            </p>
+          ) : (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-[11px] text-muted-foreground border-b border-border/40 bg-muted/20">
+                  <th className="text-right font-medium px-5 py-2.5">שם ההוצאה</th>
+                  <th className="text-right font-medium px-4 py-2.5">הערות</th>
+                  <th className="text-left font-medium px-5 py-2.5 tabular-nums">לחודש</th>
+                  <th className="text-left font-medium px-5 py-2.5 tabular-nums">לשנה</th>
+                  <th className="px-3 py-2.5 w-16" />
                 </tr>
-              ))}
-            </tbody>
-            <tfoot>
-              <tr className="border-t-2 border-border/60 bg-muted/20">
-                <td className="px-5 py-3 font-bold">סך הכל</td>
-                <td />
-                <td className="px-5 py-3 font-bold tabular-nums text-left" style={{ color: fund?.colorClass }}>
-                  {fmt(totals.monthly)}
-                </td>
-                <td className="px-5 py-3 tabular-nums text-muted-foreground text-left">{fmt(totals.annual)}</td>
-                <td />
-              </tr>
-              {fund && (
-                <tr className="bg-muted/10 text-xs text-muted-foreground">
-                  <td colSpan={5} className="px-5 py-2">
-                    תקציב חודשי של הקופה: <span className="font-semibold text-foreground">{fmt(fund.monthlyAllocation)}</span>
-                    {" · "}
-                    {gap === 0
-                      ? <span className="text-emerald-600 font-medium">מאוזן בדיוק ✓</span>
-                      : gap > 0
-                        ? <span className="text-amber-600">פנוי: {fmt(gap)}</span>
-                        : <span className="text-rose-600">חריגה: {fmt(Math.abs(gap))}</span>
-                    }
+              </thead>
+              <tbody className="divide-y divide-border/30">
+                {items.map(item => (
+                  <tr key={item.id} className="hover:bg-muted/20 transition-colors group">
+                    <td className="px-5 py-2.5 font-medium">{item.name}</td>
+                    <td className="px-4 py-2.5 text-muted-foreground text-xs">{item.notes || "—"}</td>
+                    <td className="px-5 py-2.5 tabular-nums text-left">{fmt(item.monthlyAmount)}</td>
+                    <td className="px-5 py-2.5 tabular-nums text-muted-foreground text-left">{fmt(item.monthlyAmount * 12)}</td>
+                    <td className="px-3 py-2.5">
+                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity justify-end">
+                        <button onClick={() => openEdit(item)}
+                          className="p-1 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors">
+                          <Pencil className="w-3 h-3" />
+                        </button>
+                        <button onClick={() => handleDelete(item.id)} disabled={deletingId === item.id}
+                          className="p-1 rounded-lg hover:bg-rose-50 text-muted-foreground hover:text-rose-600 transition-colors">
+                          {deletingId === item.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="border-t-2 border-border/60 bg-muted/20">
+                  <td className="px-5 py-3 font-bold">סך הכל</td>
+                  <td />
+                  <td className="px-5 py-3 font-bold tabular-nums text-left" style={{ color: fund?.colorClass }}>
+                    {fmt(totals.monthly)}
                   </td>
+                  <td className="px-5 py-3 tabular-nums text-muted-foreground text-left font-semibold">{fmt(totals.annual)}</td>
+                  <td />
                 </tr>
-              )}
-            </tfoot>
-          </table>
+              </tfoot>
+            </table>
+          )}
         </div>
-      )}
-    </div>
+
+        {/* Footer summary */}
+        <div className="px-5 py-3 border-t border-border/50 bg-muted/10 flex items-center justify-between text-sm">
+          <span className="text-muted-foreground">תקציב חודשי לקופה:</span>
+          <span className="font-bold text-primary">{fmt(totals.monthly)}</span>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
