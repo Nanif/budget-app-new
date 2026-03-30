@@ -10,7 +10,6 @@ import Home from "@/pages/Home";
 import Dashboard from "@/pages/Dashboard";
 import Budget from "@/pages/Budget";
 import CashWallet from "@/pages/CashWallet";
-import FixedExpenses from "@/pages/FixedExpenses";
 import Incomes from "@/pages/Incomes";
 import Charity from "@/pages/Charity";
 import Expenses from "@/pages/Expenses";
@@ -36,7 +35,6 @@ function Router() {
         <Route path="/dashboard" component={Dashboard} />
         <Route path="/budget" component={Budget} />
         <Route path="/cash" component={CashWallet} />
-        <Route path="/fixed" component={FixedExpenses} />
         <Route path="/expenses" component={Expenses} />
         <Route path="/incomes" component={Incomes} />
         <Route path="/charity" component={Charity} />

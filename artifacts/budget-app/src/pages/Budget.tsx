@@ -12,6 +12,7 @@ import {
   Pencil, Check, X, Loader2, Plus, Wallet, Settings2,
   TrendingUp, TrendingDown, AlertTriangle, ArrowLeft,
   Minus, CalendarDays, CircleDollarSign, Trash2, BarChart3,
+  ListChecks,
 } from "lucide-react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
@@ -26,6 +27,8 @@ import {
    TYPES
 ═══════════════════════════════════════════════════════════ */
 type BudgetYear = { id: number; name: string; totalBudget: number; tithePercentage: number };
+type FixedItem = { id: number; fundId: number; name: string; monthlyAmount: number; notes: string; displayOrder: number };
+type FixedItemsData = { fund: Fund | null; items: FixedItem[]; totals: { monthly: number; annual: number } };
 type Fund = {
   id: number; name: string; fundBehavior: string; colorClass: string;
   monthlyAllocation: number; annualAllocation: number; initialBalance: number;
@@ -141,8 +144,9 @@ export default function Budget() {
   const [funds,    setFunds]    = useState<Fund[]>([]);
   const [income,   setIncome]   = useState<IncomeSummary>({ totalIncome: 0, totalDeductions: 0, netIncome: 0, monthly: [] });
   const [spends,   setSpends]   = useState<FundSpend[]>([]);
-  const [totalExp, setTotalExp] = useState(0);
-  const [loading,  setLoading]  = useState(true);
+  const [totalExp, setTotalExp]         = useState(0);
+  const [loading,  setLoading]          = useState(true);
+  const [fixedData, setFixedData]       = useState<FixedItemsData>({ fund: null, items: [], totals: { monthly: 0, annual: 0 } });
 
   /* ── year edit ───────────────────────────────────────────── */
   const [yearEdit,   setYearEdit]   = useState(false);
@@ -168,18 +172,20 @@ export default function Budget() {
   const load = async () => {
     setLoading(true);
     try {
-      const [y, f, inc, sp, exp] = await Promise.all([
+      const [y, f, inc, sp, exp, fi] = await Promise.all([
         apiFetch("/budget-year"),
         apiFetch("/funds?all=true"),
         apiFetch("/incomes/summary"),
         apiFetch("/expenses/by-fund"),
         apiFetch("/expenses/summary"),
+        apiFetch(`/fixed-items?bid=${activeBid}`),
       ]);
       setYear(y);
       setFunds(parseFunds(f));
       setIncome(inc);
       setSpends(sp);
       setTotalExp(exp.total ?? 0);
+      setFixedData(fi);
     } catch { toast({ title: "שגיאה בטעינה", variant: "destructive" }); }
     finally { setLoading(false); }
   };
@@ -354,6 +360,15 @@ export default function Budget() {
             onDelete={f => setDeleteFund(f)}
             onAdd={openCreateFund}
           />
+
+          {/* ══ טבלת הוצאות קבועות ══════════════════════════════ */}
+          {fixedData.fund && (
+            <FixedItemsTable
+              data={fixedData}
+              activeBid={activeBid}
+              onReload={load}
+            />
+          )}
 
           {/* ══ שנתי ═════════════════════════════════════════════ */}
           <FundSection
@@ -872,11 +887,10 @@ function FundCard({ fund, spent, onEdit, onDelete, dimmed = false }: {
 
   /* route to detail page */
   const detailPath = fund.fundBehavior === "cash_monthly"        ? `/cash`
-    : fund.fundBehavior === "fixed_monthly"       ? `/fixed`
     : fund.fundBehavior === "annual_categorized"  ? `/annual`
     : fund.fundBehavior === "annual_large"         ? `/large`
     : fund.fundBehavior === "non_budget"           ? `/external`
-    : `/budget`;
+    : null;
 
   return (
     <div className={cn(
@@ -908,11 +922,13 @@ function FundCard({ fund, spent, onEdit, onDelete, dimmed = false }: {
             className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors">
             <Pencil className="w-3.5 h-3.5" />
           </button>
-          <Link href={detailPath}>
-            <span className="p-1.5 rounded-lg hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors block">
-              <ArrowLeft className="w-3.5 h-3.5" />
-            </span>
-          </Link>
+          {detailPath && (
+            <Link href={detailPath}>
+              <span className="p-1.5 rounded-lg hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors block">
+                <ArrowLeft className="w-3.5 h-3.5" />
+              </span>
+            </Link>
+          )}
         </div>
       </div>
 
@@ -984,6 +1000,174 @@ function FundSection({ title, funds, spendMap, onEdit, onDelete, onAdd, dimmed =
         </div>
       )}
     </section>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════
+   FIXED ITEMS TABLE
+═══════════════════════════════════════════════════════════ */
+function FixedItemsTable({ data, activeBid, onReload }: {
+  data: FixedItemsData; activeBid: number; onReload: () => void;
+}) {
+  const { toast } = useToast();
+  const { fund, items, totals } = data;
+
+  const [addOpen,   setAddOpen]   = useState(false);
+  const [editItem,  setEditItem]  = useState<FixedItem | null>(null);
+  const [form,      setForm]      = useState({ name: "", monthlyAmount: "", notes: "" });
+  const [saving,    setSaving]    = useState(false);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+
+  const gap = (fund?.monthlyAllocation ?? 0) - totals.monthly;
+
+  const openAdd  = () => { setForm({ name: "", monthlyAmount: "", notes: "" }); setEditItem(null); setAddOpen(true); };
+  const openEdit = (item: FixedItem) => { setForm({ name: item.name, monthlyAmount: String(item.monthlyAmount), notes: item.notes ?? "" }); setEditItem(item); setAddOpen(true); };
+
+  const handleSave = async () => {
+    if (!form.name.trim() || !form.monthlyAmount || parseFloat(form.monthlyAmount) <= 0) {
+      toast({ title: "שם וסכום נדרשים", variant: "destructive" }); return;
+    }
+    setSaving(true);
+    try {
+      const payload = { name: form.name.trim(), monthlyAmount: parseFloat(form.monthlyAmount), notes: form.notes.trim(), fundId: fund!.id };
+      if (editItem) {
+        await apiFetch(`/fixed-items/${editItem.id}`, { method: "PUT", body: JSON.stringify(payload) });
+        toast({ title: "פריט עודכן" });
+      } else {
+        await apiFetch(`/fixed-items?bid=${activeBid}`, { method: "POST", body: JSON.stringify(payload) });
+        toast({ title: "פריט נוסף" });
+      }
+      setAddOpen(false); setEditItem(null);
+      onReload();
+    } catch { toast({ title: "שגיאה בשמירה", variant: "destructive" }); }
+    finally { setSaving(false); }
+  };
+
+  const handleDelete = async (id: number) => {
+    setDeletingId(id);
+    try {
+      await apiFetch(`/fixed-items/${id}`, { method: "DELETE" });
+      toast({ title: "פריט נמחק" });
+      onReload();
+    } catch { toast({ title: "שגיאה במחיקה", variant: "destructive" }); }
+    finally { setDeletingId(null); }
+  };
+
+  return (
+    <div className="bg-card rounded-2xl border border-border/60 overflow-hidden shadow-sm">
+      {/* Header */}
+      <div className="flex items-center justify-between px-5 py-4 border-b border-border/50">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center"
+            style={{ background: `${fund?.colorClass ?? "#64748b"}22` }}>
+            <ListChecks className="w-4 h-4" style={{ color: fund?.colorClass ?? "#64748b" }} />
+          </div>
+          <div>
+            <p className="font-semibold text-sm">הוצאות קבועות — {fund?.name}</p>
+            <p className="text-[11px] text-muted-foreground">טבלת עזר • הסכום הכולל = תקציב חודשי</p>
+          </div>
+        </div>
+        <button onClick={openAdd}
+          className="flex items-center gap-1.5 text-xs bg-primary text-primary-foreground px-3 py-1.5 rounded-xl hover:bg-primary/90 transition-colors">
+          <Plus className="w-3.5 h-3.5" /> הוסף פריט
+        </button>
+      </div>
+
+      {/* Add / Edit form */}
+      {addOpen && (
+        <div className="px-5 py-3 bg-muted/30 border-b border-border/40 flex items-center gap-3">
+          <Input
+            value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))}
+            placeholder="שם ההוצאה..." className="flex-1 h-8 text-sm rounded-lg"
+            autoFocus
+          />
+          <Input
+            value={form.monthlyAmount} onChange={e => setForm(p => ({ ...p, monthlyAmount: e.target.value }))}
+            type="number" placeholder="₪ לחודש" dir="ltr" className="w-28 h-8 text-sm rounded-lg"
+          />
+          <Input
+            value={form.notes} onChange={e => setForm(p => ({ ...p, notes: e.target.value }))}
+            placeholder="הערות (אופציונלי)" className="w-40 h-8 text-sm rounded-lg"
+          />
+          <button onClick={handleSave} disabled={saving}
+            className="p-1.5 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">
+            {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+          </button>
+          <button onClick={() => { setAddOpen(false); setEditItem(null); }}
+            className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground transition-colors">
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
+      {/* Table */}
+      {items.length === 0 && !addOpen ? (
+        <p className="text-center text-sm text-muted-foreground py-8">
+          אין פריטים עדיין — לחץ "הוסף פריט" להתחיל
+        </p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-[11px] text-muted-foreground border-b border-border/40">
+                <th className="text-right font-medium px-5 py-2.5">שם ההוצאה</th>
+                <th className="text-right font-medium px-4 py-2.5">הערות</th>
+                <th className="text-left font-medium px-5 py-2.5 tabular-nums">לחודש</th>
+                <th className="text-left font-medium px-5 py-2.5 tabular-nums">לשנה</th>
+                <th className="px-3 py-2.5 w-16" />
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border/30">
+              {items.map(item => (
+                <tr key={item.id} className="hover:bg-muted/20 transition-colors group">
+                  <td className="px-5 py-2.5 font-medium">{item.name}</td>
+                  <td className="px-4 py-2.5 text-muted-foreground text-xs">{item.notes || "—"}</td>
+                  <td className="px-5 py-2.5 tabular-nums text-left">{fmt(item.monthlyAmount)}</td>
+                  <td className="px-5 py-2.5 tabular-nums text-muted-foreground text-left">{fmt(item.monthlyAmount * 12)}</td>
+                  <td className="px-3 py-2.5">
+                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity justify-end">
+                      <button onClick={() => openEdit(item)}
+                        className="p-1 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors">
+                        <Pencil className="w-3 h-3" />
+                      </button>
+                      <button onClick={() => handleDelete(item.id)} disabled={deletingId === item.id}
+                        className="p-1 rounded-lg hover:bg-rose-50 text-muted-foreground hover:text-rose-600 transition-colors">
+                        {deletingId === item.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr className="border-t-2 border-border/60 bg-muted/20">
+                <td className="px-5 py-3 font-bold">סך הכל</td>
+                <td />
+                <td className="px-5 py-3 font-bold tabular-nums text-left" style={{ color: fund?.colorClass }}>
+                  {fmt(totals.monthly)}
+                </td>
+                <td className="px-5 py-3 tabular-nums text-muted-foreground text-left">{fmt(totals.annual)}</td>
+                <td />
+              </tr>
+              {fund && (
+                <tr className="bg-muted/10 text-xs text-muted-foreground">
+                  <td colSpan={5} className="px-5 py-2">
+                    תקציב חודשי של הקופה: <span className="font-semibold text-foreground">{fmt(fund.monthlyAllocation)}</span>
+                    {" · "}
+                    {gap === 0
+                      ? <span className="text-emerald-600 font-medium">מאוזן בדיוק ✓</span>
+                      : gap > 0
+                        ? <span className="text-amber-600">פנוי: {fmt(gap)}</span>
+                        : <span className="text-rose-600">חריגה: {fmt(Math.abs(gap))}</span>
+                    }
+                  </td>
+                </tr>
+              )}
+            </tfoot>
+          </table>
+        </div>
+      )}
+    </div>
   );
 }
 
