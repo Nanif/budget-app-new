@@ -146,8 +146,8 @@ export default function Budget() {
   const [spends,   setSpends]   = useState<FundSpend[]>([]);
   const [totalExp, setTotalExp]         = useState(0);
   const [loading,  setLoading]          = useState(true);
-  const [fixedData, setFixedData]       = useState<FixedItemsData>({ fund: null, items: [], totals: { monthly: 0, annual: 0 } });
-  const [fixedOpen, setFixedOpen]       = useState(false);
+  const [fixedDataMap, setFixedDataMap]   = useState<Record<number, FixedItemsData>>({});
+  const [fixedOpenId,  setFixedOpenId]   = useState<number | null>(null);
 
   /* ── year edit ───────────────────────────────────────────── */
   const [yearEdit,   setYearEdit]   = useState(false);
@@ -173,20 +173,32 @@ export default function Budget() {
   const load = async () => {
     setLoading(true);
     try {
-      const [y, f, inc, sp, exp, fi] = await Promise.all([
+      const [y, rawFunds, inc, sp, exp] = await Promise.all([
         apiFetch("/budget-year"),
         apiFetch("/funds?all=true"),
         apiFetch("/incomes/summary"),
         apiFetch("/expenses/by-fund"),
         apiFetch("/expenses/summary"),
-        apiFetch(`/fixed-items?bid=${activeBid}`),
       ]);
+      const parsedFunds = parseFunds(rawFunds);
       setYear(y);
-      setFunds(parseFunds(f));
+      setFunds(parsedFunds);
       setIncome(inc);
       setSpends(sp);
       setTotalExp(exp.total ?? 0);
-      setFixedData(fi);
+
+      // Fetch fixed items for every active fixed_monthly fund
+      const fixedFunds = parsedFunds.filter(
+        (f: Fund) => f.isActive && f.fundBehavior === "fixed_monthly"
+      );
+      const fixedResults = await Promise.all(
+        fixedFunds.map((f: Fund) =>
+          apiFetch(`/fixed-items?bid=${activeBid}&fundId=${f.id}`)
+        )
+      );
+      const map: Record<number, FixedItemsData> = {};
+      fixedFunds.forEach((f: Fund, i: number) => { map[f.id] = fixedResults[i]; });
+      setFixedDataMap(map);
     } catch { toast({ title: "שגיאה בטעינה", variant: "destructive" }); }
     finally { setLoading(false); }
   };
@@ -360,9 +372,8 @@ export default function Budget() {
             onEdit={openEditFund}
             onDelete={f => setDeleteFund(f)}
             onAdd={openCreateFund}
-            fixedFundId={fixedData.fund?.id}
-            fixedBudget={fixedData.totals.monthly * 12}
-            onOpenFixed={() => setFixedOpen(true)}
+            fixedDataMap={fixedDataMap}
+            onOpenFixed={id => setFixedOpenId(id)}
           />
 
           {/* ══ שנתי ═════════════════════════════════════════════ */}
@@ -451,11 +462,11 @@ export default function Budget() {
       </AlertDialog>
 
       {/* ══ Fixed Items Dialog ═══════════════════════════════════ */}
-      {fixedData.fund && (
+      {fixedOpenId !== null && fixedDataMap[fixedOpenId] && (
         <FixedItemsDialog
-          open={fixedOpen}
-          onClose={() => setFixedOpen(false)}
-          data={fixedData}
+          open={true}
+          onClose={() => setFixedOpenId(null)}
+          data={fixedDataMap[fixedOpenId]}
           activeBid={activeBid}
           onReload={load}
         />
@@ -986,12 +997,13 @@ function FundCard({ fund, spent, onEdit, onDelete, dimmed = false, fixedBudget, 
    FUND SECTION
 ═══════════════════════════════════════════════════════════ */
 function FundSection({ title, funds, spendMap, onEdit, onDelete, onAdd, dimmed = false,
-  fixedFundId, fixedBudget, onOpenFixed,
+  fixedDataMap, onOpenFixed,
 }: {
   title: string; funds: Fund[]; spendMap: Record<number, number>;
   onEdit: (f: Fund) => void; onDelete: (f: Fund) => void;
   onAdd: () => void; dimmed?: boolean;
-  fixedFundId?: number; fixedBudget?: number; onOpenFixed?: () => void;
+  fixedDataMap?: Record<number, FixedItemsData>;
+  onOpenFixed?: (fundId: number) => void;
 }) {
   const sorted = [...funds].sort((a, b) => a.displayOrder - b.displayOrder);
   return (
@@ -1004,18 +1016,21 @@ function FundSection({ title, funds, spendMap, onEdit, onDelete, onAdd, dimmed =
         <EmptyFunds onAdd={onAdd} />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-          {sorted.map(fund => (
-            <FundCard
-              key={fund.id}
-              fund={fund}
-              spent={spendMap[fund.id] ?? 0}
-              onEdit={() => onEdit(fund)}
-              onDelete={() => onDelete(fund)}
-              dimmed={dimmed}
-              fixedBudget={fund.id === fixedFundId ? fixedBudget : undefined}
-              onOpenFixed={fund.id === fixedFundId ? onOpenFixed : undefined}
-            />
-          ))}
+          {sorted.map(fund => {
+            const fd = fixedDataMap?.[fund.id];
+            return (
+              <FundCard
+                key={fund.id}
+                fund={fund}
+                spent={spendMap[fund.id] ?? 0}
+                onEdit={() => onEdit(fund)}
+                onDelete={() => onDelete(fund)}
+                dimmed={dimmed}
+                fixedBudget={fd ? fd.totals.monthly * 12 : undefined}
+                onOpenFixed={fd && onOpenFixed ? () => onOpenFixed(fund.id) : undefined}
+              />
+            );
+          })}
         </div>
       )}
     </section>
