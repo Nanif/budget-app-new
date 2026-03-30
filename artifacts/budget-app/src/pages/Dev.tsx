@@ -5,7 +5,20 @@ import { cn } from "@/lib/utils";
 import {
   ChevronRight, ChevronDown, FileCode, Folder, FolderOpen,
   Loader2, Database, Table2, RefreshCw, ChevronLeft, Monitor, Server,
+  Copy, Check,
 } from "lucide-react";
+
+/* ── useCopy ───────────────────────────────────────────────── */
+function useCopy() {
+  const [copied, setCopied] = useState(false);
+  const copy = useCallback((text: string) => {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    });
+  }, []);
+  return { copied, copy };
+}
 
 /* ── Types ─────────────────────────────────────────────────── */
 type FileEntry = { name: string; path: string; isDir: boolean; ext?: string };
@@ -65,6 +78,7 @@ function CodePane({ root }: { root: "client" | "server" }) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set([""]));
   const [selected, setSelected] = useState<{ path: string; content: string; name: string } | null>(null);
   const [loading,  setLoading]  = useState<string | null>(null);
+  const { copied, copy } = useCopy();
 
   const fetchDir = useCallback(async (dirPath: string) => {
     if (tree[dirPath]) return;
@@ -162,7 +176,15 @@ function CodePane({ root }: { root: "client" | "server" }) {
           <>
             <div className="sticky top-0 bg-slate-800 border-b border-slate-700 px-4 py-2 flex items-center gap-2 z-10">
               <FileCode className="w-4 h-4 text-blue-400" />
-              <span className="text-xs text-slate-300 font-mono">{selected.path}</span>
+              <span className="text-xs text-slate-300 font-mono flex-1">{selected.path}</span>
+              <button
+                onClick={() => copy(selected.content)}
+                title="העתק קוד"
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200 transition-colors"
+              >
+                {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                {copied ? "הועתק!" : "העתק קוד"}
+              </button>
             </div>
             <pre className="p-4 text-xs font-mono text-slate-200 leading-relaxed whitespace-pre overflow-x-auto">
               <code>{selected.content}</code>
@@ -188,6 +210,12 @@ function DbPane() {
   const [data,     setData]     = useState<TableData | null>(null);
   const [page,     setPage]     = useState(1);
   const [loading,  setLoading]  = useState(false);
+  const { copied, copy } = useCopy();
+
+  const copyData = () => {
+    if (!data) return;
+    copy(JSON.stringify(data.rows, null, 2));
+  };
 
   useEffect(() => {
     apiFetch("/dev/db/tables").then((t: string[]) => {
@@ -241,9 +269,21 @@ function DbPane() {
             <span className="text-sm font-medium font-mono">{selected}</span>
             {data && <span className="text-xs text-muted-foreground">({data.total.toLocaleString()} שורות)</span>}
           </div>
-          <button onClick={() => loadTable(selected, page)} className="p-1.5 rounded hover:bg-muted transition-colors">
-            <RefreshCw className={cn("w-3.5 h-3.5 text-muted-foreground", loading && "animate-spin")} />
-          </button>
+          <div className="flex items-center gap-2">
+            {data && (
+              <button
+                onClick={copyData}
+                title="העתק דאטה"
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-muted hover:bg-muted/80 text-foreground transition-colors border border-border/50"
+              >
+                {copied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                {copied ? "הועתק!" : "העתק דאטה"}
+              </button>
+            )}
+            <button onClick={() => loadTable(selected, page)} className="p-1.5 rounded hover:bg-muted transition-colors">
+              <RefreshCw className={cn("w-3.5 h-3.5 text-muted-foreground", loading && "animate-spin")} />
+            </button>
+          </div>
         </div>
 
         {/* Table */}
