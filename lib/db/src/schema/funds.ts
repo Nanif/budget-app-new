@@ -15,7 +15,7 @@ import { budgetYearsTable } from "./budgetYears";
 export const fundsTable = pgTable("funds", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
-  budgetYearId: integer("budget_year_id").notNull().references(() => budgetYearsTable.id, { onDelete: "cascade" }),
+  budgetYearId: integer("budget_year_id").references(() => budgetYearsTable.id, { onDelete: "set null" }),
   name: text("name").notNull(),
   fundBehavior: text("fund_behavior").notNull().default("annual_large"),
   description: text("description").notNull().default(""),
