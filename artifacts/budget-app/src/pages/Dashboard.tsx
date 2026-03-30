@@ -168,9 +168,10 @@ function WalletMonthCard({ fundName, monthLabel, monthlyTarget, totals }: {
 }) {
   const deposits    = totals?.deposits    ?? 0;
   const withdrawals = totals?.withdrawals ?? 0;
-  const remaining   = Math.max(0, monthlyTarget - deposits);
-  const pct         = monthlyTarget > 0 ? Math.min(100, (deposits / monthlyTarget) * 100) : 0;
-  const over        = deposits >= monthlyTarget && monthlyTarget > 0;
+  const net         = deposits - withdrawals;           // ניתן פחות נלקח
+  const remaining   = Math.max(0, monthlyTarget - net);
+  const pct         = monthlyTarget > 0 ? Math.min(100, (net / monthlyTarget) * 100) : 0;
+  const over        = net >= monthlyTarget && monthlyTarget > 0;
 
   return (
     <div className="bg-card border border-border/60 rounded-2xl shadow-sm overflow-hidden">
@@ -192,37 +193,45 @@ function WalletMonthCard({ fundName, monthLabel, monthlyTarget, totals }: {
         </div>
       </div>
 
-      {/* Progress bar — deposits vs. target */}
+      {/* Progress bar — net vs. target */}
       <div className="px-5 pb-3">
         <div className="flex justify-between text-[11px] text-muted-foreground mb-1">
-          <span>{fmt(deposits)} ניתן</span>
+          <span>
+            <span className="text-emerald-600 font-medium">{fmt(deposits)}</span>
+            {withdrawals > 0 && (
+              <span className="text-rose-500"> − {fmt(withdrawals)}</span>
+            )}
+            {" = "}
+            <span className="font-semibold text-foreground">{fmt(net)} ניתן</span>
+          </span>
           <span className="font-medium">{Math.round(pct)}% מתוך {fmt(monthlyTarget)}</span>
         </div>
         <div className="h-1.5 bg-muted rounded-full overflow-hidden">
           <div className={cn("h-full rounded-full transition-all duration-500",
             over ? "bg-emerald-500" : pct >= 70 ? "bg-amber-500" : "bg-amber-400"
-          )} style={{ width: `${pct}%` }} />
+          )} style={{ width: `${Math.max(0, pct)}%` }} />
         </div>
       </div>
 
       {/* Stats row */}
       <div className="grid grid-cols-3 divide-x divide-x-reverse divide-border/50 border-t border-border/50 text-center">
-        {[
-          { label: "ניתן (הפקדות)",   value: fmt(deposits),    color: "text-emerald-600",
-            icon: <ArrowDownLeft className="w-3 h-3 mx-auto mb-0.5 text-emerald-500" /> },
-          { label: "נלקח (משיכות)",   value: fmt(withdrawals), color: "text-rose-500",
-            icon: <ArrowUpRight className="w-3 h-3 mx-auto mb-0.5 text-rose-400" /> },
-          { label: over ? "כוסה ✓" : "נותר לתת",
-            value: fmt(remaining),
-            color: over ? "text-emerald-600" : remaining > 0 ? "text-amber-600" : "text-muted-foreground",
-            icon: <Wallet className="w-3 h-3 mx-auto mb-0.5 text-muted-foreground" /> },
-        ].map(s => (
-          <div key={s.label} className="py-3 px-2">
-            {s.icon}
-            <p className="text-[10px] text-muted-foreground mb-0.5">{s.label}</p>
-            <p className={cn("text-sm font-bold tabular-nums", s.color)}>{s.value}</p>
-          </div>
-        ))}
+        <div className="py-3 px-2">
+          <ArrowDownLeft className="w-3 h-3 mx-auto mb-0.5 text-emerald-500" />
+          <p className="text-[10px] text-muted-foreground mb-0.5">ניתן</p>
+          <p className="text-sm font-bold tabular-nums text-emerald-600">{fmt(deposits)}</p>
+        </div>
+        <div className="py-3 px-2">
+          <ArrowUpRight className="w-3 h-3 mx-auto mb-0.5 text-rose-400" />
+          <p className="text-[10px] text-muted-foreground mb-0.5">נלקח</p>
+          <p className="text-sm font-bold tabular-nums text-rose-500">−{fmt(withdrawals)}</p>
+        </div>
+        <div className="py-3 px-2">
+          <Wallet className="w-3 h-3 mx-auto mb-0.5 text-muted-foreground" />
+          <p className="text-[10px] text-muted-foreground mb-0.5">{over ? "כוסה ✓" : "נותר לתת"}</p>
+          <p className={cn("text-sm font-bold tabular-nums",
+            over ? "text-emerald-600" : remaining > 0 ? "text-amber-600" : "text-muted-foreground"
+          )}>{fmt(remaining)}</p>
+        </div>
       </div>
     </div>
   );
