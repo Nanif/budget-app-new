@@ -167,7 +167,9 @@ router.get("/", async (req, res) => {
 /* ── POST ─────────────────────────────────────────────────────── */
 router.post("/", async (req, res) => {
   try {
-    const body = { ...req.body, userId: DEFAULT_USER_ID, budgetYearId: getBYID(req) };
+    /* Non-budget funds are global (cross-year) — no budget year */
+    const isNonBudget = NON_BUDGET_BEHAVIORS.has(req.body?.fundBehavior);
+    const body = { ...req.body, userId: DEFAULT_USER_ID, budgetYearId: isNonBudget ? null : getBYID(req) };
     const parsed = insertFundSchema.safeParse(body);
     if (!parsed.success) { res.status(400).json({ error: "Invalid input", details: parsed.error.issues }); return; }
     const [created] = await db.insert(fundsTable).values(parsed.data).returning();
@@ -185,8 +187,10 @@ router.put("/:id", async (req, res) => {
     const [existing] = await db.select({ isDefault: fundsTable.isDefault, name: fundsTable.name, budgetYearId: fundsTable.budgetYearId })
       .from(fundsTable).where(and(eq(fundsTable.id, id), eq(fundsTable.userId, DEFAULT_USER_ID)));
     if (!existing) { res.status(404).json({ error: "Not found" }); return; }
-    /* Preserve budgetYearId: null for global funds, current year for year-scoped funds */
-    const budgetYearId = existing.budgetYearId === null ? null : (existing.budgetYearId ?? getBYID(req));
+    /* budgetYearId depends on the NEW behavior being saved */
+    const newBehavior = req.body?.fundBehavior ?? "";
+    const willBeNonBudget = NON_BUDGET_BEHAVIORS.has(newBehavior);
+    const budgetYearId = willBeNonBudget ? null : (existing.budgetYearId ?? getBYID(req));
     const body = { ...req.body, userId: DEFAULT_USER_ID, budgetYearId };
     if (existing.isDefault) { body.name = existing.name; }
     const parsed = insertFundSchema.safeParse(body);

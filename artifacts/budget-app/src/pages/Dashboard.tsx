@@ -75,8 +75,10 @@ export default function DashboardPage() {
 
   const MONTHLY_BEH    = new Set(["fixed_monthly", "expense_monthly", "cash_monthly"]);
   const NON_BUDGET_BEH = new Set(["non_budget", "fixed_non_budget", "expense_non_budget"]);
+  /* Behaviors with no transaction capability (ללא תנועות) — excluded from dashboard */
+  const NO_TXN_BEH     = new Set(["fixed_monthly", "fixed_non_budget", "fixed_annual"]);
 
-  const activeFunds    = funds.filter(f => f.hasTxn);
+  const activeFunds    = funds.filter(f => !NO_TXN_BEH.has(f.fundBehavior));
   const monthlyFunds   = activeFunds.filter(f => MONTHLY_BEH.has(f.fundBehavior));
   const annualFunds    = activeFunds.filter(f => !MONTHLY_BEH.has(f.fundBehavior) && !NON_BUDGET_BEH.has(f.fundBehavior));
   const nonBudgetFunds = activeFunds.filter(f => NON_BUDGET_BEH.has(f.fundBehavior));
