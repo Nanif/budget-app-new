@@ -185,6 +185,18 @@ export default function Budget() {
     finally { setYearSaving(false); }
   };
 
+  const saveTithe = async (pct: number) => {
+    if (!year) return;
+    try {
+      const updated = await apiFetch("/budget-year", {
+        method: "PUT",
+        body: JSON.stringify({ name: year.name, totalBudget: year.totalBudget, tithePercentage: pct }),
+      });
+      setYear(updated);
+      toast({ title: "אחוז תרומות עודכן" });
+    } catch { toast({ title: "שגיאה בשמירה", variant: "destructive" }); }
+  };
+
   /* ── fund dialog helpers ─────────────────────────────────── */
   const openCreateFund = () => {
     setEditFund(null);
@@ -284,6 +296,7 @@ export default function Budget() {
             fundsCount={budgetFunds.length}
             year={year}
             onEditYear={openYearEdit}
+            onSaveTithe={saveTithe}
           />
 
           {/* ══ Anomalies ════════════════════════════════════════ */}
@@ -614,69 +627,104 @@ function IncomeChart({ data }: { data: { label: string; income: number; key: str
 /* ═══════════════════════════════════════════════════════════
    ANNUAL SUMMARY
 ═══════════════════════════════════════════════════════════ */
-function AnnualSummary({ totalBudget, totalExpenses, totalIncome, fundsCount, year, onEditYear }: {
+function AnnualSummary({ totalBudget, totalExpenses, totalIncome, fundsCount, year, onEditYear, onSaveTithe }: {
   totalBudget: number; totalExpenses: number; totalIncome: number;
   fundsCount: number; year: BudgetYear | null; onEditYear: () => void;
+  onSaveTithe: (pct: number) => Promise<void>;
 }) {
-  const utilizationPct = totalBudget > 0 ? Math.min(100, (totalExpenses / totalBudget) * 100) : 0;
-  const coveragePct    = totalBudget > 0 ? Math.min(200, (totalIncome / totalBudget) * 100) : 0;
+  const [titheEdit, setTitheEdit] = useState(false);
+  const [titheVal,  setTitheVal]  = useState("");
+  const [titheSaving, setTitheSaving] = useState(false);
+
+  const tithePct    = year?.tithePercentage ?? 0;
+  /* gross = funds / (1 - pct/100)  →  tithe = gross - funds */
+  const grossNeeded = tithePct > 0 && tithePct < 100
+    ? totalBudget / (1 - tithePct / 100)
+    : totalBudget;
+  const titheAmount = grossNeeded - totalBudget;
+  const totalFrame  = grossNeeded;
+
+  const openTitheEdit = () => { setTitheVal(String(tithePct)); setTitheEdit(true); };
+  const handleSaveTithe = async () => {
+    const pct = parseFloat(titheVal);
+    if (isNaN(pct) || pct < 0 || pct >= 100) return;
+    setTitheSaving(true);
+    await onSaveTithe(pct);
+    setTitheSaving(false);
+    setTitheEdit(false);
+  };
 
   return (
     <div className="bg-card rounded-2xl border border-border/60 p-5 shadow-sm flex flex-col gap-4">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <CalendarDays className="w-4 h-4 text-primary" />
-          <h3 className="font-display font-bold">סיכום שנתי</h3>
+          <h3 className="font-display font-bold">מסגרת תקציב שנתית</h3>
         </div>
         <button onClick={onEditYear}
           className="text-xs text-muted-foreground hover:text-primary transition-colors flex items-center gap-1">
-          <Settings2 className="w-3 h-3" /> עדכן
+          <Settings2 className="w-3 h-3" /> הגדרות שנה
         </button>
       </div>
 
-      <div className="space-y-3">
-        <div className="flex items-center justify-between text-sm">
-          <span className="text-muted-foreground">שנה</span>
-          <span className="font-semibold">{year?.name || "—"}</span>
-        </div>
-        <div className="flex items-center justify-between text-sm">
-          <span className="text-muted-foreground">קופות פעילות</span>
-          <span className="font-semibold">{fundsCount}</span>
-        </div>
-        <div className="flex items-center justify-between text-sm">
-          <span className="text-muted-foreground">מעשרות</span>
-          <span className="font-semibold">{year?.tithePercentage ?? 10}%</span>
-        </div>
+      {/* Meta row */}
+      <div className="flex items-center gap-4 text-sm text-muted-foreground">
+        <span>{year?.name || "—"}</span>
+        <span className="w-1 h-1 rounded-full bg-muted-foreground/30" />
+        <span>{fundsCount} קופות</span>
       </div>
 
-      <div className="space-y-3 pt-2 border-t border-border/40">
-        {/* Utilization */}
-        <div>
-          <div className="flex justify-between text-xs mb-1.5">
-            <span className="text-muted-foreground">ניצול תקציב</span>
-            <span className={cn("font-semibold",
-              utilizationPct >= 100 ? "text-rose-600" : utilizationPct >= 80 ? "text-amber-600" : "text-emerald-600"
-            )}>{Math.round(utilizationPct)}%</span>
-          </div>
-          <div className="h-2 bg-muted rounded-full overflow-hidden">
-            <div className={cn("h-full rounded-full transition-all",
-              utilizationPct >= 100 ? "bg-rose-500" : utilizationPct >= 80 ? "bg-amber-500" : "bg-emerald-500"
-            )} style={{ width: `${Math.min(100, utilizationPct)}%` }} />
-          </div>
+      {/* ── Tithe section ── */}
+      <div className="rounded-xl bg-violet-50 border border-violet-100 p-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <p className="text-sm font-semibold text-violet-800">אחוז תרומות</p>
+          {!titheEdit ? (
+            <button onClick={openTitheEdit}
+              className="flex items-center gap-1.5 text-xs text-violet-600 hover:text-violet-800 transition-colors">
+              <span className="text-base font-bold">{tithePct}%</span>
+              <Pencil className="w-3 h-3" />
+            </button>
+          ) : (
+            <div className="flex items-center gap-1.5">
+              <Input
+                type="number" dir="ltr" value={titheVal}
+                onChange={e => setTitheVal(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter") handleSaveTithe(); if (e.key === "Escape") setTitheEdit(false); }}
+                className="h-7 w-20 text-sm rounded-lg text-center px-2"
+                min={0} max={99} step={0.5}
+                autoFocus
+              />
+              <span className="text-sm text-muted-foreground">%</span>
+              <button onClick={handleSaveTithe} disabled={titheSaving}
+                className="p-1 rounded-lg bg-violet-600 text-white hover:bg-violet-700 transition-colors">
+                {titheSaving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
+              </button>
+              <button onClick={() => setTitheEdit(false)}
+                className="p-1 rounded-lg hover:bg-muted transition-colors text-muted-foreground">
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+          )}
         </div>
-        {/* Coverage */}
-        <div>
-          <div className="flex justify-between text-xs mb-1.5">
-            <span className="text-muted-foreground">כיסוי הכנסה</span>
-            <span className={cn("font-semibold", coveragePct >= 100 ? "text-emerald-600" : "text-rose-600")}>
-              {Math.round(coveragePct)}%
-            </span>
-          </div>
-          <div className="h-2 bg-muted rounded-full overflow-hidden">
-            <div className={cn("h-full rounded-full transition-all",
-              coveragePct >= 100 ? "bg-emerald-500" : "bg-rose-400"
-            )} style={{ width: `${Math.min(100, coveragePct)}%` }} />
-          </div>
+        <p className="text-xs text-violet-600/80">
+          מסך ההכנסות הגולמיות — אחרי ניכוי האחוז נשאר התקציב לקופות
+        </p>
+      </div>
+
+      {/* ── Calculation breakdown ── */}
+      <div className="space-y-2 pt-1">
+        <div className="flex items-center justify-between text-sm">
+          <span className="text-muted-foreground">סך כל הקופות</span>
+          <span className="font-semibold">{fmt(totalBudget)}</span>
+        </div>
+        <div className="flex items-center justify-between text-sm">
+          <span className="text-muted-foreground">תרומות ({tithePct}%)</span>
+          <span className="font-semibold text-violet-600">+ {fmt(titheAmount)}</span>
+        </div>
+        <div className="border-t border-border/50 pt-2 flex items-center justify-between">
+          <span className="font-bold text-sm">ס״ה תקציב שנתי כולל</span>
+          <span className="font-display font-bold text-lg text-primary">{fmt(totalFrame)}</span>
         </div>
       </div>
     </div>
