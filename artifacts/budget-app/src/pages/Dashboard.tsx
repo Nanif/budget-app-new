@@ -91,7 +91,7 @@ export default function DashboardPage() {
     <div className="space-y-6" dir="rtl">
 
       {/* ══ מעשרות ══════════════════════════════════════════════ */}
-      <div className="h-[calc(100vh-80px)]">
+      <div className="max-w-lg">
         <TitheCard
           income={income}
           budgetYear={budgetYear}
@@ -147,81 +147,82 @@ function TitheCard({ income, budgetYear, tithes, titheTarget, titheGiven, titheL
     finally { setSaving(false); }
   };
 
+  const over = titheLeft <= 0;
+
   return (
-    <div className={SECTION_STYLE}>
-      <div className={SECTION_HEAD}>
-        <div className={SECTION_TITLE}>
-          <div className={ICON_WRAP("bg-violet-100")}>
-            <HeartHandshake className="w-4 h-4 text-violet-600" />
+    <div className="bg-card border border-border/60 rounded-2xl shadow-sm overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center justify-between px-5 pt-4 pb-3">
+        <div className="flex items-center gap-2">
+          <div className="w-7 h-7 rounded-xl bg-violet-100 flex items-center justify-center">
+            <HeartHandshake className="w-3.5 h-3.5 text-violet-600" />
           </div>
-          מעשרות
+          <span className="font-semibold text-sm">מעשרות</span>
         </div>
         <Link href="/charity">
-          <span className={GO_LINK}>לכל הצדקות <ArrowLeft className="w-3 h-3" /></span>
+          <span className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-violet-600 transition-colors">
+            לכל הצדקות <ArrowLeft className="w-3 h-3" />
+          </span>
         </Link>
       </div>
 
-      <div className="px-5 pb-4 space-y-4 flex-1 overflow-y-auto">
-        <div className="grid grid-cols-2 gap-2">
-          {[
-            { label: "הכנסה נטו", value: fmt(income.netIncome), color: "text-foreground" },
-            { label: `יעד (${budgetYear.tithePercentage}%)`, value: fmt(titheTarget), color: "text-violet-600" },
-            { label: "נתרם", value: fmt(titheGiven), color: "text-emerald-600" },
-            { label: titheLeft > 0 ? "נותר לתת" : "עודף", value: fmt(Math.abs(titheLeft)), color: titheLeft > 0 ? "text-rose-500" : "text-emerald-600" },
-          ].map(s => (
-            <div key={s.label} className="bg-muted/40 rounded-xl p-3">
-              <p className="text-xs text-muted-foreground">{s.label}</p>
-              <p className={cn("font-bold mt-0.5", s.color)}>{s.value}</p>
+      {/* Progress bar */}
+      <div className="px-5 pb-3">
+        <div className="flex justify-between text-[11px] text-muted-foreground mb-1">
+          <span>{fmt(titheGiven)} נתרם</span>
+          <span className="font-medium">{Math.round(tithePct)}% מתוך {fmt(titheTarget)}</span>
+        </div>
+        <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+          <div className={cn("h-full rounded-full transition-all duration-500",
+            over ? "bg-emerald-500" : tithePct >= 80 ? "bg-violet-500" : "bg-violet-400"
+          )} style={{ width: `${tithePct}%` }} />
+        </div>
+      </div>
+
+      {/* Stats row */}
+      <div className="grid grid-cols-3 divide-x divide-x-reverse divide-border/50 border-t border-border/50 text-center">
+        {[
+          { label: "הכנסה נטו", value: fmt(income.netIncome), color: "text-foreground" },
+          { label: `יעד ${budgetYear.tithePercentage}%`, value: fmt(titheTarget), color: "text-violet-600" },
+          { label: over ? "עודף" : "נותר", value: fmt(Math.abs(titheLeft)), color: over ? "text-emerald-600" : "text-rose-500" },
+        ].map(s => (
+          <div key={s.label} className="py-3 px-2">
+            <p className="text-[10px] text-muted-foreground mb-0.5">{s.label}</p>
+            <p className={cn("text-sm font-bold tabular-nums", s.color)}>{s.value}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Tithe list */}
+      {tithes.length > 0 && (
+        <div className="border-t border-border/50 px-5 py-2">
+          {tithes.slice(0, 4).map(t => (
+            <div key={t.id} className="flex items-center justify-between py-1.5 border-b border-border/20 last:border-0">
+              <span className="text-xs text-muted-foreground truncate">{t.recipient}</span>
+              <span className="text-xs font-semibold text-violet-600 tabular-nums mr-2">{fmt(t.amount)}</span>
             </div>
           ))}
         </div>
+      )}
 
-        <div>
-          <div className="flex justify-between text-xs text-muted-foreground mb-1.5">
-            <span>התקדמות</span>
-            <span className="font-semibold">{Math.round(tithePct)}%</span>
-          </div>
-          <div className="h-2.5 bg-muted rounded-full overflow-hidden">
-            <div className={cn("h-full rounded-full transition-all", tithePct >= 100 ? "bg-emerald-500" : "bg-violet-500")}
-              style={{ width: `${tithePct}%` }} />
-          </div>
-        </div>
-
-        {tithes.length > 0 && (
-          <div className="space-y-1.5">
-            {tithes.map(t => (
-              <div key={t.id} className="flex items-center justify-between text-sm py-1 border-b border-border/30 last:border-0">
-                <span className="text-muted-foreground truncate">{t.recipient}</span>
-                <span className="font-semibold text-violet-600 tabular-nums mr-2">{fmt(t.amount)}</span>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {tithes.length === 0 && (
-          <p className="text-sm text-muted-foreground text-center py-4">אין רשומות מעשר עדיין</p>
-        )}
-      </div>
-
-      <div className="border-t border-border/50 px-4 py-3 shrink-0">
+      {/* Add row */}
+      <div className="border-t border-border/50 px-4 py-2.5">
         {open ? (
           <div className="flex gap-2 items-center">
             <Input value={recipient} onChange={e => setRecipient(e.target.value)}
-              placeholder="נמען..." className="rounded-lg h-8 text-sm flex-1" autoFocus />
+              placeholder="נמען..." className="rounded-lg h-7 text-xs flex-1" autoFocus />
             <Input value={amount} onChange={e => setAmount(e.target.value)}
-              type="number" placeholder="₪" dir="ltr" className="rounded-lg h-8 text-sm w-20" />
+              type="number" placeholder="₪" dir="ltr" className="rounded-lg h-7 text-xs w-16" />
             <button onClick={handleAdd} disabled={saving}
-              className="p-1.5 rounded-lg bg-violet-600 text-white hover:bg-violet-700 transition-colors">
-              {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+              className="p-1 rounded-lg bg-violet-600 text-white hover:bg-violet-700 transition-colors">
+              {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
             </button>
-            <button onClick={() => setOpen(false)} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground transition-colors">
-              <span className="text-xs">ביטול</span>
-            </button>
+            <button onClick={() => setOpen(false)} className="text-[11px] text-muted-foreground hover:text-foreground transition-colors">ביטול</button>
           </div>
         ) : (
           <button onClick={() => setOpen(true)}
-            className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-violet-600 transition-colors w-full">
-            <Plus className="w-4 h-4" /> רשום מעשר חדש
+            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-violet-600 transition-colors">
+            <Plus className="w-3.5 h-3.5" /> רשום מעשר חדש
           </button>
         )}
       </div>
