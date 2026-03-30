@@ -2,7 +2,7 @@ import { Link, useLocation } from "wouter";
 import {
   Home, CalendarDays, Wallet, ShoppingBag, Calendar, PiggyBank,
   Landmark, HeartHandshake, CreditCard, StickyNote, CheckSquare,
-  Settings, Receipt, Scale, LayoutDashboard,
+  Settings, Receipt, Scale, LayoutDashboard, Code2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { YearSwitcher } from "@/components/YearSwitcher";
@@ -24,6 +24,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/charity", label: "צדקה ומעשרות", icon: HeartHandshake, section: "מעקב פיננסי" },
   { href: "/savings", label: "חובות ונכסים", icon: Scale, section: "מעקב פיננסי" },
   { href: "/settings", label: "הגדרות מערכת", icon: Settings, section: "הגדרות" },
+  { href: "/dev",      label: "מסך פיתוח",    icon: Code2,    section: "הגדרות" },
 ];
 
 export function Sidebar() {

@@ -74,6 +74,7 @@ import remindersRouter     from "./reminders";
 import dashboardRouter     from "./dashboard";
 import settingsRouter      from "./settings";
 import fixedItemsRouter    from "./fixedItems";
+import devRouter           from "./dev";
 
 const router = Router();
 
@@ -128,5 +129,8 @@ router.use("/fixed-items", fixedItemsRouter);
 
 // Settings
 router.use("/settings", settingsRouter);
+
+// Dev panel (file viewer + DB viewer)
+router.use("/dev", devRouter);
 
 export default router;
