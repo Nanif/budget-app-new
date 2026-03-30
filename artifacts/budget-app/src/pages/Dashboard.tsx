@@ -18,7 +18,7 @@ type FundSummary   = {
   id: number; name: string; colorClass: string; fundBehavior: string; description: string;
   monthlyAllocation: number; annualAllocation: number; initialBalance: number;
   budgetAmount: number; actualAmount: number; remaining: number;
-  usagePercent: number; status: "ok" | "warning" | "over";
+  usagePercent: number; status: "ok" | "warning" | "over"; hasTxn: boolean;
 };
 
 /* ── Helpers ────────────────────────────────────────────────── */
@@ -73,9 +73,13 @@ export default function DashboardPage() {
   const titheLeft   = titheTarget - titheGiven;
   const tithePct    = titheTarget > 0 ? Math.min(100, (titheGiven / titheTarget) * 100) : 0;
 
-  const monthlyFunds   = funds.filter(f => f.fundBehavior === "fixed_monthly" || f.fundBehavior === "cash_monthly");
-  const annualFunds    = funds.filter(f => f.fundBehavior === "annual_categorized" || f.fundBehavior === "annual_large");
-  const nonBudgetFunds = funds.filter(f => f.fundBehavior === "non_budget");
+  const MONTHLY_BEH    = new Set(["fixed_monthly", "expense_monthly", "cash_monthly"]);
+  const NON_BUDGET_BEH = new Set(["non_budget", "fixed_non_budget", "expense_non_budget"]);
+
+  const activeFunds    = funds.filter(f => f.hasTxn);
+  const monthlyFunds   = activeFunds.filter(f => MONTHLY_BEH.has(f.fundBehavior));
+  const annualFunds    = activeFunds.filter(f => !MONTHLY_BEH.has(f.fundBehavior) && !NON_BUDGET_BEH.has(f.fundBehavior));
+  const nonBudgetFunds = activeFunds.filter(f => NON_BUDGET_BEH.has(f.fundBehavior));
 
   if (loading) {
     return (

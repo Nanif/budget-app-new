@@ -1,11 +1,14 @@
 import { Router } from "express";
-import { db, fundsTable, insertFundSchema, expensesTable } from "@workspace/db";
+import { db, fundsTable, insertFundSchema, expensesTable, cashEnvelopeTransactionsTable } from "@workspace/db";
 import { eq, and, asc, sql } from "drizzle-orm";
 
 const router = Router();
 const DEFAULT_USER_ID = 1;
 const DEFAULT_BUDGET_YEAR_ID = 1;
 function getBYID(req: any): number { const b = parseInt(String(req.query.bid)); return isNaN(b) ? DEFAULT_BUDGET_YEAR_ID : b; }
+
+const MONTHLY_BEHAVIORS  = new Set(["fixed_monthly", "expense_monthly", "cash_monthly"]);
+const NON_BUDGET_BEHAVIORS = new Set(["non_budget", "fixed_non_budget", "expense_non_budget"]);
 
 /* ── GET summary (per-fund stats) ─────────────────────────────── */
 router.get("/summary", async (req, res) => {
@@ -15,39 +18,56 @@ router.get("/summary", async (req, res) => {
       .where(and(eq(fundsTable.userId, DEFAULT_USER_ID), eq(fundsTable.budgetYearId, byid), eq(fundsTable.isActive, true)))
       .orderBy(asc(fundsTable.displayOrder));
 
-    const spentRows = await db.select({
-      fundId: expensesTable.fundId,
-      total: sql<string>`COALESCE(SUM(amount), 0)`,
-    }).from(expensesTable)
-      .where(and(eq(expensesTable.userId, DEFAULT_USER_ID), eq(expensesTable.budgetYearId, byid)))
-      .groupBy(expensesTable.fundId);
+    const [spentRows, cetRows] = await Promise.all([
+      db.select({
+        fundId: expensesTable.fundId,
+        total: sql<string>`COALESCE(SUM(amount), 0)`,
+        cnt:   sql<string>`COUNT(*)`,
+      }).from(expensesTable)
+        .where(and(eq(expensesTable.userId, DEFAULT_USER_ID), eq(expensesTable.budgetYearId, byid)))
+        .groupBy(expensesTable.fundId),
+
+      db.select({
+        fundId: cashEnvelopeTransactionsTable.fundId,
+        cnt:    sql<string>`COUNT(*)`,
+      }).from(cashEnvelopeTransactionsTable)
+        .where(and(eq(cashEnvelopeTransactionsTable.userId, DEFAULT_USER_ID), eq(cashEnvelopeTransactionsTable.budgetYearId, byid)))
+        .groupBy(cashEnvelopeTransactionsTable.fundId),
+    ]);
 
     const spentMap: Record<number, number> = {};
-    for (const r of spentRows) { if (r.fundId) spentMap[r.fundId] = parseFloat(r.total); }
+    const expCntMap: Record<number, number> = {};
+    for (const r of spentRows) {
+      if (r.fundId) {
+        spentMap[r.fundId]  = parseFloat(r.total);
+        expCntMap[r.fundId] = parseInt(r.cnt);
+      }
+    }
+    const cetCntMap: Record<number, number> = {};
+    for (const r of cetRows) { cetCntMap[r.fundId] = parseInt(r.cnt); }
 
     const summary = funds.map(fund => {
       const monthly = parseFloat(fund.monthlyAllocation);
       const annual  = parseFloat(fund.annualAllocation);
       const initial = parseFloat(fund.initialBalance);
       let budgetAmount = 0;
-      if (fund.fundBehavior === "fixed_monthly" || fund.fundBehavior === "cash_monthly") {
-        budgetAmount = monthly * 12;
-      } else if (fund.fundBehavior === "annual_categorized" || fund.fundBehavior === "annual_large") {
-        budgetAmount = annual;
-      } else if (fund.fundBehavior === "non_budget") {
-        budgetAmount = initial;
-      }
+      if      (MONTHLY_BEHAVIORS.has(fund.fundBehavior))   budgetAmount = monthly * 12;
+      else if (NON_BUDGET_BEHAVIORS.has(fund.fundBehavior)) budgetAmount = initial;
+      else                                                   budgetAmount = annual;
+
       const actualAmount = spentMap[fund.id] || 0;
       const remaining    = budgetAmount - actualAmount;
       const usagePercent = budgetAmount > 0 ? Math.min(100, (actualAmount / budgetAmount) * 100) : 0;
       const status: "ok" | "warning" | "over" =
         usagePercent >= 100 ? "over" : usagePercent >= 80 ? "warning" : "ok";
+      const hasTxn = (expCntMap[fund.id] || 0) > 0 || (cetCntMap[fund.id] || 0) > 0;
+
       return {
         id: fund.id, name: fund.name, colorClass: fund.colorClass,
         fundBehavior: fund.fundBehavior, description: fund.description,
         monthlyAllocation: monthly, annualAllocation: annual, initialBalance: initial,
         budgetAmount, actualAmount, remaining,
-        usagePercent: Math.round(usagePercent), status,
+        usagePercent: Math.round(usagePercent), status, hasTxn,
       };
     });
     res.json(summary);
