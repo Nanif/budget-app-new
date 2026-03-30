@@ -8,7 +8,7 @@ import { apiFetch } from "@/lib/api";
 import { useCashCurrentMonth } from "@/hooks/useCashCurrentMonth";
 import {
   HeartHandshake,
-  ArrowLeft, Plus, Check, Loader2, Wallet, ArrowDownLeft, ArrowUpRight,
+  ArrowLeft, Plus, Check, Loader2, Wallet, ArrowDownLeft, ArrowUpRight, ChevronDown,
 } from "lucide-react";
 
 /* ── Types ─────────────────────────────────────────────────── */
@@ -94,7 +94,7 @@ export default function DashboardPage() {
   const NO_TXN_BEH     = new Set(["fixed_monthly", "fixed_non_budget", "fixed_annual"]);
 
   const activeFunds    = funds.filter(f => !NO_TXN_BEH.has(f.fundBehavior));
-  const monthlyFunds   = activeFunds.filter(f => MONTHLY_BEH.has(f.fundBehavior));
+  const monthlyFunds   = activeFunds.filter(f => MONTHLY_BEH.has(f.fundBehavior) && f.fundBehavior !== "cash_monthly");
   const annualFunds    = activeFunds.filter(f => !MONTHLY_BEH.has(f.fundBehavior) && !NON_BUDGET_BEH.has(f.fundBehavior));
   const nonBudgetFunds = activeFunds.filter(f => NON_BUDGET_BEH.has(f.fundBehavior));
 
@@ -250,6 +250,7 @@ function TitheCard({ income, budgetYear, tithes, titheTarget, titheGiven, titheL
   const [amount, setAmount]       = useState("");
   const [saving, setSaving]       = useState(false);
   const [open, setOpen]           = useState(false);
+  const [expanded, setExpanded]   = useState(false);
 
   const handleAdd = async () => {
     if (!recipient.trim() || !amount || parseFloat(amount) <= 0) {
@@ -275,12 +276,25 @@ function TitheCard({ income, budgetYear, tithes, titheTarget, titheGiven, titheL
             <HeartHandshake className="w-3.5 h-3.5 text-violet-600" />
           </div>
           <span className="font-semibold text-sm">מעשרות</span>
+          {tithes.length > 0 && !expanded && (
+            <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full">
+              {tithes.length}
+            </span>
+          )}
         </div>
-        <Link href="/charity">
-          <span className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-violet-600 transition-colors">
-            לכל הצדקות <ArrowLeft className="w-3 h-3" />
-          </span>
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link href="/charity">
+            <span className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-violet-600 transition-colors">
+              לכל הצדקות <ArrowLeft className="w-3 h-3" />
+            </span>
+          </Link>
+          <button
+            onClick={() => setExpanded(p => !p)}
+            className="p-1 rounded-lg hover:bg-muted transition-colors text-muted-foreground"
+          >
+            <ChevronDown className={cn("w-4 h-4 transition-transform duration-200", expanded && "rotate-180")} />
+          </button>
+        </div>
       </div>
 
       {/* Progress bar */}
@@ -310,39 +324,42 @@ function TitheCard({ income, budgetYear, tithes, titheTarget, titheGiven, titheL
         ))}
       </div>
 
-      {/* Tithe list */}
-      {tithes.length > 0 && (
-        <div className="border-t border-border/50 px-5 py-2">
-          {tithes.slice(0, 4).map(t => (
-            <div key={t.id} className="flex items-center justify-between py-1.5 border-b border-border/20 last:border-0">
-              <span className="text-xs text-muted-foreground truncate">{t.recipient}</span>
-              <span className="text-xs font-semibold text-violet-600 tabular-nums mr-2">{fmt(t.amount)}</span>
+      {/* Tithe list + Add row — visible only when expanded */}
+      {expanded && (
+        <>
+          {tithes.length > 0 && (
+            <div className="border-t border-border/50 px-5 py-2">
+              {tithes.slice(0, 6).map(t => (
+                <div key={t.id} className="flex items-center justify-between py-1.5 border-b border-border/20 last:border-0">
+                  <span className="text-xs text-muted-foreground truncate">{t.recipient}</span>
+                  <span className="text-xs font-semibold text-violet-600 tabular-nums mr-2">{fmt(t.amount)}</span>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
-      )}
+          )}
 
-      {/* Add row */}
-      <div className="border-t border-border/50 px-4 py-2.5">
-        {open ? (
-          <div className="flex gap-2 items-center">
-            <Input value={recipient} onChange={e => setRecipient(e.target.value)}
-              placeholder="נמען..." className="rounded-lg h-7 text-xs flex-1" autoFocus />
-            <Input value={amount} onChange={e => setAmount(e.target.value)}
-              type="number" placeholder="₪" dir="ltr" className="rounded-lg h-7 text-xs w-16" />
-            <button onClick={handleAdd} disabled={saving}
-              className="p-1 rounded-lg bg-violet-600 text-white hover:bg-violet-700 transition-colors">
-              {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
-            </button>
-            <button onClick={() => setOpen(false)} className="text-[11px] text-muted-foreground hover:text-foreground transition-colors">ביטול</button>
+          <div className="border-t border-border/50 px-4 py-2.5">
+            {open ? (
+              <div className="flex gap-2 items-center">
+                <Input value={recipient} onChange={e => setRecipient(e.target.value)}
+                  placeholder="נמען..." className="rounded-lg h-7 text-xs flex-1" autoFocus />
+                <Input value={amount} onChange={e => setAmount(e.target.value)}
+                  type="number" placeholder="₪" dir="ltr" className="rounded-lg h-7 text-xs w-16" />
+                <button onClick={handleAdd} disabled={saving}
+                  className="p-1 rounded-lg bg-violet-600 text-white hover:bg-violet-700 transition-colors">
+                  {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
+                </button>
+                <button onClick={() => setOpen(false)} className="text-[11px] text-muted-foreground hover:text-foreground transition-colors">ביטול</button>
+              </div>
+            ) : (
+              <button onClick={() => setOpen(true)}
+                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-violet-600 transition-colors">
+                <Plus className="w-3.5 h-3.5" /> רשום מעשר חדש
+              </button>
+            )}
           </div>
-        ) : (
-          <button onClick={() => setOpen(true)}
-            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-violet-600 transition-colors">
-            <Plus className="w-3.5 h-3.5" /> רשום מעשר חדש
-          </button>
-        )}
-      </div>
+        </>
+      )}
     </div>
   );
 }
