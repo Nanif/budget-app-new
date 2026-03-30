@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Plus, X, TrendingDown, TrendingUp, Wallet, HeartHandshake } from "lucide-react";
+import { TrendingDown, TrendingUp, Wallet, HeartHandshake } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,7 +35,6 @@ const ACTIONS = [
 export function QuickActions() {
   const { toast } = useToast();
   const { currentMonth } = useCashCurrentMonth();
-  const [open,        setOpen]        = useState(false);
   const [activeDialog, setActiveDialog] = useState<DialogType>(null);
   const [saving,      setSaving]      = useState(false);
 
@@ -52,10 +51,7 @@ export function QuickActions() {
   const expenseFunds = funds.filter(f => EXPENSE_BEHAVIORS.has(f.fundBehavior));
   const cashFunds    = funds.filter(f => CASH_BEHAVIORS.has(f.fundBehavior));
 
-  const openDialog = (type: DialogType) => {
-    setOpen(false);
-    setActiveDialog(type);
-  };
+  const openDialog = (type: DialogType) => setActiveDialog(type);
 
   const closeDialog = () => setActiveDialog(null);
 
@@ -168,61 +164,34 @@ export function QuickActions() {
 
   return (
     <>
-      {/* ── Speed-dial FAB ──────────────────────────────────────── */}
-      <div className="fixed bottom-6 left-6 z-50 flex flex-col-reverse items-start gap-3">
-        {/* Action buttons — visible when open */}
-        {ACTIONS.map((action, i) => {
-          const Icon = action.icon;
-          return (
-            <div
-              key={action.id}
-              className={cn(
-                "flex items-center gap-2 transition-all duration-200",
-                open
-                  ? "opacity-100 translate-y-0 pointer-events-auto"
-                  : "opacity-0 translate-y-4 pointer-events-none"
-              )}
-              style={{ transitionDelay: open ? `${i * 40}ms` : "0ms" }}
-            >
-              <span className="bg-card border border-border shadow-sm text-sm font-medium px-2.5 py-1 rounded-lg whitespace-nowrap">
-                {action.label}
-              </span>
+      {/* ── Action bar — always visible ──────────────────────────── */}
+      <div className="fixed bottom-0 left-0 right-0 md:right-64 z-40 bg-card/95 backdrop-blur-sm border-t border-border/60 shadow-lg px-4 py-2.5" dir="rtl">
+        <div className="flex items-center justify-around max-w-xl mx-auto gap-2">
+          {ACTIONS.map(action => {
+            const Icon = action.icon;
+            return (
               <button
+                key={action.id}
                 onClick={() => openDialog(action.id)}
                 className={cn(
-                  "w-10 h-10 rounded-full text-white shadow-md flex items-center justify-center",
-                  "ring-2 ring-white transition-transform active:scale-95",
-                  action.bg
+                  "flex flex-col items-center gap-1 px-4 py-2 rounded-xl transition-all active:scale-95",
+                  "hover:bg-muted/60 group flex-1"
                 )}
               >
-                <Icon className="w-4 h-4" />
+                <div className={cn(
+                  "w-9 h-9 rounded-xl flex items-center justify-center text-white shadow-sm transition-transform group-hover:scale-105",
+                  action.bg.split(" ")[0]
+                )}>
+                  <Icon className="w-4.5 h-4.5" />
+                </div>
+                <span className="text-xs font-medium text-muted-foreground group-hover:text-foreground transition-colors">
+                  {action.label}
+                </span>
               </button>
-            </div>
-          );
-        })}
-
-        {/* Main FAB */}
-        <button
-          onClick={() => setOpen(p => !p)}
-          className={cn(
-            "w-14 h-14 rounded-full shadow-lg flex items-center justify-center text-white",
-            "transition-all duration-300 active:scale-95",
-            open
-              ? "bg-gray-600 hover:bg-gray-700 rotate-45"
-              : "bg-teal-600 hover:bg-teal-700 rotate-0"
-          )}
-        >
-          {open ? <X className="w-6 h-6" /> : <Plus className="w-6 h-6" />}
-        </button>
+            );
+          })}
+        </div>
       </div>
-
-      {/* Backdrop */}
-      {open && (
-        <div
-          className="fixed inset-0 z-40 bg-black/10"
-          onClick={() => setOpen(false)}
-        />
-      )}
 
       {/* ── Dialog: הוצאה ───────────────────────────────────────── */}
       <Dialog open={activeDialog === "expense"} onOpenChange={v => !v && closeDialog()}>
