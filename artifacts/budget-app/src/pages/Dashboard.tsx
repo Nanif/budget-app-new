@@ -235,17 +235,17 @@ function WalletMonthCard({ fundName, monthLabel, monthlyTarget, totals, transact
       {/* Stats row */}
       <div className="grid grid-cols-3 divide-x divide-x-reverse divide-border/50 border-t border-border/50 text-center">
         <div className="py-3 px-2">
+          <Wallet className="w-3 h-3 mx-auto mb-0.5 text-muted-foreground" />
+          <p className="text-[10px] text-muted-foreground mb-0.5">תקציב</p>
+          <p className="text-sm font-bold tabular-nums text-foreground">{fmt(monthlyTarget)}</p>
+        </div>
+        <div className="py-3 px-2">
           <ArrowDownLeft className="w-3 h-3 mx-auto mb-0.5 text-emerald-500" />
           <p className="text-[10px] text-muted-foreground mb-0.5">ניתן</p>
-          <p className="text-sm font-bold tabular-nums text-emerald-600">{fmt(deposits)}</p>
+          <p className="text-sm font-bold tabular-nums text-emerald-600">{fmt(net)}</p>
         </div>
         <div className="py-3 px-2">
-          <ArrowUpRight className="w-3 h-3 mx-auto mb-0.5 text-rose-400" />
-          <p className="text-[10px] text-muted-foreground mb-0.5">נלקח</p>
-          <p className="text-sm font-bold tabular-nums text-rose-500">−{fmt(withdrawals)}</p>
-        </div>
-        <div className="py-3 px-2">
-          <Wallet className="w-3 h-3 mx-auto mb-0.5 text-muted-foreground" />
+          <ArrowUpRight className="w-3 h-3 mx-auto mb-0.5 text-muted-foreground" />
           <p className="text-[10px] text-muted-foreground mb-0.5">{over ? "כוסה ✓" : "נותר לתת"}</p>
           <p className={cn("text-sm font-bold tabular-nums",
             over ? "text-emerald-600" : remaining > 0 ? "text-amber-600" : "text-muted-foreground"
