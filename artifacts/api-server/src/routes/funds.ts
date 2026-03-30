@@ -57,18 +57,46 @@ router.get("/summary", async (req, res) => {
   }
 });
 
+/* ── default funds seeded for every new budget year ─────────── */
+const DEFAULT_FUNDS = [
+  { name: "קופת שוטף",             fundBehavior: "cash_monthly",       colorClass: "#f59e0b", monthlyAllocation: "0", annualAllocation: "0", initialBalance: "0", includeInBudget: true,  displayOrder: 0 },
+  { name: "קופת קבועות",           fundBehavior: "fixed_monthly",      colorClass: "#3b82f6", monthlyAllocation: "0", annualAllocation: "0", initialBalance: "0", includeInBudget: true,  displayOrder: 1 },
+  { name: "קופת משכנתא וחובות",    fundBehavior: "fixed_monthly",      colorClass: "#8b5cf6", monthlyAllocation: "0", annualAllocation: "0", initialBalance: "0", includeInBudget: true,  displayOrder: 2 },
+  { name: "קופת מעגל שנה",         fundBehavior: "annual_categorized", colorClass: "#10b981", monthlyAllocation: "0", annualAllocation: "0", initialBalance: "0", includeInBudget: true,  displayOrder: 3 },
+];
+
+async function seedDefaultFunds(byid: number) {
+  const toInsert = DEFAULT_FUNDS.map(f => ({
+    ...f,
+    userId: DEFAULT_USER_ID,
+    budgetYearId: byid,
+    isActive: true,
+    description: "",
+  }));
+  await db.insert(fundsTable).values(toInsert);
+}
+
 /* ── GET all (active + inactive) ──────────────────────────────── */
 router.get("/", async (req, res) => {
   try {
+    const byid = getBYID(req);
     const includeInactive = req.query.all === "true";
     const baseWhere = and(
       eq(fundsTable.userId, DEFAULT_USER_ID),
-      eq(fundsTable.budgetYearId, getBYID(req)),
+      eq(fundsTable.budgetYearId, byid),
       ...(includeInactive ? [] : [eq(fundsTable.isActive, true)])
     );
-    const rows = await db.select().from(fundsTable)
+    let rows = await db.select().from(fundsTable)
       .where(baseWhere)
       .orderBy(asc(fundsTable.displayOrder));
+
+    if (rows.length === 0) {
+      await seedDefaultFunds(byid);
+      rows = await db.select().from(fundsTable)
+        .where(baseWhere)
+        .orderBy(asc(fundsTable.displayOrder));
+    }
+
     res.json(rows);
   } catch (err) {
     req.log.error({ err }, "Failed to get funds");

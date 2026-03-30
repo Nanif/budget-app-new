@@ -11,7 +11,7 @@ import { apiFetch } from "@/lib/api";
 import {
   Pencil, Check, X, Loader2, Plus, Wallet, Settings2,
   TrendingUp, TrendingDown, AlertTriangle, ArrowLeft,
-  Minus, BarChart3, CalendarDays, CircleDollarSign, Trash2,
+  Minus, CalendarDays, CircleDollarSign, Trash2,
 } from "lucide-react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
@@ -64,8 +64,6 @@ const COLOR_SWATCHES = [
   "#10b981","#14b8a6","#06b6d4","#0ea5e9","#3b82f6","#6366f1",
   "#8b5cf6","#a855f7","#ec4899","#f43f5e","#64748b","#475569",
 ];
-const MONTH_HE = ["ינ׳","פב׳","מר׳","אפ׳","מי׳","יו׳","יל׳","אג׳","ספ׳","אוק׳","נו׳","דצ׳"];
-
 /* ═══════════════════════════════════════════════════════════
    HELPERS
 ═══════════════════════════════════════════════════════════ */
@@ -160,22 +158,6 @@ export default function Budget() {
   const nonBudgetFunds = funds.filter(f => f.isActive && !f.includeInBudget);
   const totalBudget    = budgetFunds.reduce((s, f) => s + fundBudget(f), 0);
   const gap            = income.netIncome - totalExp;
-
-  /* ── monthly chart data ──────────────────────────────────── */
-  const chartData = useMemo(() => {
-    const now    = new Date();
-    const curYear = now.getFullYear();
-    const months: { label: string; income: number; key: string }[] = Array.from({ length: 12 }, (_, i) => ({
-      label:  MONTH_HE[i],
-      income: 0,
-      key:    `${curYear}-${String(i + 1).padStart(2, "0")}`,
-    }));
-    income.monthly.filter(m => m.entryType === "income").forEach(m => {
-      const idx = months.findIndex(x => x.key === m.month);
-      if (idx >= 0) months[idx].income += m.total;
-    });
-    return months;
-  }, [income.monthly]);
 
   /* ── year edit helpers ───────────────────────────────────── */
   const openYearEdit = () => {
@@ -274,7 +256,7 @@ export default function Budget() {
   return (
     <div className="space-y-6" dir="rtl">
       <PageHeader
-        title="תכנון תקציב שנתי"
+        title="מסגרת התקציב"
         description={year?.name || "שנת תקציב נוכחית"}
       >
         <Button variant="outline" onClick={openYearEdit} className="rounded-xl gap-1.5">
@@ -291,28 +273,15 @@ export default function Budget() {
         </div>
       ) : (
         <>
-          {/* ══ KPI Strip ═══════════════════════════════════════ */}
-          <KPIStrip
+          {/* ══ Annual Summary ═══════════════════════════════════ */}
+          <AnnualSummary
             totalBudget={totalBudget}
-            totalIncome={income.netIncome}
             totalExpenses={totalExp}
-            gap={gap}
+            totalIncome={income.netIncome}
+            fundsCount={budgetFunds.length}
+            year={year}
+            onEditYear={openYearEdit}
           />
-
-          {/* ══ Chart + Summary ══════════════════════════════════ */}
-          <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-            <div className="xl:col-span-2">
-              <IncomeChart data={chartData} />
-            </div>
-            <AnnualSummary
-              totalBudget={totalBudget}
-              totalExpenses={totalExp}
-              totalIncome={income.netIncome}
-              fundsCount={budgetFunds.length}
-              year={year}
-              onEditYear={openYearEdit}
-            />
-          </div>
 
           {/* ══ Anomalies ════════════════════════════════════════ */}
           {anomalies.length > 0 && (

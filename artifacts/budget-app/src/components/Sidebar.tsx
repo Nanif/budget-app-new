@@ -17,7 +17,7 @@ type NavItem = {
 const NAV_ITEMS: NavItem[] = [
   { href: "/", label: "דף בית", icon: Home },
   { href: "/dashboard", label: "דשבורד", icon: LayoutDashboard },
-  { href: "/budget", label: "תכנון תקציב", icon: CalendarDays, section: "קופות" },
+  { href: "/budget", label: "מסגרת התקציב", icon: CalendarDays, section: "קופות" },
   { href: "/cash", label: "קופת שוטף", icon: Wallet, section: "קופות" },
   { href: "/fixed", label: "קבועות", icon: ListChecks, section: "קופות" },
   { href: "/expenses", label: "הוצאות", icon: Receipt, section: "מעקב פיננסי" },
