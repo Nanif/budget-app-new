@@ -16,6 +16,7 @@ type IncomeSummary   = { totalIncome: number; totalDeductions: number; netIncome
 type BudgetYear      = { tithePercentage: number };
 type Tithe           = { id: number; amount: number; recipient: string; isTithe: boolean; date: string };
 type WalletTotals    = { deposits: number; withdrawals: number; net: number };
+type WalletTx        = { id: number; type: "deposit" | "withdrawal"; amount: number; date: string; description: string };
 type FundSummary   = {
   id: number; name: string; colorClass: string; fundBehavior: string; description: string;
   monthlyAllocation: number; annualAllocation: number; initialBalance: number;
@@ -48,8 +49,9 @@ export default function DashboardPage() {
   const [tithes, setTithes]         = useState<Tithe[]>([]);
   const [funds, setFunds]           = useState<FundSummary[]>([]);
   const [loading, setLoading]       = useState(true);
-  const [walletTotals, setWalletTotals]   = useState<WalletTotals | null>(null);
-  const [cashFund, setCashFund]           = useState<FundSummary | null>(null);
+  const [walletTotals, setWalletTotals]         = useState<WalletTotals | null>(null);
+  const [walletTransactions, setWalletTxs]     = useState<WalletTx[]>([]);
+  const [cashFund, setCashFund]                 = useState<FundSummary | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -79,7 +81,10 @@ export default function DashboardPage() {
     setCashFund(cf ?? null);
     if (!cf) return;
     apiFetch(`/wallet?month=${currentMonth}&fundId=${cf.id}`)
-      .then((d: { totals: WalletTotals }) => setWalletTotals(d.totals))
+      .then((d: { totals: WalletTotals; transactions: WalletTx[] }) => {
+        setWalletTotals(d.totals);
+        setWalletTxs(d.transactions ?? []);
+      })
       .catch(() => {});
   }, [funds, currentMonth]);
 
@@ -115,18 +120,6 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6" dir="rtl">
 
-      {/* ══ קופת שוטף — חודש נוכחי ══════════════════════════════ */}
-      {cashFund && (
-        <div className="max-w-lg">
-          <WalletMonthCard
-            fundName={cashFund.name}
-            monthLabel={currentMonthLabel}
-            monthlyTarget={cashFund.monthlyAllocation}
-            totals={walletTotals}
-          />
-        </div>
-      )}
-
       {/* ══ מעשרות ══════════════════════════════════════════════ */}
       <div className="max-w-lg">
         <TitheCard
@@ -144,6 +137,19 @@ export default function DashboardPage() {
         />
       </div>
 
+      {/* ══ קופת שוטף — חודש נוכחי ══════════════════════════════ */}
+      {cashFund && (
+        <div className="max-w-lg">
+          <WalletMonthCard
+            fundName={cashFund.name}
+            monthLabel={currentMonthLabel}
+            monthlyTarget={cashFund.monthlyAllocation}
+            totals={walletTotals}
+            transactions={walletTransactions}
+          />
+        </div>
+      )}
+
       {/* ══ קופות ════════════════════════════════════════════= */}
       {funds.length > 0 && (
         <div className="space-y-5 pb-6">
@@ -160,47 +166,59 @@ export default function DashboardPage() {
 /* ═══════════════════════════════════════════════════════════
    CARD: קופת שוטף — חודש נוכחי
 ═══════════════════════════════════════════════════════════ */
-function WalletMonthCard({ fundName, monthLabel, monthlyTarget, totals }: {
+function WalletMonthCard({ fundName, monthLabel, monthlyTarget, totals, transactions }: {
   fundName: string;
   monthLabel: string;
   monthlyTarget: number;
   totals: WalletTotals | null;
+  transactions: WalletTx[];
 }) {
+  const [expanded, setExpanded] = useState(false);
+
   const deposits    = totals?.deposits    ?? 0;
   const withdrawals = totals?.withdrawals ?? 0;
-  const net         = deposits - withdrawals;           // ניתן פחות נלקח
+  const net         = deposits - withdrawals;
   const remaining   = Math.max(0, monthlyTarget - net);
   const pct         = monthlyTarget > 0 ? Math.min(100, (net / monthlyTarget) * 100) : 0;
   const over        = net >= monthlyTarget && monthlyTarget > 0;
 
+  const recent = transactions.slice(0, 8);
+
   return (
     <div className="bg-card border border-border/60 rounded-2xl shadow-sm overflow-hidden">
-      {/* Header */}
-      <div className="flex items-center justify-between px-5 pt-4 pb-3">
+      {/* Header — clickable */}
+      <button
+        onClick={() => setExpanded(e => !e)}
+        className="w-full flex items-center justify-between px-5 pt-4 pb-3 text-start hover:bg-muted/30 transition-colors"
+      >
         <div className="flex items-center gap-2">
           <div className="w-7 h-7 rounded-xl bg-amber-100 flex items-center justify-center">
             <Wallet className="w-3.5 h-3.5 text-amber-600" />
           </div>
           <span className="font-semibold text-sm">{fundName}</span>
+          {transactions.length > 0 && (
+            <span className="text-[10px] bg-amber-100 text-amber-700 rounded-full px-1.5 py-0.5 font-medium">
+              {transactions.length}
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <span className="text-[11px] text-muted-foreground bg-muted px-2 py-0.5 rounded-full">{monthLabel}</span>
-          <Link href="/cash">
+          <Link href="/cash" onClick={e => e.stopPropagation()}>
             <span className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-amber-600 transition-colors">
               לקופה <ArrowLeft className="w-3 h-3" />
             </span>
           </Link>
+          <ChevronDown className={cn("w-4 h-4 text-muted-foreground transition-transform duration-200", expanded && "rotate-180")} />
         </div>
-      </div>
+      </button>
 
-      {/* Progress bar — net vs. target */}
+      {/* Progress bar */}
       <div className="px-5 pb-3">
         <div className="flex justify-between text-[11px] text-muted-foreground mb-1">
           <span>
             <span className="text-emerald-600 font-medium">{fmt(deposits)}</span>
-            {withdrawals > 0 && (
-              <span className="text-rose-500"> − {fmt(withdrawals)}</span>
-            )}
+            {withdrawals > 0 && <span className="text-rose-500"> − {fmt(withdrawals)}</span>}
             {" = "}
             <span className="font-semibold text-foreground">{fmt(net)} ניתן</span>
           </span>
@@ -233,6 +251,41 @@ function WalletMonthCard({ fundName, monthLabel, monthlyTarget, totals }: {
           )}>{fmt(remaining)}</p>
         </div>
       </div>
+
+      {/* Transactions list — shown when expanded */}
+      {expanded && (
+        <div className="border-t border-border/50">
+          {recent.length === 0 ? (
+            <p className="text-center text-xs text-muted-foreground py-4">אין תנועות בחודש זה</p>
+          ) : (
+            <ul className="divide-y divide-border/40">
+              {recent.map(tx => (
+                <li key={tx.id} className="flex items-center justify-between px-5 py-2.5 text-sm">
+                  <div className="flex items-center gap-2 min-w-0">
+                    {tx.type === "deposit"
+                      ? <ArrowDownLeft className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                      : <ArrowUpRight  className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+                    }
+                    <span className="truncate text-xs text-muted-foreground">
+                      {tx.description || (tx.type === "deposit" ? "הפקדה" : "משיכה")}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-3 shrink-0">
+                    <span className={cn("text-xs font-medium tabular-nums",
+                      tx.type === "deposit" ? "text-emerald-600" : "text-rose-500"
+                    )}>
+                      {tx.type === "deposit" ? "+" : "−"}{fmt(tx.amount)}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground">
+                      {new Date(tx.date).toLocaleDateString("he-IL", { day: "numeric", month: "numeric" })}
+                    </span>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
     </div>
   );
 }
