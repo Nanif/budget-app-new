@@ -11,7 +11,7 @@ import { apiFetch } from "@/lib/api";
 import {
   Pencil, Check, X, Loader2, Plus, Wallet, Settings2,
   TrendingUp, TrendingDown, AlertTriangle, ArrowLeft,
-  Minus, CalendarDays, CircleDollarSign, Trash2,
+  Minus, CalendarDays, CircleDollarSign, Trash2, BarChart3,
 } from "lucide-react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
@@ -39,25 +39,59 @@ type FundSpend = { fundId: number | null; total: number };
    CONSTANTS
 ═══════════════════════════════════════════════════════════ */
 const BEHAVIOR_LABELS: Record<string, string> = {
-  fixed_monthly:      "קבועות",
-  cash_monthly:       "שוטף",
-  annual_categorized: "מעגל השנה",
-  annual_large:       "הוצאות גדולות",
-  non_budget:         "חיצוני",
+  fixed_monthly:       "קבועות",
+  expense_monthly:     "הוצאות חודשי",
+  cash_monthly:        "שוטף",
+  fixed_annual:        "קבועות שנתי",
+  annual_categorized:  "מעגל השנה",
+  annual_large:        "הוצאות גדולות",
+  cash_annual:         "קופה שנתית",
+  fixed_non_budget:    "חיצוני קבוע",
+  expense_non_budget:  "הוצאות חיצוני",
+  non_budget:          "חיצוני",
 };
 const BEHAVIOR_BADGE: Record<string, string> = {
-  fixed_monthly:      "bg-slate-100 text-slate-700",
-  cash_monthly:       "bg-amber-100 text-amber-700",
-  annual_categorized: "bg-violet-100 text-violet-700",
-  annual_large:       "bg-rose-100 text-rose-700",
-  non_budget:         "bg-gray-100 text-gray-500",
+  fixed_monthly:       "bg-slate-100 text-slate-700",
+  expense_monthly:     "bg-orange-100 text-orange-700",
+  cash_monthly:        "bg-amber-100 text-amber-700",
+  fixed_annual:        "bg-sky-100 text-sky-700",
+  annual_categorized:  "bg-violet-100 text-violet-700",
+  annual_large:        "bg-rose-100 text-rose-700",
+  cash_annual:         "bg-teal-100 text-teal-700",
+  fixed_non_budget:    "bg-gray-100 text-gray-500",
+  expense_non_budget:  "bg-gray-100 text-gray-500",
+  non_budget:          "bg-gray-100 text-gray-500",
 };
-const BEHAVIOR_OPTIONS = [
-  { value: "fixed_monthly",      label: "קבועות (חודשי)",        desc: "הוצאות קבועות חודשיות — הגדרת מסגרת" },
-  { value: "cash_monthly",       label: "שוטף (ארנק מזומן)",      desc: "ארנק מזומן — מעקב הפקדות חודשיות" },
-  { value: "annual_categorized", label: "מעגל השנה (שנתי)",       desc: "הוצאות שנתיות עם קטגוריות" },
-  { value: "annual_large",       label: "הוצאות גדולות (שנתי)",   desc: "רכישות גדולות — תיעוד כל הוצאה" },
-  { value: "non_budget",         label: "מחוץ לתקציב",            desc: "קופה עם יתרה עצמאית (בונוס, עודפים)" },
+
+/* ── period + transaction → fundBehavior ──────────────────── */
+type Period      = "monthly" | "annual" | "non_budget";
+type Transaction = "none" | "expenses" | "physical";
+
+const BEHAVIOR_MAP: Record<Period, Record<Transaction, string>> = {
+  monthly:    { none: "fixed_monthly",      expenses: "expense_monthly",    physical: "cash_monthly"        },
+  annual:     { none: "fixed_annual",       expenses: "annual_categorized", physical: "cash_annual"         },
+  non_budget: { none: "fixed_non_budget",   expenses: "expense_non_budget", physical: "non_budget"          },
+};
+const BEHAVIOR_TO_PERIOD: Record<string, Period> = {
+  fixed_monthly: "monthly", expense_monthly: "monthly", cash_monthly: "monthly",
+  fixed_annual: "annual", annual_categorized: "annual", annual_large: "annual", cash_annual: "annual",
+  fixed_non_budget: "non_budget", expense_non_budget: "non_budget", non_budget: "non_budget",
+};
+const BEHAVIOR_TO_TXN: Record<string, Transaction> = {
+  fixed_monthly: "none", expense_monthly: "expenses", cash_monthly: "physical",
+  fixed_annual: "none", annual_categorized: "expenses", annual_large: "expenses", cash_annual: "physical",
+  fixed_non_budget: "none", expense_non_budget: "expenses", non_budget: "physical",
+};
+
+const PERIOD_OPTIONS: { value: Period; label: string; desc: string }[] = [
+  { value: "monthly",    label: "חודשי",           desc: "תקציב חודשי קבוע × 12" },
+  { value: "annual",     label: "שנתי",            desc: "תקציב שנתי" },
+  { value: "non_budget", label: "מחוץ לתקציב",    desc: "קופה עצמאית" },
+];
+const TRANSACTION_OPTIONS: { value: Transaction; label: string; desc: string }[] = [
+  { value: "none",     label: "ללא תנועות",         desc: "מגדיר מסגרת בלבד — לא ניתן לשייך הוצאות" },
+  { value: "expenses", label: "תנועות הוצאות",      desc: "ניתן לשייך הוצאות — מחושבות ביתרה" },
+  { value: "physical", label: "תנועות לקחת / לתת",  desc: "קופה פיזית — מעקב הפקדות ומשיכות" },
 ];
 const COLOR_SWATCHES = [
   "#ef4444","#f97316","#f59e0b","#eab308","#84cc16","#22c55e",
@@ -72,11 +106,14 @@ function fmt(n: number, compact = false) {
     return `${(n / 1000).toFixed(n % 1000 === 0 ? 0 : 1)}K ₪`;
   return new Intl.NumberFormat("he-IL", { style: "currency", currency: "ILS", maximumFractionDigits: 0 }).format(n);
 }
-function isMonthlyFund(b: string) { return b === "fixed_monthly" || b === "cash_monthly"; }
+const MONTHLY_BEHAVIORS = new Set(["fixed_monthly", "expense_monthly", "cash_monthly"]);
+const NON_BUDGET_BEHAVIORS = new Set(["non_budget", "fixed_non_budget", "expense_non_budget"]);
+function isMonthlyFund(b: string) { return MONTHLY_BEHAVIORS.has(b); }
+function isNonBudgetFund(b: string) { return NON_BUDGET_BEHAVIORS.has(b); }
 function fundBudget(f: Fund) {
-  return isMonthlyFund(f.fundBehavior)
-    ? f.monthlyAllocation * 12
-    : (f.annualAllocation || f.initialBalance || 0);
+  if (isMonthlyFund(f.fundBehavior))    return f.monthlyAllocation * 12;
+  if (isNonBudgetFund(f.fundBehavior))  return f.initialBalance || 0;
+  return f.annualAllocation || 0;
 }
 function utilStatus(pct: number): "ok" | "warn" | "over" {
   if (pct >= 100) return "over";
@@ -116,9 +153,10 @@ export default function Budget() {
   const [fundDialog,  setFundDialog]  = useState(false);
   const [editFund,    setEditFund]    = useState<Fund | null>(null);
   const [fundForm,    setFundForm]    = useState({
-    name: "", fundBehavior: "annual_large", colorClass: "#6366f1",
+    name: "", period: "monthly" as Period, transactionType: "none" as Transaction,
+    colorClass: "#6366f1",
     monthlyAllocation: "", annualAllocation: "", initialBalance: "",
-    includeInBudget: true, description: "",
+    description: "",
   });
   const [fundSaving, setFundSaving] = useState(false);
 
@@ -155,9 +193,9 @@ export default function Budget() {
   }, [spends]);
 
   const activeFunds    = funds.filter(f => f.isActive);
-  const monthlyFunds   = activeFunds.filter(f => f.fundBehavior === "fixed_monthly" || f.fundBehavior === "cash_monthly");
-  const annualFunds    = activeFunds.filter(f => f.fundBehavior === "annual_categorized" || f.fundBehavior === "annual_large");
-  const nonBudgetFunds = activeFunds.filter(f => f.fundBehavior === "non_budget");
+  const monthlyFunds   = activeFunds.filter(f => MONTHLY_BEHAVIORS.has(f.fundBehavior));
+  const annualFunds    = activeFunds.filter(f => !MONTHLY_BEHAVIORS.has(f.fundBehavior) && !NON_BUDGET_BEHAVIORS.has(f.fundBehavior));
+  const nonBudgetFunds = activeFunds.filter(f => NON_BUDGET_BEHAVIORS.has(f.fundBehavior));
   const budgetFunds    = activeFunds.filter(f => f.includeInBudget);
   const totalBudget    = budgetFunds.reduce((s, f) => s + fundBudget(f), 0);
   const gap            = income.netIncome - totalExp;
@@ -200,17 +238,20 @@ export default function Budget() {
   /* ── fund dialog helpers ─────────────────────────────────── */
   const openCreateFund = () => {
     setEditFund(null);
-    setFundForm({ name: "", fundBehavior: "annual_large", colorClass: "#6366f1", monthlyAllocation: "", annualAllocation: "", initialBalance: "", includeInBudget: true, description: "" });
+    setFundForm({ name: "", period: "monthly", transactionType: "none", colorClass: "#6366f1", monthlyAllocation: "", annualAllocation: "", initialBalance: "", description: "" });
     setFundDialog(true);
   };
   const openEditFund = (f: Fund) => {
     setEditFund(f);
     setFundForm({
-      name: f.name, fundBehavior: f.fundBehavior, colorClass: f.colorClass,
+      name: f.name,
+      period:          BEHAVIOR_TO_PERIOD[f.fundBehavior] ?? "monthly",
+      transactionType: BEHAVIOR_TO_TXN[f.fundBehavior]   ?? "none",
+      colorClass: f.colorClass,
       monthlyAllocation: f.monthlyAllocation > 0 ? String(f.monthlyAllocation) : "",
       annualAllocation:  f.annualAllocation  > 0 ? String(f.annualAllocation)  : "",
       initialBalance:    f.initialBalance    > 0 ? String(f.initialBalance)    : "",
-      includeInBudget: f.includeInBudget, description: "",
+      description: "",
     });
     setFundDialog(true);
   };
@@ -218,18 +259,18 @@ export default function Budget() {
     if (!fundForm.name.trim()) { toast({ title: "שם הקופה נדרש", variant: "destructive" }); return; }
     setFundSaving(true);
     try {
-      const monthly = isMonthlyFund(fundForm.fundBehavior);
+      const behavior = BEHAVIOR_MAP[fundForm.period][fundForm.transactionType];
+      const monthly  = isMonthlyFund(behavior);
+      const nonBudg  = isNonBudgetFund(behavior);
       const payload = {
         name: fundForm.name.trim(),
-        fundBehavior: fundForm.fundBehavior,
+        fundBehavior: behavior,
         colorClass: fundForm.colorClass,
         description: fundForm.description,
-        includeInBudget: fundForm.fundBehavior !== "non_budget",
-        monthlyAllocation: monthly ? (parseFloat(fundForm.monthlyAllocation) || 0) : 0,
-        annualAllocation: !monthly
-          ? (parseFloat(fundForm.annualAllocation) || parseFloat(fundForm.initialBalance) || 0)
-          : (parseFloat(fundForm.monthlyAllocation) || 0) * 12,
-        initialBalance: parseFloat(fundForm.initialBalance) || 0,
+        includeInBudget: !nonBudg,
+        monthlyAllocation: monthly  ? (parseFloat(fundForm.monthlyAllocation) || 0) : 0,
+        annualAllocation:  !monthly && !nonBudg ? (parseFloat(fundForm.annualAllocation) || 0) : 0,
+        initialBalance:    nonBudg  ? (parseFloat(fundForm.initialBalance) || 0) : 0,
         isActive: true,
         displayOrder: editFund?.displayOrder ?? funds.length,
       };
@@ -406,6 +447,7 @@ export default function Budget() {
             <DialogTitle className="text-xl font-bold">{editFund ? "עריכת קופה" : "קופה חדשה"}</DialogTitle>
           </DialogHeader>
           <div className="space-y-5 py-2 max-h-[70vh] overflow-y-auto">
+            {/* שם */}
             <div className="space-y-1.5">
               <Label className="font-semibold flex items-center gap-2">
                 שם הקופה *
@@ -414,21 +456,45 @@ export default function Budget() {
                 )}
               </Label>
               <Input value={fundForm.name} onChange={e => setFundForm(p => ({ ...p, name: e.target.value }))}
-                placeholder='למשל: שוטף, מעגל השנה...' className="rounded-xl"
+                placeholder='למשל: ביגוד, נסיעות...' className="rounded-xl"
                 disabled={!!editFund?.isDefault} />
             </div>
+
+            {/* תקופה */}
             <div className="space-y-2">
-              <Label className="font-semibold">סוג הקופה *</Label>
-              <div className="space-y-1.5">
-                {BEHAVIOR_OPTIONS.map(opt => (
+              <Label className="font-semibold">תקופה *</Label>
+              <div className="grid grid-cols-3 gap-2">
+                {PERIOD_OPTIONS.map(opt => (
                   <button key={opt.value} type="button"
-                    onClick={() => !editFund?.isDefault && setFundForm(p => ({ ...p, fundBehavior: opt.value }))}
-                    className={cn("w-full text-right px-4 py-3 rounded-xl border-2 transition-all flex items-start gap-3",
-                      fundForm.fundBehavior === opt.value ? "border-primary bg-primary/5" : "border-border hover:border-primary/30",
-                      editFund?.isDefault && "opacity-60 cursor-not-allowed pointer-events-none"
+                    disabled={!!editFund?.isDefault}
+                    onClick={() => setFundForm(p => ({ ...p, period: opt.value }))}
+                    className={cn(
+                      "px-3 py-3 rounded-xl border-2 transition-all text-center",
+                      fundForm.period === opt.value ? "border-primary bg-primary/5" : "border-border hover:border-primary/30",
+                      editFund?.isDefault && "opacity-60 cursor-not-allowed"
                     )}>
-                    <div className={cn("w-3 h-3 rounded-full mt-1 shrink-0",
-                      fundForm.fundBehavior === opt.value ? "bg-primary" : "bg-muted")} />
+                    <p className="font-semibold text-sm">{opt.label}</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5 leading-tight">{opt.desc}</p>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* סוג תנועות */}
+            <div className="space-y-2">
+              <Label className="font-semibold">סוג תנועות *</Label>
+              <div className="space-y-1.5">
+                {TRANSACTION_OPTIONS.map(opt => (
+                  <button key={opt.value} type="button"
+                    disabled={!!editFund?.isDefault}
+                    onClick={() => setFundForm(p => ({ ...p, transactionType: opt.value }))}
+                    className={cn(
+                      "w-full text-right px-4 py-3 rounded-xl border-2 transition-all flex items-start gap-3",
+                      fundForm.transactionType === opt.value ? "border-primary bg-primary/5" : "border-border hover:border-primary/30",
+                      editFund?.isDefault && "opacity-60 cursor-not-allowed"
+                    )}>
+                    <div className={cn("w-3 h-3 rounded-full mt-1 shrink-0 flex-shrink-0",
+                      fundForm.transactionType === opt.value ? "bg-primary" : "bg-muted")} />
                     <div>
                       <p className="font-semibold text-sm">{opt.label}</p>
                       <p className="text-xs text-muted-foreground mt-0.5">{opt.desc}</p>
@@ -437,25 +503,31 @@ export default function Budget() {
                 ))}
               </div>
             </div>
+
+            {/* תקציב */}
             <div className="space-y-1.5">
               <Label className="font-semibold">
-                {isMonthlyFund(fundForm.fundBehavior) ? "הקצאה חודשית (₪)" :
-                  fundForm.fundBehavior === "non_budget" ? "יתרה התחלתית (₪)" : "הקצאה שנתית (₪)"}
+                {fundForm.period === "monthly"    ? "הקצאה חודשית (₪)" :
+                 fundForm.period === "non_budget" ? "יתרה התחלתית (₪)" : "הקצאה שנתית (₪)"}
               </Label>
               <Input type="number" dir="ltr"
-                value={isMonthlyFund(fundForm.fundBehavior) ? fundForm.monthlyAllocation :
-                  fundForm.fundBehavior === "non_budget" ? fundForm.initialBalance : fundForm.annualAllocation}
+                value={
+                  fundForm.period === "monthly"    ? fundForm.monthlyAllocation :
+                  fundForm.period === "non_budget" ? fundForm.initialBalance    : fundForm.annualAllocation
+                }
                 onChange={e => {
                   const v = e.target.value;
-                  if (isMonthlyFund(fundForm.fundBehavior))       setFundForm(p => ({ ...p, monthlyAllocation: v }));
-                  else if (fundForm.fundBehavior === "non_budget") setFundForm(p => ({ ...p, initialBalance: v }));
-                  else                                             setFundForm(p => ({ ...p, annualAllocation: v }));
+                  if      (fundForm.period === "monthly")    setFundForm(p => ({ ...p, monthlyAllocation: v }));
+                  else if (fundForm.period === "non_budget") setFundForm(p => ({ ...p, initialBalance: v }));
+                  else                                       setFundForm(p => ({ ...p, annualAllocation: v }));
                 }}
                 placeholder="0" className="rounded-xl" />
-              {isMonthlyFund(fundForm.fundBehavior) && fundForm.monthlyAllocation && (
+              {fundForm.period === "monthly" && fundForm.monthlyAllocation && (
                 <p className="text-xs text-muted-foreground">שנתי: {fmt((parseFloat(fundForm.monthlyAllocation) || 0) * 12)}</p>
               )}
             </div>
+
+            {/* צבע */}
             <div className="space-y-2">
               <Label className="font-semibold">צבע</Label>
               <div className="flex flex-wrap gap-2">
