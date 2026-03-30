@@ -154,8 +154,11 @@ export default function Budget() {
     return m;
   }, [spends]);
 
-  const budgetFunds    = funds.filter(f => f.isActive && f.includeInBudget);
-  const nonBudgetFunds = funds.filter(f => f.isActive && !f.includeInBudget);
+  const activeFunds    = funds.filter(f => f.isActive);
+  const monthlyFunds   = activeFunds.filter(f => f.fundBehavior === "fixed_monthly" || f.fundBehavior === "cash_monthly");
+  const annualFunds    = activeFunds.filter(f => f.fundBehavior === "annual_categorized" || f.fundBehavior === "annual_large");
+  const nonBudgetFunds = activeFunds.filter(f => f.fundBehavior === "non_budget");
+  const budgetFunds    = activeFunds.filter(f => f.includeInBudget);
   const totalBudget    = budgetFunds.reduce((s, f) => s + fundBudget(f), 0);
   const gap            = income.netIncome - totalExp;
 
@@ -288,48 +291,37 @@ export default function Budget() {
             <AnomalySection anomalies={anomalies} onEdit={f => openEditFund(f)} />
           )}
 
-          {/* ══ Fund Cards ═══════════════════════════════════════ */}
-          <section>
-            <div className="flex items-center justify-between mb-3 px-1">
-              <h2 className="font-display font-bold text-lg">קופות בתקציב</h2>
-              <span className="text-sm text-muted-foreground">{budgetFunds.length} קופות</span>
-            </div>
-            {budgetFunds.length === 0 ? (
-              <EmptyFunds onAdd={openCreateFund} />
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-                {budgetFunds
-                  .sort((a, b) => a.displayOrder - b.displayOrder)
-                  .map(fund => (
-                    <FundCard
-                      key={fund.id}
-                      fund={fund}
-                      spent={spendMap[fund.id] ?? 0}
-                      onEdit={() => openEditFund(fund)}
-                      onDelete={() => setDeleteFund(fund)}
-                    />
-                  ))}
-              </div>
-            )}
-          </section>
+          {/* ══ חודשי ════════════════════════════════════════════ */}
+          <FundSection
+            title="חודשי"
+            funds={monthlyFunds}
+            spendMap={spendMap}
+            onEdit={openEditFund}
+            onDelete={f => setDeleteFund(f)}
+            onAdd={openCreateFund}
+          />
 
-          {/* ══ Non-budget funds ══════════════════════════════════ */}
+          {/* ══ שנתי ═════════════════════════════════════════════ */}
+          <FundSection
+            title="שנתי"
+            funds={annualFunds}
+            spendMap={spendMap}
+            onEdit={openEditFund}
+            onDelete={f => setDeleteFund(f)}
+            onAdd={openCreateFund}
+          />
+
+          {/* ══ מחוץ לתקציב ══════════════════════════════════════ */}
           {nonBudgetFunds.length > 0 && (
-            <section>
-              <h2 className="font-display font-bold text-base mb-3 px-1 text-muted-foreground">קופות מחוץ לתקציב</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-                {nonBudgetFunds.map(fund => (
-                  <FundCard
-                    key={fund.id}
-                    fund={fund}
-                    spent={spendMap[fund.id] ?? 0}
-                    onEdit={() => openEditFund(fund)}
-                    onDelete={() => setDeleteFund(fund)}
-                    dimmed
-                  />
-                ))}
-              </div>
-            </section>
+            <FundSection
+              title="מחוץ לתקציב"
+              funds={nonBudgetFunds}
+              spendMap={spendMap}
+              onEdit={openEditFund}
+              onDelete={f => setDeleteFund(f)}
+              onAdd={openCreateFund}
+              dimmed
+            />
           )}
         </>
       )}
@@ -837,6 +829,41 @@ function FundCard({ fund, spent, onEdit, onDelete, dimmed = false }: {
         </div>
       </div>
     </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════
+   FUND SECTION
+═══════════════════════════════════════════════════════════ */
+function FundSection({ title, funds, spendMap, onEdit, onDelete, onAdd, dimmed = false }: {
+  title: string; funds: Fund[]; spendMap: Record<number, number>;
+  onEdit: (f: Fund) => void; onDelete: (f: Fund) => void;
+  onAdd: () => void; dimmed?: boolean;
+}) {
+  const sorted = [...funds].sort((a, b) => a.displayOrder - b.displayOrder);
+  return (
+    <section>
+      <div className="flex items-center justify-between mb-3 px-1">
+        <h2 className={cn("font-display font-bold text-lg", dimmed && "text-muted-foreground")}>{title}</h2>
+        <span className="text-sm text-muted-foreground">{funds.length} קופות</span>
+      </div>
+      {sorted.length === 0 ? (
+        <EmptyFunds onAdd={onAdd} />
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+          {sorted.map(fund => (
+            <FundCard
+              key={fund.id}
+              fund={fund}
+              spent={spendMap[fund.id] ?? 0}
+              onEdit={() => onEdit(fund)}
+              onDelete={() => onDelete(fund)}
+              dimmed={dimmed}
+            />
+          ))}
+        </div>
+      )}
+    </section>
   );
 }
 
