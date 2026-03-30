@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { apiFetch } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { useCashCurrentMonth, defaultDateForMonth } from "@/hooks/useCashCurrentMonth";
 
 type DialogType = "expense" | "income" | "cash" | "charity" | null;
 
@@ -33,6 +34,7 @@ const ACTIONS = [
 ══════════════════════════════════════════════════════════════════ */
 export function QuickActions() {
   const { toast } = useToast();
+  const { currentMonth } = useCashCurrentMonth();
   const [open,        setOpen]        = useState(false);
   const [activeDialog, setActiveDialog] = useState<DialogType>(null);
   const [saving,      setSaving]      = useState(false);
@@ -111,10 +113,13 @@ export function QuickActions() {
 
   /* ── cash form ───────────────────────────────────────────────── */
   const defaultCashFund = cashFunds[0]?.id ? String(cashFunds[0].id) : "";
-  const [cash, setCash] = useState({ type: "deposit" as "deposit"|"withdrawal", amount: "", description: "", fundId: "", date: today() });
+  const [cash, setCash] = useState({ type: "deposit" as "deposit"|"withdrawal", amount: "", description: "", fundId: "", date: defaultDateForMonth(currentMonth) });
   useEffect(() => {
     if (!cash.fundId && defaultCashFund) setCash(p => ({ ...p, fundId: defaultCashFund }));
   }, [defaultCashFund]);
+  useEffect(() => {
+    setCash(p => ({ ...p, date: defaultDateForMonth(currentMonth) }));
+  }, [currentMonth]);
 
   const submitCash = async () => {
     if (!cash.amount) return;

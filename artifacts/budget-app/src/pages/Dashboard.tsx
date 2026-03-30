@@ -5,15 +5,17 @@ import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import { apiFetch } from "@/lib/api";
+import { useCashCurrentMonth } from "@/hooks/useCashCurrentMonth";
 import {
   HeartHandshake,
-  ArrowLeft, Plus, Check, Loader2,
+  ArrowLeft, Plus, Check, Loader2, Wallet, ArrowDownLeft, ArrowUpRight,
 } from "lucide-react";
 
 /* ── Types ─────────────────────────────────────────────────── */
-type IncomeSummary = { totalIncome: number; totalDeductions: number; netIncome: number };
-type BudgetYear    = { tithePercentage: number };
-type Tithe         = { id: number; amount: number; recipient: string; isTithe: boolean; date: string };
+type IncomeSummary   = { totalIncome: number; totalDeductions: number; netIncome: number };
+type BudgetYear      = { tithePercentage: number };
+type Tithe           = { id: number; amount: number; recipient: string; isTithe: boolean; date: string };
+type WalletTotals    = { deposits: number; withdrawals: number; net: number };
 type FundSummary   = {
   id: number; name: string; colorClass: string; fundBehavior: string; description: string;
   monthlyAllocation: number; annualAllocation: number; initialBalance: number;
@@ -39,12 +41,15 @@ const GO_LINK       = "flex items-center gap-1 text-xs text-muted-foreground hov
 export default function DashboardPage() {
   const { toast } = useToast();
   const { activeBid } = useBudgetYear();
+  const { currentMonth } = useCashCurrentMonth();
 
   const [income, setIncome]         = useState<IncomeSummary>({ totalIncome: 0, totalDeductions: 0, netIncome: 0 });
   const [budgetYear, setBudgetYear] = useState<BudgetYear>({ tithePercentage: 10 });
   const [tithes, setTithes]         = useState<Tithe[]>([]);
   const [funds, setFunds]           = useState<FundSummary[]>([]);
   const [loading, setLoading]       = useState(true);
+  const [walletTotals, setWalletTotals]   = useState<WalletTotals | null>(null);
+  const [cashFund, setCashFund]           = useState<FundSummary | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -67,6 +72,16 @@ export default function DashboardPage() {
   }, [activeBid]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { load(); }, [load]);
+
+  /* fetch wallet data for current month once funds are loaded */
+  useEffect(() => {
+    const cf = funds.find(f => f.fundBehavior === "cash_monthly");
+    setCashFund(cf ?? null);
+    if (!cf) return;
+    apiFetch(`/wallet?month=${currentMonth}&fundId=${cf.id}`)
+      .then((d: { totals: WalletTotals }) => setWalletTotals(d.totals))
+      .catch(() => {});
+  }, [funds, currentMonth]);
 
   const titheTarget = income.netIncome * (budgetYear.tithePercentage / 100);
   const titheGiven  = tithes.filter(t => t.isTithe).reduce((s, t) => s + t.amount, 0);
@@ -93,8 +108,24 @@ export default function DashboardPage() {
     );
   }
 
+  const MONTH_NAMES = ["ינואר","פברואר","מרץ","אפריל","מאי","יוני","יולי","אוגוסט","ספטמבר","אוקטובר","נובמבר","דצמבר"];
+  const [cmYear, cmMonth] = currentMonth.split("-").map(Number);
+  const currentMonthLabel = `${MONTH_NAMES[cmMonth - 1]} ${cmYear}`;
+
   return (
     <div className="space-y-6" dir="rtl">
+
+      {/* ══ קופת שוטף — חודש נוכחי ══════════════════════════════ */}
+      {cashFund && (
+        <div className="max-w-lg">
+          <WalletMonthCard
+            fundName={cashFund.name}
+            monthLabel={currentMonthLabel}
+            monthlyTarget={cashFund.monthlyAllocation}
+            totals={walletTotals}
+          />
+        </div>
+      )}
 
       {/* ══ מעשרות ══════════════════════════════════════════════ */}
       <div className="max-w-lg">
@@ -122,6 +153,77 @@ export default function DashboardPage() {
         </div>
       )}
 
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════
+   CARD: קופת שוטף — חודש נוכחי
+═══════════════════════════════════════════════════════════ */
+function WalletMonthCard({ fundName, monthLabel, monthlyTarget, totals }: {
+  fundName: string;
+  monthLabel: string;
+  monthlyTarget: number;
+  totals: WalletTotals | null;
+}) {
+  const deposits    = totals?.deposits    ?? 0;
+  const withdrawals = totals?.withdrawals ?? 0;
+  const remaining   = Math.max(0, monthlyTarget - deposits);
+  const pct         = monthlyTarget > 0 ? Math.min(100, (deposits / monthlyTarget) * 100) : 0;
+  const over        = deposits >= monthlyTarget && monthlyTarget > 0;
+
+  return (
+    <div className="bg-card border border-border/60 rounded-2xl shadow-sm overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center justify-between px-5 pt-4 pb-3">
+        <div className="flex items-center gap-2">
+          <div className="w-7 h-7 rounded-xl bg-amber-100 flex items-center justify-center">
+            <Wallet className="w-3.5 h-3.5 text-amber-600" />
+          </div>
+          <span className="font-semibold text-sm">{fundName}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-[11px] text-muted-foreground bg-muted px-2 py-0.5 rounded-full">{monthLabel}</span>
+          <Link href="/cash">
+            <span className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-amber-600 transition-colors">
+              לקופה <ArrowLeft className="w-3 h-3" />
+            </span>
+          </Link>
+        </div>
+      </div>
+
+      {/* Progress bar — deposits vs. target */}
+      <div className="px-5 pb-3">
+        <div className="flex justify-between text-[11px] text-muted-foreground mb-1">
+          <span>{fmt(deposits)} ניתן</span>
+          <span className="font-medium">{Math.round(pct)}% מתוך {fmt(monthlyTarget)}</span>
+        </div>
+        <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+          <div className={cn("h-full rounded-full transition-all duration-500",
+            over ? "bg-emerald-500" : pct >= 70 ? "bg-amber-500" : "bg-amber-400"
+          )} style={{ width: `${pct}%` }} />
+        </div>
+      </div>
+
+      {/* Stats row */}
+      <div className="grid grid-cols-3 divide-x divide-x-reverse divide-border/50 border-t border-border/50 text-center">
+        {[
+          { label: "ניתן (הפקדות)",   value: fmt(deposits),    color: "text-emerald-600",
+            icon: <ArrowDownLeft className="w-3 h-3 mx-auto mb-0.5 text-emerald-500" /> },
+          { label: "נלקח (משיכות)",   value: fmt(withdrawals), color: "text-rose-500",
+            icon: <ArrowUpRight className="w-3 h-3 mx-auto mb-0.5 text-rose-400" /> },
+          { label: over ? "כוסה ✓" : "נותר לתת",
+            value: fmt(remaining),
+            color: over ? "text-emerald-600" : remaining > 0 ? "text-amber-600" : "text-muted-foreground",
+            icon: <Wallet className="w-3 h-3 mx-auto mb-0.5 text-muted-foreground" /> },
+        ].map(s => (
+          <div key={s.label} className="py-3 px-2">
+            {s.icon}
+            <p className="text-[10px] text-muted-foreground mb-0.5">{s.label}</p>
+            <p className={cn("text-sm font-bold tabular-nums", s.color)}>{s.value}</p>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

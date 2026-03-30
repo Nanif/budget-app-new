@@ -8,9 +8,10 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { apiFetch } from "@/lib/api";
 import { useBudgetYear } from "@/contexts/BudgetYearContext";
+import { useCashCurrentMonth, defaultDateForMonth } from "@/hooks/useCashCurrentMonth";
 import {
   ArrowDownLeft, ArrowUpRight, Loader2, Wallet,
-  ChevronLeft, ChevronRight, AlertCircle, List, Check, Trash2,
+  ChevronLeft, ChevronRight, AlertCircle, List, Check, Trash2, Pin,
 } from "lucide-react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
@@ -139,12 +140,13 @@ function TxTable({
 }
 
 function YearMonthGrid({
-  yearSummary, monthlyAlloc, year, selectedMonth, onSelectMonth,
+  yearSummary, monthlyAlloc, year, selectedMonth, currentMonth, onSelectMonth,
 }: {
   yearSummary: MonthRow[];
   monthlyAlloc: number;
   year: number;
   selectedMonth: string;
+  currentMonth: string;
   onSelectMonth: (m: string) => void;
 }) {
   const now = new Date();
@@ -172,7 +174,7 @@ function YearMonthGrid({
             const pct = monthlyAlloc > 0 ? Math.min(100, (deposits / monthlyAlloc) * 100) : 0;
             const isFuture = year > now.getFullYear() || (year === now.getFullYear() && mNum > now.getMonth() + 1);
             const isSelected = mStr === selectedMonth;
-            const isCurrent = year === now.getFullYear() && mNum === now.getMonth() + 1;
+            const isCurrentMonth = mStr === currentMonth;
             return (
               <tr
                 key={mStr}
@@ -185,7 +187,7 @@ function YearMonthGrid({
               >
                 <td className="py-3 px-4 text-sm text-right">
                   <span className="flex items-center gap-2">
-                    {isCurrent && <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" />}
+                    {isCurrentMonth && <Pin className="w-3 h-3 text-emerald-600 shrink-0" />}
                     {MONTH_NAMES[i]}
                   </span>
                 </td>
@@ -254,7 +256,8 @@ export default function CashWallet() {
   const { activeYear } = useBudgetYear();
   const now = new Date();
 
-  const [month, setMonth] = useState(toMonthStr(now));
+  const { currentMonth, setCurrentMonth } = useCashCurrentMonth();
+  const [month, setMonth] = useState(currentMonth);
   const [fund, setFund] = useState<Fund | null>(null);
   const [monthData, setMonthData] = useState<WalletData | null>(null);
   const [yearSummary, setYearSummary] = useState<MonthRow[]>([]);
@@ -342,7 +345,7 @@ export default function CashWallet() {
 
   const openDialog = (type: "deposit" | "withdrawal") => {
     setTxType(type);
-    setForm({ amount: "", description: "", date: new Date().toISOString().split("T")[0] });
+    setForm({ amount: "", description: "", date: defaultDateForMonth(currentMonth) });
     setDialogOpen(true);
   };
 
@@ -491,7 +494,21 @@ export default function CashWallet() {
                   >
                     <ChevronRight className="w-4 h-4" />
                   </button>
-                  <p className="text-sm font-semibold">{selMonthLabel}</p>
+                  <div className="text-center">
+                    <p className="text-sm font-semibold">{selMonthLabel}</p>
+                    {month === currentMonth ? (
+                      <span className="inline-flex items-center gap-1 text-[10px] text-emerald-600 font-medium mt-0.5">
+                        <Pin className="w-2.5 h-2.5" /> חודש נוכחי
+                      </span>
+                    ) : (
+                      <button
+                        onClick={() => { setCurrentMonth(month); }}
+                        className="inline-flex items-center gap-1 text-[10px] text-muted-foreground hover:text-primary transition-colors mt-0.5"
+                      >
+                        <Pin className="w-2.5 h-2.5" /> הגדר כחודש נוכחי
+                      </button>
+                    )}
+                  </div>
                   <button
                     onClick={nextMonth}
                     className="p-1.5 rounded-lg hover:bg-muted transition-colors"
@@ -583,6 +600,7 @@ export default function CashWallet() {
                 monthlyAlloc={monthlyAlloc}
                 year={budgetYear}
                 selectedMonth={month}
+                currentMonth={currentMonth}
                 onSelectMonth={setMonth}
               />
             </CardContent>
