@@ -11,7 +11,7 @@ import { useBudgetYear } from "@/contexts/BudgetYearContext";
 import { useCashCurrentMonth, defaultDateForMonth } from "@/hooks/useCashCurrentMonth";
 import {
   ArrowDownLeft, ArrowUpRight, Loader2, Wallet,
-  List, Check, Trash2, Pin,
+  List, Check, Trash2, Pin, ChevronLeft, ChevronRight,
 } from "lucide-react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
@@ -33,7 +33,6 @@ type WalletData = {
   transactions: Tx[];
   totals: { deposits: number; withdrawals: number; net: number };
 };
-type MonthRow = { month: string; deposits: number; withdrawals: number };
 
 const fmt = (n: number) =>
   new Intl.NumberFormat("he-IL", { style: "currency", currency: "ILS", maximumFractionDigits: 0 }).format(n);
@@ -126,114 +125,102 @@ function TxTable({
   );
 }
 
-function YearMonthGrid({
-  yearSummary, monthlyAlloc, year, selectedMonth, currentMonth, onSelectMonth,
+function MonthPicker({
+  year, selectedMonth, currentMonth, onSelectMonth, onSetCurrentMonth,
 }: {
-  yearSummary: MonthRow[];
-  monthlyAlloc: number;
   year: number;
   selectedMonth: string;
   currentMonth: string;
   onSelectMonth: (m: string) => void;
+  onSetCurrentMonth: (m: string) => void;
 }) {
   const now = new Date();
+  const [selYear, selMon] = selectedMonth.split("-").map(Number);
+
+  const prevMonth = () => {
+    const d = new Date(selYear, selMon - 2, 1);
+    onSelectMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
+  };
+  const nextMonth = () => {
+    const d = new Date(selYear, selMon, 1);
+    onSelectMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
+  };
+
+  const isCurrentSelected = selectedMonth === currentMonth;
+  const selLabel = `${MONTH_NAMES[selMon - 1]} ${selYear}`;
+
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full" dir="rtl">
-        <thead>
-          <tr className="border-b border-border/60 bg-muted/40">
-            <th className="py-2.5 px-4 text-xs font-semibold text-muted-foreground text-right">חודש</th>
-            <th className="py-2.5 px-4 text-xs font-semibold text-muted-foreground text-right">יעד</th>
-            <th className="py-2.5 px-4 text-xs font-semibold text-muted-foreground text-right">ניתן</th>
-            <th className="py-2.5 px-4 text-xs font-semibold text-muted-foreground text-right">נלקח</th>
-            <th className="py-2.5 px-4 text-xs font-semibold text-muted-foreground text-right">יתרה</th>
-            <th className="py-2.5 px-4 text-xs font-semibold text-muted-foreground text-right w-24">התקדמות</th>
-          </tr>
-        </thead>
-        <tbody>
-          {Array.from({ length: 12 }, (_, i) => {
-            const mNum = i + 1;
-            const mStr = `${year}-${String(mNum).padStart(2, "0")}`;
-            const row = yearSummary.find(r => r.month === mStr);
-            const deposits = row?.deposits ?? 0;
-            const withdrawals = row?.withdrawals ?? 0;
-            const balance = deposits - withdrawals;
-            const pct = monthlyAlloc > 0 ? Math.min(100, (deposits / monthlyAlloc) * 100) : 0;
-            const isFuture = year > now.getFullYear() || (year === now.getFullYear() && mNum > now.getMonth() + 1);
-            const isSelected = mStr === selectedMonth;
-            const isCurrentMonth = mStr === currentMonth;
-            return (
-              <tr
-                key={mStr}
-                onClick={() => onSelectMonth(mStr)}
-                className={cn(
-                  "border-b border-border/40 last:border-0 cursor-pointer transition-colors",
-                  isSelected ? "bg-primary/8 font-medium" : "hover:bg-muted/40",
-                  isFuture && "opacity-40",
-                )}
-              >
-                <td className="py-3 px-4 text-sm text-right">
-                  <span className="flex items-center gap-2">
-                    {isCurrentMonth && <Pin className="w-3 h-3 text-emerald-600 shrink-0" />}
-                    {MONTH_NAMES[i]}
-                  </span>
-                </td>
-                <td className="py-3 px-4 text-sm text-right tabular-nums text-muted-foreground">
-                  {fmt(monthlyAlloc)}
-                </td>
-                <td className={cn("py-3 px-4 text-sm text-right tabular-nums font-medium",
-                  deposits > 0 ? "text-emerald-600" : "text-muted-foreground"
+    <div className="space-y-4 p-4" dir="rtl">
+      {/* Month chips grid */}
+      <div className="grid grid-cols-4 gap-2">
+        {Array.from({ length: 12 }, (_, i) => {
+          const mNum = i + 1;
+          const mStr = `${year}-${String(mNum).padStart(2, "0")}`;
+          const isSelected = mStr === selectedMonth;
+          const isCurrent = mStr === currentMonth;
+          const isFuture = year > now.getFullYear() ||
+            (year === now.getFullYear() && mNum > now.getMonth() + 1);
+          return (
+            <button
+              key={mStr}
+              onClick={() => onSelectMonth(mStr)}
+              className={cn(
+                "relative rounded-xl py-2.5 px-3 text-sm font-medium transition-all",
+                "flex flex-col items-center gap-0.5",
+                isSelected
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "bg-muted/60 hover:bg-muted text-foreground",
+                isFuture && !isSelected && "opacity-40",
+              )}
+            >
+              <span>{MONTH_NAMES[i]}</span>
+              {isCurrent && (
+                <span className={cn(
+                  "flex items-center gap-0.5 text-[10px] font-semibold",
+                  isSelected ? "text-primary-foreground/80" : "text-emerald-600"
                 )}>
-                  {deposits > 0 ? fmt(deposits) : "—"}
-                </td>
-                <td className={cn("py-3 px-4 text-sm text-right tabular-nums",
-                  withdrawals > 0 ? "text-rose-500" : "text-muted-foreground"
-                )}>
-                  {withdrawals > 0 ? fmt(withdrawals) : "—"}
-                </td>
-                <td className={cn("py-3 px-4 text-sm text-right tabular-nums font-semibold",
-                  balance > 0 ? "text-primary" : balance < 0 ? "text-rose-600" : "text-muted-foreground"
-                )}>
-                  {deposits > 0 || withdrawals > 0 ? fmt(balance) : "—"}
-                </td>
-                <td className="py-3 px-4">
-                  {!isFuture && monthlyAlloc > 0 && (
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
-                        <div
-                          className={cn("h-full rounded-full",
-                            pct >= 100 ? "bg-emerald-500" : pct >= 60 ? "bg-primary" : "bg-amber-400"
-                          )}
-                          style={{ width: `${pct}%` }}
-                        />
-                      </div>
-                      <span className="text-[11px] text-muted-foreground w-8 text-left tabular-nums">
-                        {Math.round(pct)}%
-                      </span>
-                    </div>
-                  )}
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-        <tfoot className="border-t-2 border-border bg-muted/30">
-          <tr>
-            <td className="py-3 px-4 text-sm font-bold text-right">סה"כ</td>
-            <td className="py-3 px-4 text-sm font-bold text-right tabular-nums">{fmt(monthlyAlloc * 12)}</td>
-            <td className="py-3 px-4 text-sm font-bold text-right tabular-nums text-emerald-600">
-              {fmt(yearSummary.reduce((s, r) => s + r.deposits, 0))}
-            </td>
-            <td className="py-3 px-4 text-sm font-bold text-right tabular-nums text-rose-500">
-              {fmt(yearSummary.reduce((s, r) => s + r.withdrawals, 0))}
-            </td>
-            <td className="py-3 px-4 text-sm font-bold text-right tabular-nums text-primary">
-              {fmt(yearSummary.reduce((s, r) => s + r.deposits - r.withdrawals, 0))}
-            </td>
-            <td />
-          </tr>
-        </tfoot>
-      </table>
+                  <Pin className="w-2.5 h-2.5" /> נוכחי
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Navigation row */}
+      <div className="flex items-center justify-between border-t border-border/40 pt-3">
+        <button
+          onClick={prevMonth}
+          className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors px-2 py-1 rounded-lg hover:bg-muted"
+        >
+          <ChevronRight className="w-4 h-4" />
+          חודש קודם
+        </button>
+
+        <div className="text-center">
+          <p className="text-sm font-semibold">{selLabel}</p>
+          {isCurrentSelected ? (
+            <span className="inline-flex items-center gap-1 text-[11px] text-emerald-600 font-medium">
+              <Pin className="w-2.5 h-2.5" /> חודש נוכחי
+            </span>
+          ) : (
+            <button
+              onClick={() => onSetCurrentMonth(selectedMonth)}
+              className="inline-flex items-center gap-1 text-[11px] text-primary hover:text-primary/80 font-medium transition-colors mt-0.5"
+            >
+              <Pin className="w-2.5 h-2.5" /> הגדר כחודש נוכחי
+            </button>
+          )}
+        </div>
+
+        <button
+          onClick={nextMonth}
+          className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors px-2 py-1 rounded-lg hover:bg-muted"
+        >
+          חודש הבא
+          <ChevronLeft className="w-4 h-4" />
+        </button>
+      </div>
     </div>
   );
 }
@@ -243,11 +230,10 @@ export default function CashWallet() {
   const { activeYear } = useBudgetYear();
   const now = new Date();
 
-  const { currentMonth } = useCashCurrentMonth();
+  const { currentMonth, setCurrentMonth } = useCashCurrentMonth();
   const [month, setMonth] = useState(currentMonth);
   const [fund, setFund] = useState<Fund | null>(null);
   const [monthData, setMonthData] = useState<WalletData | null>(null);
-  const [yearSummary, setYearSummary] = useState<MonthRow[]>([]);
   const [allTx, setAllTx] = useState<Tx[]>([]);
   const [loading, setLoading] = useState(true);
   const [allTxOpen, setAllTxOpen] = useState(false);
@@ -281,11 +267,6 @@ export default function CashWallet() {
     loadMonth();
   }, [fund, month]);
 
-  useEffect(() => {
-    if (!fund) return;
-    loadYearSummary();
-  }, [fund, budgetYear]);
-
   const loadMonth = async () => {
     if (!fund) return;
     setLoading(true);
@@ -294,21 +275,6 @@ export default function CashWallet() {
       setMonthData(d);
     } catch { toast({ title: "שגיאה בטעינה", variant: "destructive" }); }
     finally { setLoading(false); }
-  };
-
-  const loadYearSummary = async () => {
-    if (!fund) return;
-    try {
-      const rows: { month: string; type: string; total: number }[] =
-        await apiFetch(`/wallet/summary?year=${budgetYear}`);
-      const map: Record<string, MonthRow> = {};
-      for (const r of rows) {
-        if (!map[r.month]) map[r.month] = { month: r.month, deposits: 0, withdrawals: 0 };
-        if (r.type === "deposit") map[r.month].deposits = r.total;
-        else map[r.month].withdrawals = r.total;
-      }
-      setYearSummary(Object.values(map));
-    } catch { }
   };
 
   const openAllTx = async () => {
@@ -346,7 +312,7 @@ export default function CashWallet() {
       });
       toast({ title: txType === "deposit" ? "ניתן נרשם ✓" : "נלקח נרשם ✓" });
       setDialogOpen(false);
-      await Promise.all([loadMonth(), loadYearSummary()]);
+      await loadMonth();
       setAllTx([]);
     } catch { toast({ title: "שגיאה בשמירה", variant: "destructive" }); }
     finally { setSaving(false); }
@@ -364,12 +330,10 @@ export default function CashWallet() {
         const withdrawals = txs.filter(t => t.type === "withdrawal").reduce((s, t) => s + t.amount, 0);
         return { transactions: txs, totals: { deposits, withdrawals, net: deposits - withdrawals } };
       });
-      await loadYearSummary();
     } catch { toast({ title: "שגיאה", variant: "destructive" }); }
     finally { setDeleteId(null); }
   };
 
-  const monthlyAlloc = fund?.monthlyAllocation ?? 0;
   const [selYear, selMonth] = month.split("-").map(Number);
   const selMonthLabel = `${MONTH_NAMES[selMonth - 1]} ${selYear}`;
 
@@ -408,19 +372,18 @@ export default function CashWallet() {
         </Card>
       ) : (
         <>
-          {/* ── Monthly summary grid ────────────────────────────── */}
+          {/* ── Month picker ────────────────────────────────────── */}
           <Card className="rounded-2xl overflow-hidden">
-            <CardHeader>
-              <CardTitle className="text-sm">חודשים — {budgetYear}</CardTitle>
+            <CardHeader className="pb-1">
+              <CardTitle className="text-sm">חודשי שנת תקציב {budgetYear}</CardTitle>
             </CardHeader>
             <CardContent className="p-0">
-              <YearMonthGrid
-                yearSummary={yearSummary}
-                monthlyAlloc={monthlyAlloc}
+              <MonthPicker
                 year={budgetYear}
                 selectedMonth={month}
                 currentMonth={currentMonth}
                 onSelectMonth={setMonth}
+                onSetCurrentMonth={setCurrentMonth}
               />
             </CardContent>
           </Card>
