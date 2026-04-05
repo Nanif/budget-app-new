@@ -7,19 +7,18 @@ import { Input } from "@/components/ui/input";
 import { apiFetch } from "@/lib/api";
 import { useCashCurrentMonth } from "@/hooks/useCashCurrentMonth";
 import {
-  HeartHandshake,
-  ArrowLeft, Plus, Check, Loader2, Wallet, ArrowDownLeft, ArrowUpRight, ChevronDown,
-  TrendingUp, Sparkles,
+  HeartHandshake, ArrowLeft, Plus, Check, Loader2,
+  Wallet, ArrowDownLeft, ArrowUpRight, ChevronDown, Sparkles, X,
 } from "lucide-react";
 
 /* ── Types ─────────────────────────────────────────────────── */
-type IncomeSummary   = { totalIncome: number; totalDeductions: number; netIncome: number };
-type BudgetYear      = { tithePercentage: number };
-type Tithe           = { id: number; amount: number; recipient: string; isTithe: boolean; date: string };
-type WalletTotals    = { deposits: number; withdrawals: number; net: number };
-type WalletTx        = { id: number; type: "deposit" | "withdrawal"; amount: number; date: string; description: string };
-type RecentTx        = { id: number; label: string; amount: number; date: string; sign: "+" | "-" };
-type FundSummary     = {
+type IncomeSummary = { totalIncome: number; totalDeductions: number; netIncome: number };
+type BudgetYear    = { tithePercentage: number };
+type Tithe         = { id: number; amount: number; recipient: string; isTithe: boolean; date: string };
+type WalletTotals  = { deposits: number; withdrawals: number; net: number };
+type WalletTx      = { id: number; type: "deposit" | "withdrawal"; amount: number; date: string; description: string };
+type RecentTx      = { id: number; label: string; amount: number; date: string; sign: "+" | "-" };
+type FundSummary   = {
   id: number; name: string; colorClass: string; fundBehavior: string; description: string;
   monthlyAllocation: number; annualAllocation: number; initialBalance: number;
   budgetAmount: number; actualAmount: number; remaining: number;
@@ -29,6 +28,24 @@ type FundSummary     = {
 /* ── Helpers ────────────────────────────────────────────────── */
 function fmt(n: number) {
   return new Intl.NumberFormat("he-IL", { style: "currency", currency: "ILS", maximumFractionDigits: 0 }).format(n);
+}
+
+/* ── Modal ──────────────────────────────────────────────────── */
+function TxModal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" dir="rtl">
+      <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-card border border-border/60 rounded-2xl shadow-2xl w-full max-w-sm max-h-[80vh] flex flex-col overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border/50 shrink-0">
+          <span className="font-semibold text-sm">{title}</span>
+          <button onClick={onClose} className="p-1 rounded-lg hover:bg-muted transition-colors text-muted-foreground">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+        <div className="overflow-y-auto flex-1">{children}</div>
+      </div>
+    </div>
+  );
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -97,16 +114,15 @@ export default function DashboardPage() {
   const nonBudgetFunds = activeFunds.filter(f => NON_BUDGET_BEH.has(f.fundBehavior));
 
   const MONTH_NAMES = ["ינואר","פברואר","מרץ","אפריל","מאי","יוני","יולי","אוגוסט","ספטמבר","אוקטובר","נובמבר","דצמבר"];
-  const [cmYear, cmMonth] = currentMonth.split("-").map(Number);
+  const [, cmMonth] = currentMonth.split("-").map(Number);
+  const [cmYear]    = currentMonth.split("-").map(Number);
   const currentMonthLabel = `${MONTH_NAMES[cmMonth - 1]} ${cmYear}`;
 
   if (loading) {
     return (
       <div className="space-y-4" dir="rtl">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {[1, 2].map(i => (
-            <div key={i} className="h-48 bg-muted animate-pulse rounded-3xl" />
-          ))}
+        <div className="space-y-4 max-w-xl">
+          {[1, 2].map(i => <div key={i} className="h-44 bg-muted animate-pulse rounded-3xl" />)}
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
           {[1,2,3,4].map(i => <div key={i} className="h-40 bg-muted animate-pulse rounded-2xl" />)}
@@ -118,8 +134,8 @@ export default function DashboardPage() {
   return (
     <div className="space-y-8" dir="rtl">
 
-      {/* ══ שורה עליונה: מעשרות + קופת שוטף ═══════════════════ */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {/* ══ מעשרות — קופת שוטף (מוערם) ═══════════════════════════ */}
+      <div className="space-y-4 max-w-xl">
         <TitheCard
           income={income}
           budgetYear={budgetYear}
@@ -133,7 +149,7 @@ export default function DashboardPage() {
             setTithes(prev => [{ ...created, amount: parseFloat(String(created.amount)) }, ...prev]);
           }}
         />
-        {cashFund ? (
+        {cashFund && (
           <WalletMonthCard
             fundName={cashFund.name}
             monthLabel={currentMonthLabel}
@@ -141,8 +157,6 @@ export default function DashboardPage() {
             totals={walletTotals}
             transactions={walletTransactions}
           />
-        ) : (
-          <div className="hidden md:block" />
         )}
       </div>
 
@@ -170,8 +184,8 @@ function TitheCard({ income, budgetYear, tithes, titheTarget, titheGiven, titheL
   const [recipient, setRecipient] = useState("");
   const [amount, setAmount]       = useState("");
   const [saving, setSaving]       = useState(false);
-  const [open, setOpen]           = useState(false);
-  const [expanded, setExpanded]   = useState(false);
+  const [addOpen, setAddOpen]     = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
 
   const handleAdd = async () => {
     if (!recipient.trim() || !amount || parseFloat(amount) <= 0) {
@@ -180,7 +194,7 @@ function TitheCard({ income, budgetYear, tithes, titheTarget, titheGiven, titheL
     setSaving(true);
     try {
       await onAdd({ recipient: recipient.trim(), amount: parseFloat(amount), isTithe: true, date: new Date().toISOString().split("T")[0], description: "" });
-      setRecipient(""); setAmount(""); setOpen(false);
+      setRecipient(""); setAmount(""); setAddOpen(false);
       toast({ title: "מעשר נרשם ✓" });
     } catch { toast({ title: "שגיאה", variant: "destructive" }); }
     finally { setSaving(false); }
@@ -189,113 +203,112 @@ function TitheCard({ income, budgetYear, tithes, titheTarget, titheGiven, titheL
   const over = titheLeft <= 0;
 
   return (
-    <div className="rounded-3xl overflow-hidden border border-border/50 shadow-sm bg-card flex flex-col">
-      {/* Gradient header strip */}
-      <div className="bg-gradient-to-l from-violet-500 to-purple-700 px-5 pt-5 pb-4 relative overflow-hidden">
-        <div className="absolute inset-0 opacity-10">
-          <div className="absolute -top-6 -left-6 w-32 h-32 rounded-full bg-white" />
-          <div className="absolute -bottom-8 -right-4 w-24 h-24 rounded-full bg-white" />
-        </div>
-        <div className="relative flex items-start justify-between">
-          <div>
-            <div className="flex items-center gap-2 mb-3">
-              <div className="w-7 h-7 rounded-xl bg-white/20 flex items-center justify-center backdrop-blur-sm">
-                <HeartHandshake className="w-4 h-4 text-white" />
+    <>
+      <div className="rounded-3xl overflow-hidden border border-border/50 shadow-sm bg-card flex flex-col">
+        {/* Soft gradient header */}
+        <div className="bg-gradient-to-l from-violet-50 to-purple-100 dark:from-violet-950/40 dark:to-purple-900/30 px-5 pt-5 pb-4 relative overflow-hidden border-b border-violet-100 dark:border-violet-800/30">
+          <div className="flex items-start justify-between">
+            <div>
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-7 h-7 rounded-xl bg-violet-100 dark:bg-violet-800/40 flex items-center justify-center">
+                  <HeartHandshake className="w-4 h-4 text-violet-600 dark:text-violet-400" />
+                </div>
+                <span className="font-semibold text-sm text-violet-900 dark:text-violet-100">מעשרות</span>
               </div>
-              <span className="text-white/90 font-semibold text-sm">מעשרות</span>
+              <p className="text-violet-900 dark:text-violet-100 text-2xl font-bold tabular-nums tracking-tight">{fmt(titheGiven)}</p>
+              <p className="text-violet-500 dark:text-violet-400 text-xs mt-0.5">נתרם מתוך {fmt(titheTarget)}</p>
             </div>
-            <p className="text-white text-2xl font-bold tabular-nums tracking-tight">{fmt(titheGiven)}</p>
-            <p className="text-white/70 text-xs mt-0.5">נתרם מתוך {fmt(titheTarget)}</p>
+            <div className="text-left">
+              <p className={cn("text-2xl font-bold tabular-nums", over ? "text-emerald-600" : "text-rose-500")}>
+                {fmt(Math.abs(titheLeft))}
+              </p>
+              <p className="text-violet-500 dark:text-violet-400 text-xs mt-0.5 text-left">{over ? "עודף ✓" : "נותר לתת"}</p>
+            </div>
           </div>
-          <div className="text-left">
-            <p className={cn("text-2xl font-bold tabular-nums", over ? "text-emerald-300" : "text-rose-300")}>
-              {fmt(Math.abs(titheLeft))}
-            </p>
-            <p className="text-white/70 text-xs mt-0.5 text-left">{over ? "עודף ✓" : "נותר לתת"}</p>
-          </div>
-        </div>
-
-        {/* Progress bar */}
-        <div className="mt-4">
-          <div className="flex justify-between text-white/70 text-[11px] mb-1.5">
-            <span>{Math.round(tithePct)}% הושלם</span>
-            <span>יעד {budgetYear.tithePercentage}% מהכנסה</span>
-          </div>
-          <div className="h-2 bg-white/20 rounded-full overflow-hidden">
-            <div
-              className={cn("h-full rounded-full transition-all duration-700", over ? "bg-emerald-400" : "bg-white")}
-              style={{ width: `${tithePct}%` }}
-            />
+          {/* Progress bar */}
+          <div className="mt-4">
+            <div className="flex justify-between text-violet-500 dark:text-violet-400 text-[11px] mb-1.5">
+              <span>{Math.round(tithePct)}% הושלם</span>
+              <span>יעד {budgetYear.tithePercentage}% מהכנסה</span>
+            </div>
+            <div className="h-2 bg-violet-200/60 dark:bg-violet-800/40 rounded-full overflow-hidden">
+              <div
+                className={cn("h-full rounded-full transition-all duration-700", over ? "bg-emerald-500" : "bg-violet-500")}
+                style={{ width: `${tithePct}%` }}
+              />
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Stats row */}
-      <div className="grid grid-cols-3 divide-x divide-x-reverse divide-border/40 border-b border-border/40">
-        {[
-          { label: "הכנסה נטו", value: fmt(income.netIncome), cls: "text-foreground" },
-          { label: `יעד ${budgetYear.tithePercentage}%`, value: fmt(titheTarget), cls: "text-violet-600" },
-          { label: over ? "עודף" : "נותר", value: fmt(Math.abs(titheLeft)), cls: over ? "text-emerald-600" : "text-rose-500" },
-        ].map(s => (
-          <div key={s.label} className="py-3 px-2 text-center">
-            <p className="text-[10px] text-muted-foreground mb-0.5">{s.label}</p>
-            <p className={cn("text-sm font-bold tabular-nums", s.cls)}>{s.value}</p>
-          </div>
-        ))}
-      </div>
+        {/* Stats row */}
+        <div className="grid grid-cols-3 divide-x divide-x-reverse divide-border/40 border-b border-border/40">
+          {[
+            { label: "הכנסה נטו", value: fmt(income.netIncome), cls: "text-foreground" },
+            { label: `יעד ${budgetYear.tithePercentage}%`, value: fmt(titheTarget), cls: "text-violet-600" },
+            { label: over ? "עודף" : "נותר", value: fmt(Math.abs(titheLeft)), cls: over ? "text-emerald-600" : "text-rose-500" },
+          ].map(s => (
+            <div key={s.label} className="py-3 px-2 text-center">
+              <p className="text-[10px] text-muted-foreground mb-0.5">{s.label}</p>
+              <p className={cn("text-sm font-bold tabular-nums", s.cls)}>{s.value}</p>
+            </div>
+          ))}
+        </div>
 
-      {/* Footer */}
-      <div className="px-4 py-2.5 flex items-center justify-between">
-        <Link href="/charity">
-          <span className="flex items-center gap-1 text-xs text-muted-foreground hover:text-violet-600 transition-colors">
-            לכל הצדקות <ArrowLeft className="w-3 h-3" />
-          </span>
-        </Link>
-        <button
-          onClick={() => setExpanded(p => !p)}
-          className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-        >
-          {expanded ? "סגור" : `${tithes.length} תרומות`}
-          <ChevronDown className={cn("w-3.5 h-3.5 transition-transform duration-200", expanded && "rotate-180")} />
-        </button>
-      </div>
-
-      {/* Expanded: list + add */}
-      {expanded && (
-        <div className="border-t border-border/40">
+        {/* Footer */}
+        <div className="px-4 py-2.5 flex items-center justify-between">
+          <Link href="/charity">
+            <span className="flex items-center gap-1 text-xs text-muted-foreground hover:text-violet-600 transition-colors">
+              לכל הצדקות <ArrowLeft className="w-3 h-3" />
+            </span>
+          </Link>
           {tithes.length > 0 && (
-            <div className="px-5 py-2">
-              {tithes.slice(0, 6).map(t => (
-                <div key={t.id} className="flex items-center justify-between py-1.5 border-b border-border/20 last:border-0">
-                  <span className="text-xs text-muted-foreground truncate">{t.recipient}</span>
-                  <span className="text-xs font-semibold text-violet-600 tabular-nums mr-2">{fmt(t.amount)}</span>
+            <button
+              onClick={() => setModalOpen(true)}
+              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-violet-600 transition-colors"
+            >
+              {tithes.length} תרומות
+              <ChevronDown className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Modal */}
+      {modalOpen && (
+        <TxModal title="תרומות ומעשרות" onClose={() => { setModalOpen(false); setAddOpen(false); }}>
+          {tithes.length > 0 && (
+            <div className="px-4 py-2">
+              {tithes.slice(0, 10).map(t => (
+                <div key={t.id} className="flex items-center justify-between py-2 border-b border-border/20 last:border-0">
+                  <span className="text-sm text-muted-foreground truncate">{t.recipient}</span>
+                  <span className="text-sm font-semibold text-violet-600 tabular-nums mr-2">{fmt(t.amount)}</span>
                 </div>
               ))}
             </div>
           )}
-          <div className="border-t border-border/40 px-4 py-2.5">
-            {open ? (
+          <div className="border-t border-border/40 px-4 py-3">
+            {addOpen ? (
               <div className="flex gap-2 items-center">
                 <Input value={recipient} onChange={e => setRecipient(e.target.value)}
-                  placeholder="נמען..." className="rounded-lg h-7 text-xs flex-1" autoFocus />
+                  placeholder="נמען..." className="rounded-lg h-8 text-xs flex-1" autoFocus />
                 <Input value={amount} onChange={e => setAmount(e.target.value)}
-                  type="number" placeholder="₪" dir="ltr" className="rounded-lg h-7 text-xs w-16" />
+                  type="number" placeholder="₪" dir="ltr" className="rounded-lg h-8 text-xs w-20" />
                 <button onClick={handleAdd} disabled={saving}
-                  className="p-1 rounded-lg bg-violet-600 text-white hover:bg-violet-700 transition-colors">
-                  {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
+                  className="p-1.5 rounded-lg bg-violet-600 text-white hover:bg-violet-700 transition-colors">
+                  {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
                 </button>
-                <button onClick={() => setOpen(false)} className="text-[11px] text-muted-foreground hover:text-foreground transition-colors">ביטול</button>
+                <button onClick={() => setAddOpen(false)} className="text-xs text-muted-foreground hover:text-foreground transition-colors">ביטול</button>
               </div>
             ) : (
-              <button onClick={() => setOpen(true)}
-                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-violet-600 transition-colors">
+              <button onClick={() => setAddOpen(true)}
+                className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-violet-600 transition-colors">
                 <Plus className="w-3.5 h-3.5" /> רשום מעשר חדש
               </button>
             )}
           </div>
-        </div>
+        </TxModal>
       )}
-    </div>
+    </>
   );
 }
 
@@ -303,13 +316,10 @@ function TitheCard({ income, budgetYear, tithes, titheTarget, titheGiven, titheL
    CARD: קופת שוטף — חודש נוכחי
 ═══════════════════════════════════════════════════════════ */
 function WalletMonthCard({ fundName, monthLabel, monthlyTarget, totals, transactions }: {
-  fundName: string;
-  monthLabel: string;
-  monthlyTarget: number;
-  totals: WalletTotals | null;
-  transactions: WalletTx[];
+  fundName: string; monthLabel: string; monthlyTarget: number;
+  totals: WalletTotals | null; transactions: WalletTx[];
 }) {
-  const [expanded, setExpanded] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
 
   const deposits    = totals?.deposits    ?? 0;
   const withdrawals = totals?.withdrawals ?? 0;
@@ -318,117 +328,114 @@ function WalletMonthCard({ fundName, monthLabel, monthlyTarget, totals, transact
   const pct         = monthlyTarget > 0 ? Math.min(100, (net / monthlyTarget) * 100) : 0;
   const over        = net >= monthlyTarget && monthlyTarget > 0;
 
-  const recent = transactions.slice(0, 8);
-
   return (
-    <div className="rounded-3xl overflow-hidden border border-border/50 shadow-sm bg-card flex flex-col">
-      {/* Gradient header strip */}
-      <div className="bg-gradient-to-l from-amber-400 to-orange-500 px-5 pt-5 pb-4 relative overflow-hidden">
-        <div className="absolute inset-0 opacity-10">
-          <div className="absolute -top-6 -right-6 w-32 h-32 rounded-full bg-white" />
-          <div className="absolute -bottom-8 -left-4 w-24 h-24 rounded-full bg-white" />
-        </div>
-        <div className="relative flex items-start justify-between">
-          <div>
-            <div className="flex items-center gap-2 mb-3">
-              <div className="w-7 h-7 rounded-xl bg-white/20 flex items-center justify-center backdrop-blur-sm">
-                <Wallet className="w-4 h-4 text-white" />
+    <>
+      <div className="rounded-3xl overflow-hidden border border-border/50 shadow-sm bg-card flex flex-col">
+        {/* Soft gradient header */}
+        <div className="bg-gradient-to-l from-amber-50 to-orange-100 dark:from-amber-950/40 dark:to-orange-900/30 px-5 pt-5 pb-4 relative overflow-hidden border-b border-amber-100 dark:border-amber-800/30">
+          <div className="flex items-start justify-between">
+            <div>
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-7 h-7 rounded-xl bg-amber-100 dark:bg-amber-800/40 flex items-center justify-center">
+                  <Wallet className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                </div>
+                <span className="font-semibold text-sm text-amber-900 dark:text-amber-100">{fundName}</span>
+                {transactions.length > 0 && (
+                  <span className="text-[10px] bg-amber-200/60 dark:bg-amber-800/40 text-amber-700 dark:text-amber-300 rounded-full px-1.5 py-0.5 font-medium">
+                    {transactions.length}
+                  </span>
+                )}
               </div>
-              <span className="text-white/90 font-semibold text-sm">{fundName}</span>
-              {transactions.length > 0 && (
-                <span className="text-[10px] bg-white/20 text-white rounded-full px-1.5 py-0.5 font-medium">
-                  {transactions.length}
-                </span>
-              )}
+              <p className="text-amber-900 dark:text-amber-100 text-2xl font-bold tabular-nums tracking-tight">{fmt(net)}</p>
+              <p className="text-amber-500 dark:text-amber-400 text-xs mt-0.5">ניתן החודש</p>
             </div>
-            <p className="text-white text-2xl font-bold tabular-nums tracking-tight">{fmt(net)}</p>
-            <p className="text-white/70 text-xs mt-0.5">ניתן החודש</p>
+            <div className="text-left">
+              <p className={cn("text-2xl font-bold tabular-nums", over ? "text-emerald-600" : "text-amber-700 dark:text-amber-300")}>
+                {fmt(remaining)}
+              </p>
+              <p className="text-amber-500 dark:text-amber-400 text-xs mt-0.5 text-left">{over ? "כוסה ✓" : "נותר לתת"}</p>
+            </div>
           </div>
-          <div className="text-left">
-            <p className={cn("text-2xl font-bold tabular-nums", over ? "text-emerald-200" : "text-white/90")}>
-              {fmt(remaining)}
-            </p>
-            <p className="text-white/70 text-xs mt-0.5 text-left">{over ? "כוסה ✓" : "נותר לתת"}</p>
+          {/* Progress bar */}
+          <div className="mt-4">
+            <div className="flex justify-between text-amber-500 dark:text-amber-400 text-[11px] mb-1.5">
+              <span>{Math.round(pct)}% הושלם</span>
+              <span className="bg-amber-200/60 dark:bg-amber-800/40 rounded-full px-2 py-0.5 text-amber-700 dark:text-amber-300">{monthLabel}</span>
+            </div>
+            <div className="h-2 bg-amber-200/60 dark:bg-amber-800/40 rounded-full overflow-hidden">
+              <div
+                className={cn("h-full rounded-full transition-all duration-700", over ? "bg-emerald-500" : "bg-amber-500")}
+                style={{ width: `${Math.max(0, pct)}%` }}
+              />
+            </div>
           </div>
         </div>
 
-        {/* Progress bar */}
-        <div className="mt-4">
-          <div className="flex justify-between text-white/70 text-[11px] mb-1.5">
-            <span>{Math.round(pct)}% הושלם</span>
-            <span className="bg-white/20 rounded-full px-2 py-0.5">{monthLabel}</span>
+        {/* Stats row */}
+        <div className="grid grid-cols-3 divide-x divide-x-reverse divide-border/40 border-b border-border/40">
+          <div className="py-3 px-2 text-center">
+            <Wallet className="w-3 h-3 mx-auto mb-0.5 text-muted-foreground" />
+            <p className="text-[10px] text-muted-foreground mb-0.5">תקציב</p>
+            <p className="text-sm font-bold tabular-nums">{fmt(monthlyTarget)}</p>
           </div>
-          <div className="h-2 bg-white/20 rounded-full overflow-hidden">
-            <div
-              className={cn("h-full rounded-full transition-all duration-700", over ? "bg-emerald-400" : "bg-white")}
-              style={{ width: `${Math.max(0, pct)}%` }}
-            />
+          <div className="py-3 px-2 text-center">
+            <ArrowDownLeft className="w-3 h-3 mx-auto mb-0.5 text-emerald-500" />
+            <p className="text-[10px] text-muted-foreground mb-0.5">ניתן</p>
+            <p className="text-sm font-bold tabular-nums text-emerald-600">{fmt(net)}</p>
           </div>
+          <div className="py-3 px-2 text-center">
+            <ArrowUpRight className="w-3 h-3 mx-auto mb-0.5 text-muted-foreground" />
+            <p className="text-[10px] text-muted-foreground mb-0.5">{over ? "כוסה ✓" : "נותר לתת"}</p>
+            <p className={cn("text-sm font-bold tabular-nums",
+              over ? "text-emerald-600" : remaining > 0 ? "text-amber-600" : "text-muted-foreground"
+            )}>{fmt(remaining)}</p>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="px-4 py-2.5 flex items-center justify-between">
+          <Link href="/cash">
+            <span className="flex items-center gap-1 text-xs text-muted-foreground hover:text-amber-600 transition-colors">
+              לקופה <ArrowLeft className="w-3 h-3" />
+            </span>
+          </Link>
+          {transactions.length > 0 && (
+            <button
+              onClick={() => setModalOpen(true)}
+              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-amber-600 transition-colors"
+            >
+              תנועות
+              <ChevronDown className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Stats row */}
-      <div className="grid grid-cols-3 divide-x divide-x-reverse divide-border/40 border-b border-border/40">
-        <div className="py-3 px-2 text-center">
-          <Wallet className="w-3 h-3 mx-auto mb-0.5 text-muted-foreground" />
-          <p className="text-[10px] text-muted-foreground mb-0.5">תקציב</p>
-          <p className="text-sm font-bold tabular-nums">{fmt(monthlyTarget)}</p>
-        </div>
-        <div className="py-3 px-2 text-center">
-          <ArrowDownLeft className="w-3 h-3 mx-auto mb-0.5 text-emerald-500" />
-          <p className="text-[10px] text-muted-foreground mb-0.5">ניתן</p>
-          <p className="text-sm font-bold tabular-nums text-emerald-600">{fmt(net)}</p>
-        </div>
-        <div className="py-3 px-2 text-center">
-          <ArrowUpRight className="w-3 h-3 mx-auto mb-0.5 text-muted-foreground" />
-          <p className="text-[10px] text-muted-foreground mb-0.5">{over ? "כוסה ✓" : "נותר לתת"}</p>
-          <p className={cn("text-sm font-bold tabular-nums",
-            over ? "text-emerald-600" : remaining > 0 ? "text-amber-600" : "text-muted-foreground"
-          )}>{fmt(remaining)}</p>
-        </div>
-      </div>
-
-      {/* Footer */}
-      <div className="px-4 py-2.5 flex items-center justify-between">
-        <Link href="/cash">
-          <span className="flex items-center gap-1 text-xs text-muted-foreground hover:text-amber-600 transition-colors">
-            לקופה <ArrowLeft className="w-3 h-3" />
-          </span>
-        </Link>
-        <button
-          onClick={() => setExpanded(e => !e)}
-          className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-        >
-          {expanded ? "סגור" : "תנועות"}
-          <ChevronDown className={cn("w-3.5 h-3.5 transition-transform duration-200", expanded && "rotate-180")} />
-        </button>
-      </div>
-
-      {/* Transactions list */}
-      {expanded && (
-        <div className="border-t border-border/40">
-          {recent.length === 0 ? (
-            <p className="text-center text-xs text-muted-foreground py-4">אין תנועות בחודש זה</p>
+      {/* Modal */}
+      {modalOpen && (
+        <TxModal title={`תנועות — ${fundName}`} onClose={() => setModalOpen(false)}>
+          {transactions.length === 0 ? (
+            <p className="text-center text-xs text-muted-foreground py-6">אין תנועות בחודש זה</p>
           ) : (
             <ul className="divide-y divide-border/30">
-              {recent.map(tx => (
-                <li key={tx.id} className="flex items-center justify-between px-5 py-2.5 text-sm">
+              {transactions.slice(0, 20).map(tx => (
+                <li key={tx.id} className="flex items-center justify-between px-4 py-3">
                   <div className="flex items-center gap-2 min-w-0">
                     {tx.type === "deposit"
                       ? <ArrowDownLeft className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
                       : <ArrowUpRight  className="w-3.5 h-3.5 text-rose-400 shrink-0" />
                     }
-                    <span className="truncate text-xs text-muted-foreground">
+                    <span className="truncate text-sm text-muted-foreground">
                       {tx.description || (tx.type === "deposit" ? "ניתן" : "נלקח")}
                     </span>
                   </div>
                   <div className="flex items-center gap-3 shrink-0">
-                    <span className={cn("text-xs font-medium tabular-nums",
+                    <span className={cn("text-sm font-medium tabular-nums",
                       tx.type === "deposit" ? "text-emerald-600" : "text-rose-500"
                     )}>
                       {tx.type === "deposit" ? "+" : "−"}{fmt(tx.amount)}
                     </span>
-                    <span className="text-[10px] text-muted-foreground">
+                    <span className="text-[11px] text-muted-foreground">
                       {new Date(tx.date).toLocaleDateString("he-IL", { day: "numeric", month: "numeric" })}
                     </span>
                   </div>
@@ -436,19 +443,19 @@ function WalletMonthCard({ fundName, monthLabel, monthlyTarget, totals, transact
               ))}
             </ul>
           )}
-        </div>
+        </TxModal>
       )}
-    </div>
+    </>
   );
 }
 
 /* ═══════════════════════════════════════════════════════════
    FUND GROUP + FUND CARD
 ═══════════════════════════════════════════════════════════ */
-const ACCENT_STYLES: Record<string, { dot: string; label: string }> = {
-  blue:  { dot: "bg-blue-500/20 text-blue-700",   label: "text-blue-600/60" },
-  teal:  { dot: "bg-teal-500/20 text-teal-700",   label: "text-teal-600/60" },
-  slate: { dot: "bg-slate-500/20 text-slate-700", label: "text-slate-500/60" },
+const ACCENT_STYLES: Record<string, { dot: string }> = {
+  blue:  { dot: "bg-blue-500/10 text-blue-700 dark:text-blue-400" },
+  teal:  { dot: "bg-teal-500/10 text-teal-700 dark:text-teal-400" },
+  slate: { dot: "bg-slate-500/10 text-slate-600 dark:text-slate-400" },
 };
 
 function FundGroup({ title, funds, activeBid, accent }: {
@@ -463,7 +470,7 @@ function FundGroup({ title, funds, activeBid, accent }: {
           <Sparkles className="w-3 h-3" />
           {title}
         </span>
-        <div className={cn("flex-1 h-px", a.label.replace("text-", "bg-"))} />
+        <div className="flex-1 h-px bg-border/40" />
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
         {funds.map(fund => <FundCard key={fund.id} fund={fund} activeBid={activeBid} />)}
@@ -478,27 +485,26 @@ function FundCard({ fund, activeBid }: { fund: FundSummary; activeBid: number })
   const isMonthly   = fund.fundBehavior === "fixed_monthly" || fund.fundBehavior === "cash_monthly";
   const isNonBudget = fund.fundBehavior === "non_budget";
 
-  const [expanded, setExpanded]   = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
   const [txns, setTxns]           = useState<RecentTx[]>([]);
   const [txLoading, setTxLoading] = useState(false);
   const [txFetched, setTxFetched] = useState(false);
 
   const statusConfig = {
-    over:    { bar: "bg-rose-500",    remaining: "text-rose-600",    ring: "border-rose-200" },
-    warning: { bar: "bg-amber-500",   remaining: "text-amber-600",   ring: "border-amber-200" },
+    over:    { bar: "bg-rose-500",    remaining: "text-rose-600",    ring: "border-rose-200 dark:border-rose-800" },
+    warning: { bar: "bg-amber-500",   remaining: "text-amber-600",   ring: "border-amber-200 dark:border-amber-800" },
     ok:      { bar: "bg-emerald-500", remaining: "text-emerald-600", ring: "border-border/60" },
   }[fund.status];
 
-  const handleToggle = async () => {
-    const next = !expanded;
-    setExpanded(next);
-    if (next && !txFetched) {
+  const handleOpen = async () => {
+    setModalOpen(true);
+    if (!txFetched) {
       setTxLoading(true);
       try {
         if (WALLET_BEHAVIORS.has(fund.fundBehavior)) {
           const d = await apiFetch(`/wallet?fundId=${fund.id}`);
           const raw: WalletTx[] = d.transactions ?? [];
-          setTxns(raw.slice(0, 8).map(t => ({
+          setTxns(raw.slice(0, 20).map(t => ({
             id: t.id,
             label: t.description || (t.type === "deposit" ? "ניתן" : "נלקח"),
             amount: t.amount,
@@ -507,7 +513,7 @@ function FundCard({ fund, activeBid }: { fund: FundSummary; activeBid: number })
           })));
         } else {
           const raw = await apiFetch(`/expenses?fundId=${fund.id}&bid=${activeBid}`);
-          setTxns((raw as any[]).slice(0, 8).map((e: any) => ({
+          setTxns((raw as any[]).slice(0, 20).map((e: any) => ({
             id: e.id,
             label: e.description || e.categoryName || "הוצאה",
             amount: parseFloat(String(e.amount)),
@@ -522,83 +528,85 @@ function FundCard({ fund, activeBid }: { fund: FundSummary; activeBid: number })
   };
 
   return (
-    <div className={cn(
-      "bg-card border rounded-2xl shadow-sm hover:shadow-md transition-all flex flex-col overflow-hidden",
-      statusConfig.ring,
-    )}>
-      {/* Top accent bar */}
-      <div className="h-1 w-full" style={{ backgroundColor: fund.colorClass }} />
+    <>
+      <div className={cn(
+        "bg-card border rounded-2xl shadow-sm hover:shadow-md transition-all flex flex-col overflow-hidden",
+        statusConfig.ring,
+      )}>
+        {/* Top accent bar */}
+        <div className="h-1 w-full" style={{ backgroundColor: fund.colorClass }} />
 
-      {/* Clickable body */}
-      <button onClick={handleToggle} className="p-4 flex flex-col gap-3 text-start w-full hover:bg-muted/20 transition-colors flex-1">
-        {/* Name row */}
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2 min-w-0">
-            <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: fund.colorClass }} />
-            <span className="font-semibold text-sm truncate">{fund.name}</span>
+        {/* Clickable body */}
+        <button onClick={handleOpen} className="p-4 flex flex-col gap-3 text-start w-full hover:bg-muted/20 transition-colors flex-1">
+          {/* Name row */}
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: fund.colorClass }} />
+              <span className="font-semibold text-sm truncate">{fund.name}</span>
+            </div>
+            <ChevronDown className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
           </div>
-          <ChevronDown className={cn("w-3.5 h-3.5 text-muted-foreground shrink-0 transition-transform duration-200", expanded && "rotate-180")} />
-        </div>
 
-        {/* Numbers */}
-        <div className="space-y-1.5 text-xs w-full">
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">{isNonBudget ? "יתרת פתיחה" : isMonthly ? "תקציב שנתי" : "תקציב"}</span>
-            <span className="font-medium tabular-nums">{fmt(fund.budgetAmount)}</span>
-          </div>
-          {isMonthly && (
+          {/* Numbers */}
+          <div className="space-y-1.5 text-xs w-full">
             <div className="flex justify-between">
-              <span className="text-muted-foreground">חודשי</span>
-              <span className="font-medium tabular-nums">{fmt(fund.monthlyAllocation)}</span>
+              <span className="text-muted-foreground">{isNonBudget ? "יתרת פתיחה" : isMonthly ? "תקציב שנתי" : "תקציב"}</span>
+              <span className="font-medium tabular-nums">{fmt(fund.budgetAmount)}</span>
+            </div>
+            {isMonthly && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">חודשי</span>
+                <span className="font-medium tabular-nums">{fmt(fund.monthlyAllocation)}</span>
+              </div>
+            )}
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">הוצאות בפועל</span>
+              <span className="font-medium tabular-nums">{fmt(fund.actualAmount)}</span>
+            </div>
+            <div className="flex justify-between border-t border-border/40 pt-1.5">
+              <span className="text-muted-foreground">{isNonBudget ? "יתרה" : "נותר"}</span>
+              <span className={cn("font-bold tabular-nums", statusConfig.remaining)}>{fmt(fund.remaining)}</span>
+            </div>
+          </div>
+
+          {/* Progress bar */}
+          {fund.budgetAmount > 0 && (
+            <div className="w-full">
+              <div className="flex justify-between text-[10px] text-muted-foreground mb-1">
+                <span>{fund.usagePercent}%</span>
+                {fund.status === "over"    && <span className="text-rose-500 font-semibold">חריגה!</span>}
+                {fund.status === "warning" && <span className="text-amber-500 font-semibold">קרוב לגבול</span>}
+              </div>
+              <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                <div className={cn("h-full rounded-full transition-all", statusConfig.bar)}
+                  style={{ width: `${fund.usagePercent}%` }} />
+              </div>
             </div>
           )}
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">הוצאות בפועל</span>
-            <span className="font-medium tabular-nums">{fmt(fund.actualAmount)}</span>
-          </div>
-          <div className="flex justify-between border-t border-border/40 pt-1.5">
-            <span className="text-muted-foreground">{isNonBudget ? "יתרה" : "נותר"}</span>
-            <span className={cn("font-bold tabular-nums", statusConfig.remaining)}>{fmt(fund.remaining)}</span>
-          </div>
-        </div>
+        </button>
+      </div>
 
-        {/* Progress bar */}
-        {fund.budgetAmount > 0 && (
-          <div className="w-full">
-            <div className="flex justify-between text-[10px] text-muted-foreground mb-1">
-              <span>{fund.usagePercent}%</span>
-              {fund.status === "over"    && <span className="text-rose-500 font-semibold">חריגה!</span>}
-              {fund.status === "warning" && <span className="text-amber-500 font-semibold">קרוב לגבול</span>}
-            </div>
-            <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-              <div className={cn("h-full rounded-full transition-all", statusConfig.bar)}
-                style={{ width: `${fund.usagePercent}%` }} />
-            </div>
-          </div>
-        )}
-      </button>
-
-      {/* Transactions panel */}
-      {expanded && (
-        <div className="border-t border-border/40">
+      {/* Modal */}
+      {modalOpen && (
+        <TxModal title={`תנועות — ${fund.name}`} onClose={() => setModalOpen(false)}>
           {txLoading ? (
-            <div className="flex justify-center py-3">
-              <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />
+            <div className="flex justify-center py-8">
+              <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
             </div>
           ) : txns.length === 0 ? (
-            <p className="text-center text-[11px] text-muted-foreground py-3">אין תנועות</p>
+            <p className="text-center text-sm text-muted-foreground py-8">אין תנועות</p>
           ) : (
             <ul className="divide-y divide-border/30">
               {txns.map(tx => (
-                <li key={tx.id} className="flex items-center justify-between px-3 py-2 text-xs">
-                  <span className="truncate text-muted-foreground flex-1 ml-2">{tx.label}</span>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <span className={cn("font-medium tabular-nums",
+                <li key={tx.id} className="flex items-center justify-between px-4 py-3">
+                  <span className="truncate text-sm text-muted-foreground flex-1 ml-3">{tx.label}</span>
+                  <div className="flex items-center gap-3 shrink-0">
+                    <span className={cn("text-sm font-medium tabular-nums",
                       tx.sign === "+" ? "text-emerald-600" : "text-rose-500"
                     )}>
                       {tx.sign}{fmt(tx.amount)}
                     </span>
-                    <span className="text-[10px] text-muted-foreground">
+                    <span className="text-[11px] text-muted-foreground">
                       {new Date(tx.date).toLocaleDateString("he-IL", { day: "numeric", month: "numeric" })}
                     </span>
                   </div>
@@ -606,8 +614,8 @@ function FundCard({ fund, activeBid }: { fund: FundSummary; activeBid: number })
               ))}
             </ul>
           )}
-        </div>
+        </TxModal>
       )}
-    </div>
+    </>
   );
 }
