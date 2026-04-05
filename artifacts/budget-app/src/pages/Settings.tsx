@@ -255,8 +255,6 @@ function CategoriesSection() {
   };
 
   const handleDelete = async (id: number) => {
-    const cat = cats.find(c => c.id === id);
-    if (cat?.isSystem) { toast({ title: "לא ניתן למחוק קטגוריה מובנית", variant: "destructive" }); return; }
     setDeletingId(id);
     try {
       await apiFetch(`/categories/${id}`, { method: "DELETE" });
@@ -343,23 +341,16 @@ function CategoriesSection() {
                   /* View mode */
                   <>
                     <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: cat.color }} />
-                    <span className={cn("flex-1 text-sm font-medium", !cat.isActive && "text-muted-foreground line-through")}>
-                      {cat.name}
-                    </span>
-                    {cat.isSystem && (
-                      <span className="text-[10px] bg-muted text-muted-foreground px-1.5 py-0.5 rounded-full">מובנית</span>
-                    )}
+                    <span className="flex-1 text-sm font-medium">{cat.name}</span>
                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button onClick={() => openEdit(cat)}
                         className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors">
                         <Pencil className="w-3.5 h-3.5" />
                       </button>
-                      {!cat.isSystem && (
-                        <button onClick={() => handleDelete(cat.id)} disabled={deletingId === cat.id}
-                          className="p-1.5 rounded-lg hover:bg-rose-50 text-muted-foreground hover:text-rose-600 transition-colors">
-                          {deletingId === cat.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
-                        </button>
-                      )}
+                      <button onClick={() => handleDelete(cat.id)} disabled={deletingId === cat.id}
+                        className="p-1.5 rounded-lg hover:bg-rose-50 text-muted-foreground hover:text-rose-600 transition-colors">
+                        {deletingId === cat.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                      </button>
                     </div>
                   </>
                 )}
