@@ -151,7 +151,7 @@ export function QuickActions() {
             amount:      parseFloat(ef.amount),
             description: ef.name.trim(),
             date:        ef.date,
-            activeMonth: ef.date.slice(0, 7),
+            activeMonth: currentMonth,
           }),
         });
       }
