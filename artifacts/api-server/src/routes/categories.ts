@@ -97,14 +97,13 @@ router.patch("/:id/toggle", async (req, res) => {
   }
 });
 
-/* ── DELETE (soft – marks inactive, only non-system) ─────────── */
+/* ── DELETE (soft – marks inactive) ─────────────────────────── */
 router.delete("/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-    const [cat] = await db.select({ isSystem: categoriesTable.isSystem })
+    const [cat] = await db.select({ id: categoriesTable.id })
       .from(categoriesTable).where(and(eq(categoriesTable.id, id), eq(categoriesTable.userId, DEFAULT_USER_ID)));
     if (!cat) { res.status(404).json({ error: "Not found" }); return; }
-    if (cat.isSystem) { res.status(403).json({ error: "לא ניתן למחוק קטגוריה מובנית" }); return; }
     await db.update(categoriesTable).set({ isActive: false, updatedAt: new Date() })
       .where(eq(categoriesTable.id, id));
     res.status(204).send();
