@@ -56,7 +56,7 @@ function TxModal({ title, onClose, children }: { title: string; onClose: () => v
 ═══════════════════════════════════════════════════════════ */
 export default function DashboardPage() {
   const { toast } = useToast();
-  const { activeBid } = useBudgetYear();
+  const { activeBid, activeYear } = useBudgetYear();
   const { currentMonth, setCurrentMonth } = useCashCurrentMonth(activeBid);
   const { cashFundId } = useCashFund();
 
@@ -156,6 +156,8 @@ export default function DashboardPage() {
             fundName={cashFund.name}
             currentMonth={currentMonth}
             onChangeMonth={setCurrentMonth}
+            minMonth={activeYear?.startDate ? activeYear.startDate.slice(0, 7) : undefined}
+            maxMonth={activeYear?.endDate ? activeYear.endDate.slice(0, 7) : undefined}
             monthlyTarget={cashFund.monthlyAllocation}
             totals={walletTotals}
             transactions={walletTransactions}
@@ -320,14 +322,21 @@ function TitheCard({ income, budgetYear, tithes, titheTarget, titheGiven, titheL
 ═══════════════════════════════════════════════════════════ */
 const MONTH_NAMES_HE = ["ינואר","פברואר","מרץ","אפריל","מאי","יוני","יולי","אוגוסט","ספטמבר","אוקטובר","נובמבר","דצמבר"];
 
-function MonthPickerPopover({ anchorRef, currentMonth, onSelect, onClose }: {
+function MonthPickerPopover({ anchorRef, currentMonth, minMonth, maxMonth, onSelect, onClose }: {
   anchorRef: { current: HTMLButtonElement | null } | null;
-  currentMonth: string; onSelect: (m: string) => void; onClose: () => void;
+  currentMonth: string; minMonth?: string; maxMonth?: string;
+  onSelect: (m: string) => void; onClose: () => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [selYear, setSelYear] = useState(() => parseInt(currentMonth.split("-")[0]));
   const [style, setStyle] = useState<React.CSSProperties>({ position: "fixed", top: 0, left: 0, width: 280, zIndex: 9999 });
-  const now = new Date();
+
+  // Determine allowed range — clamp maxMonth to today
+  const todayStr = (() => { const n = new Date(); return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,"0")}`; })();
+  const effectiveMin = minMonth ?? "2000-01";
+  const effectiveMax = maxMonth ? (maxMonth < todayStr ? maxMonth : todayStr) : todayStr;
+  const minYear = parseInt(effectiveMin.slice(0, 4), 10);
+  const maxYear = parseInt(effectiveMax.slice(0, 4), 10);
 
   useEffect(() => {
     const btn = anchorRef?.current;
@@ -351,11 +360,19 @@ function MonthPickerPopover({ anchorRef, currentMonth, onSelect, onClose }: {
     <div ref={ref} style={style} className="bg-card border border-border/60 rounded-2xl shadow-xl p-4" dir="rtl">
       {/* Year nav */}
       <div className="flex items-center justify-between mb-3">
-        <button onClick={() => setSelYear(y => y - 1)} className="p-1 rounded-lg hover:bg-muted transition-colors">
+        <button
+          onClick={() => setSelYear(y => y - 1)}
+          disabled={selYear <= minYear}
+          className="p-1 rounded-lg hover:bg-muted transition-colors disabled:opacity-30"
+        >
           <ChevronRight className="w-4 h-4 text-muted-foreground" />
         </button>
         <span className="text-sm font-semibold">{selYear}</span>
-        <button onClick={() => setSelYear(y => y + 1)} disabled={selYear >= now.getFullYear()} className="p-1 rounded-lg hover:bg-muted transition-colors disabled:opacity-30">
+        <button
+          onClick={() => setSelYear(y => y + 1)}
+          disabled={selYear >= maxYear}
+          className="p-1 rounded-lg hover:bg-muted transition-colors disabled:opacity-30"
+        >
           <ChevronLeft className="w-4 h-4 text-muted-foreground" />
         </button>
       </div>
@@ -364,14 +381,14 @@ function MonthPickerPopover({ anchorRef, currentMonth, onSelect, onClose }: {
         {Array.from({ length: 12 }, (_, i) => {
           const mStr = `${selYear}-${String(i + 1).padStart(2, "0")}`;
           const isSelected = mStr === currentMonth;
-          const isFuture = selYear > now.getFullYear() || (selYear === now.getFullYear() && i + 1 > now.getMonth() + 1);
+          const outOfRange = mStr < effectiveMin || mStr > effectiveMax;
           return (
             <button key={mStr} onClick={() => { onSelect(mStr); onClose(); }}
-              disabled={isFuture}
+              disabled={outOfRange}
               className={cn(
                 "rounded-xl py-2 text-xs font-medium transition-all",
                 isSelected ? "bg-amber-500 text-white shadow-sm" : "bg-muted/60 hover:bg-muted text-foreground",
-                isFuture && "opacity-30 cursor-default",
+                outOfRange && "opacity-20 cursor-default",
               )}
             >
               {MONTH_NAMES_HE[i]}
@@ -387,9 +404,10 @@ function MonthPickerPopover({ anchorRef, currentMonth, onSelect, onClose }: {
 /* ═══════════════════════════════════════════════════════════
    CARD: קופת שוטף — חודש נוכחי
 ═══════════════════════════════════════════════════════════ */
-function WalletMonthCard({ fundName, currentMonth, onChangeMonth, monthlyTarget, totals, transactions }: {
-  fundName: string; currentMonth: string; onChangeMonth: (m: string) => void; monthlyTarget: number;
-  totals: WalletTotals | null; transactions: WalletTx[];
+function WalletMonthCard({ fundName, currentMonth, onChangeMonth, minMonth, maxMonth, monthlyTarget, totals, transactions }: {
+  fundName: string; currentMonth: string; onChangeMonth: (m: string) => void;
+  minMonth?: string; maxMonth?: string;
+  monthlyTarget: number; totals: WalletTotals | null; transactions: WalletTx[];
 }) {
   const [modalOpen, setModalOpen]       = useState(false);
   const [pickerOpen, setPickerOpen]     = useState(false);
@@ -529,6 +547,8 @@ function WalletMonthCard({ fundName, currentMonth, onChangeMonth, monthlyTarget,
         <MonthPickerPopover
           anchorRef={btnRef}
           currentMonth={currentMonth}
+          minMonth={minMonth}
+          maxMonth={maxMonth}
           onSelect={onChangeMonth}
           onClose={() => setPickerOpen(false)}
         />
