@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import {
   ChevronRight, ChevronDown, FileCode, Folder, FolderOpen,
   Loader2, Database, Table2, RefreshCw, ChevronLeft, Monitor, Server,
-  Copy, Check,
+  Copy, Check, Rocket,
 } from "lucide-react";
 
 /* ── useCopy ───────────────────────────────────────────────── */
@@ -35,7 +35,18 @@ export default function Dev() {
 
   return (
     <div className="flex flex-col h-[calc(100vh-6rem)]" dir="rtl">
-      <PageHeader title="מסך פיתוח" description="צפייה בקוד ובנתוני מסד הנתונים" />
+      <div className="flex items-center justify-between">
+        <PageHeader title="מסך פיתוח" description="צפייה בקוד ובנתוני מסד הנתונים" />
+        <a
+          href="https://replit.com/deployments"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors shadow-sm"
+        >
+          <Rocket className="w-4 h-4" />
+          פרסם אפליקציה
+        </a>
+      </div>
 
       {/* Tab bar */}
       <div className="flex gap-1 mt-4 mb-3">
