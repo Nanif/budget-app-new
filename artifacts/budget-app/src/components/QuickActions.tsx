@@ -3,7 +3,7 @@ import {
   TrendingDown, TrendingUp, Wallet, HeartHandshake,
   Receipt, ArrowUpRight, ArrowDownRight, CircleDollarSign,
   CalendarDays, Tag, StickyNote, RefreshCw, Check, X,
-  Loader2, ShieldAlert, ArrowDownLeft, Gift,
+  Loader2, ShieldAlert, ArrowDownLeft,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -283,7 +283,7 @@ export function QuickActions() {
           receiptNumber: chf.receiptNumber.trim() || null,
         }),
       });
-      toast({ title: chf.isTithe ? "מעשר נרשם ✓" : "תרומה נרשמה ✓" });
+      toast({ title: "תרומה נרשמה ✓" });
       close();
     } catch { toast({ title: "שגיאה בשמירה", variant: "destructive" }); }
     finally { setSaving(false); }
@@ -806,53 +806,23 @@ export function QuickActions() {
           dir="rtl"
         >
           {/* Header */}
-          <div className={cn(
-            "flex items-center gap-3 px-6 pt-6 pb-4 border-b border-border/40",
-            chf.isTithe ? "bg-gradient-to-l from-violet-50/60 to-white" : "bg-gradient-to-l from-rose-50/60 to-white"
-          )}>
-            <div className={cn(
-              "w-10 h-10 rounded-2xl flex items-center justify-center shadow-sm shrink-0",
-              chf.isTithe ? "bg-violet-600" : "bg-rose-600"
-            )}>
-              {chf.isTithe ? <HeartHandshake className="w-5 h-5 text-white" /> : <Gift className="w-5 h-5 text-white" />}
+          <div className="flex items-center gap-3 px-6 pt-6 pb-4 border-b border-border/40 bg-gradient-to-l from-violet-50/60 to-white">
+            <div className="w-10 h-10 rounded-2xl flex items-center justify-center shadow-sm shrink-0 bg-violet-600">
+              <HeartHandshake className="w-5 h-5 text-white" />
             </div>
             <div>
-              <DialogTitle className="text-lg font-bold text-foreground leading-tight">
-                {chf.isTithe ? "מעשר חדש" : "תרומה חדשה"}
-              </DialogTitle>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                {chf.isTithe ? "רישום תשלום מעשר" : "רישום תרומה כללית"}
-              </p>
+              <DialogTitle className="text-lg font-bold text-foreground leading-tight">תרומה חדשה</DialogTitle>
+              <p className="text-xs text-muted-foreground mt-0.5">רישום תרומה</p>
             </div>
           </div>
 
           {/* Body */}
           <div className="px-6 py-5 space-y-5 max-h-[70vh] overflow-y-auto">
-            {/* Type toggle */}
-            <div className="grid grid-cols-2 gap-2 p-1 bg-muted/60 rounded-2xl">
-              {([
-                { v: true,  label: "מעשר",  Icon: HeartHandshake, cls: "bg-violet-600" },
-                { v: false, label: "תרומה", Icon: Gift,           cls: "bg-rose-600"   },
-              ] as const).map(t => (
-                <button
-                  key={String(t.v)}
-                  type="button"
-                  onClick={() => chfSet("isTithe", t.v)}
-                  className={cn(
-                    "flex items-center justify-center gap-1.5 py-2 rounded-xl text-sm font-semibold transition-all",
-                    chf.isTithe === t.v ? `${t.cls} text-white shadow-sm` : "text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  <t.Icon className="w-4 h-4" />
-                  {t.label}
-                </button>
-              ))}
-            </div>
 
             {/* Amount */}
             <div>
               <Label className="text-sm font-semibold flex items-center gap-1 mb-1.5">
-                <CircleDollarSign className={cn("w-3.5 h-3.5", chf.isTithe ? "text-violet-600" : "text-rose-600")} />
+                <CircleDollarSign className="w-3.5 h-3.5 text-violet-600" />
                 סכום <span className="text-rose-500">*</span>
               </Label>
               <div className="relative">
@@ -866,8 +836,7 @@ export function QuickActions() {
                   placeholder="0.00"
                   className={cn(
                     "pr-9 text-2xl font-bold h-14 rounded-2xl tabular-nums text-left",
-                    errChAmount ? "border-rose-400 focus-visible:ring-rose-300 bg-rose-50/40"
-                      : chf.isTithe ? "focus-visible:ring-violet-300" : "focus-visible:ring-rose-300"
+                    errChAmount ? "border-rose-400 focus-visible:ring-rose-300 bg-rose-50/40" : "focus-visible:ring-violet-300"
                   )}
                 />
               </div>
@@ -877,17 +846,16 @@ export function QuickActions() {
             {/* Recipient */}
             <div>
               <Label className="text-sm font-semibold flex items-center gap-1 mb-1.5">
-                {chf.isTithe ? "נמען / ארגון" : "תיאור התרומה"} <span className="text-rose-500">*</span>
+                נמען / ארגון <span className="text-rose-500">*</span>
               </Label>
               <Input
                 value={chf.recipient}
                 onChange={e => chfSet("recipient", e.target.value)}
                 onBlur={() => chfTouch("recipient")}
-                placeholder={chf.isTithe ? "שם הארגון או האדם..." : "לדוגמה: עמותה, צדקה..."}
+                placeholder="שם הארגון או האדם..."
                 className={cn(
                   "rounded-2xl",
-                  errChRecipient ? "border-rose-400 focus-visible:ring-rose-300 bg-rose-50/40"
-                    : chf.isTithe ? "focus-visible:ring-violet-300" : "focus-visible:ring-rose-300"
+                  errChRecipient ? "border-rose-400 focus-visible:ring-rose-300 bg-rose-50/40" : "focus-visible:ring-violet-300"
                 )}
               />
               <FieldError msg={errChRecipient} />
@@ -896,7 +864,7 @@ export function QuickActions() {
             {/* Date */}
             <div>
               <Label className="text-sm font-semibold flex items-center gap-1 mb-1.5">
-                <CalendarDays className={cn("w-3.5 h-3.5", chf.isTithe ? "text-violet-600" : "text-rose-600")} />
+                <CalendarDays className="w-3.5 h-3.5 text-violet-600" />
                 תאריך <span className="text-rose-500">*</span>
               </Label>
               <Input
@@ -906,8 +874,7 @@ export function QuickActions() {
                 onBlur={() => chfTouch("date")}
                 className={cn(
                   "rounded-2xl max-w-[200px]",
-                  errChDate ? "border-rose-400 focus-visible:ring-rose-300 bg-rose-50/40"
-                    : chf.isTithe ? "focus-visible:ring-violet-300" : "focus-visible:ring-rose-300"
+                  errChDate ? "border-rose-400 focus-visible:ring-rose-300 bg-rose-50/40" : "focus-visible:ring-violet-300"
                 )}
               />
               <FieldError msg={errChDate} />
@@ -916,7 +883,7 @@ export function QuickActions() {
             {/* Receipt number */}
             <div>
               <Label className="text-sm font-semibold flex items-center gap-1 mb-1.5">
-                <Receipt className={cn("w-3.5 h-3.5", chf.isTithe ? "text-violet-600" : "text-rose-600")} />
+                <Receipt className="w-3.5 h-3.5 text-violet-600" />
                 מספר קבלה
                 <span className="text-xs font-normal text-muted-foreground mr-1">(אופציונלי)</span>
               </Label>
@@ -924,7 +891,7 @@ export function QuickActions() {
                 value={chf.receiptNumber}
                 onChange={e => chfSet("receiptNumber", e.target.value)}
                 placeholder="מספר קבלה לתיעוד..."
-                className={cn("rounded-2xl", chf.isTithe ? "focus-visible:ring-violet-300" : "focus-visible:ring-rose-300")}
+                className="rounded-2xl focus-visible:ring-violet-300"
                 dir="ltr"
               />
             </div>
@@ -932,7 +899,7 @@ export function QuickActions() {
             {/* Notes */}
             <div>
               <Label className="text-sm font-semibold flex items-center gap-1 mb-1.5">
-                <StickyNote className={cn("w-3.5 h-3.5", chf.isTithe ? "text-violet-600" : "text-rose-600")} />
+                <StickyNote className="w-3.5 h-3.5 text-violet-600" />
                 הערה
                 <span className="text-xs font-normal text-muted-foreground mr-1">(אופציונלי)</span>
               </Label>
@@ -941,12 +908,7 @@ export function QuickActions() {
                 onChange={e => chfSet("description", e.target.value)}
                 placeholder="הערות נוספות..."
                 rows={2}
-                className={cn(
-                  "w-full rounded-2xl border border-input bg-background px-3 py-2 text-sm resize-none",
-                  "ring-offset-background placeholder:text-muted-foreground",
-                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
-                  chf.isTithe ? "focus-visible:ring-violet-300" : "focus-visible:ring-rose-300"
-                )}
+                className="w-full rounded-2xl border border-input bg-background px-3 py-2 text-sm resize-none ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-violet-300"
               />
             </div>
           </div>
@@ -958,13 +920,10 @@ export function QuickActions() {
             </Button>
             <Button
               onClick={saveCharity} disabled={saving}
-              className={cn(
-                "rounded-2xl flex-1 h-10 text-white shadow-sm",
-                chf.isTithe ? "bg-violet-600 hover:bg-violet-700" : "bg-rose-600 hover:bg-rose-700"
-              )}
+              className="rounded-2xl flex-1 h-10 text-white shadow-sm bg-violet-600 hover:bg-violet-700"
             >
               {saving ? <Loader2 className="w-4 h-4 animate-spin ml-1.5" /> : <Check className="w-4 h-4 ml-1.5" />}
-              {chf.isTithe ? "שמור מעשר" : "שמור תרומה"}
+              שמור תרומה
             </Button>
           </div>
         </DialogContent>
