@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { createPortal } from "react-dom";
 import { Link } from "wouter";
 import { useBudgetYear } from "@/contexts/BudgetYearContext";
 import { cn } from "@/lib/utils";
@@ -56,7 +57,7 @@ function TxModal({ title, onClose, children }: { title: string; onClose: () => v
 export default function DashboardPage() {
   const { toast } = useToast();
   const { activeBid } = useBudgetYear();
-  const { currentMonth, setCurrentMonth } = useCashCurrentMonth();
+  const { currentMonth, setCurrentMonth } = useCashCurrentMonth(activeBid);
   const { cashFundId } = useCashFund();
 
   const [income, setIncome]         = useState<IncomeSummary>({ totalIncome: 0, totalDeductions: 0, netIncome: 0 });
@@ -319,23 +320,35 @@ function TitheCard({ income, budgetYear, tithes, titheTarget, titheGiven, titheL
 ═══════════════════════════════════════════════════════════ */
 const MONTH_NAMES_HE = ["ינואר","פברואר","מרץ","אפריל","מאי","יוני","יולי","אוגוסט","ספטמבר","אוקטובר","נובמבר","דצמבר"];
 
-function MonthPickerPopover({ currentMonth, onSelect, onClose }: {
+function MonthPickerPopover({ anchorRef, currentMonth, onSelect, onClose }: {
+  anchorRef: { current: HTMLButtonElement | null } | null;
   currentMonth: string; onSelect: (m: string) => void; onClose: () => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [selYear, setSelYear] = useState(() => parseInt(currentMonth.split("-")[0]));
+  const [style, setStyle] = useState<React.CSSProperties>({ position: "fixed", top: 0, left: 0, width: 280, zIndex: 9999 });
   const now = new Date();
 
   useEffect(() => {
+    const btn = anchorRef?.current;
+    if (btn) {
+      const rect = btn.getBoundingClientRect();
+      setStyle({ position: "fixed", top: rect.bottom + 4, right: window.innerWidth - rect.right, width: Math.max(rect.width, 280), zIndex: 9999 });
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
+      const btn = anchorRef?.current;
+      if (ref.current && !ref.current.contains(e.target as Node) &&
+          (!btn || !btn.contains(e.target as Node))) onClose();
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
-  }, [onClose]);
+  }, [onClose, anchorRef]);
 
-  return (
-    <div ref={ref} className="absolute top-full left-0 right-0 mt-1 z-50 bg-card border border-border/60 rounded-2xl shadow-xl p-4" dir="rtl">
+  return createPortal(
+    <div ref={ref} style={style} className="bg-card border border-border/60 rounded-2xl shadow-xl p-4" dir="rtl">
       {/* Year nav */}
       <div className="flex items-center justify-between mb-3">
         <button onClick={() => setSelYear(y => y - 1)} className="p-1 rounded-lg hover:bg-muted transition-colors">
@@ -366,7 +379,8 @@ function MonthPickerPopover({ currentMonth, onSelect, onClose }: {
           );
         })}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
@@ -379,6 +393,7 @@ function WalletMonthCard({ fundName, currentMonth, onChangeMonth, monthlyTarget,
 }) {
   const [modalOpen, setModalOpen]       = useState(false);
   const [pickerOpen, setPickerOpen]     = useState(false);
+  const btnRef = useRef<HTMLButtonElement>(null);
 
   const [cmYear, cmMonthNum] = currentMonth.split("-").map(Number);
   const monthLabel = `${MONTH_NAMES_HE[cmMonthNum - 1]} ${cmYear}`;
@@ -423,6 +438,7 @@ function WalletMonthCard({ fundName, currentMonth, onChangeMonth, monthlyTarget,
             <div className="flex justify-between text-amber-500 dark:text-amber-400 text-[11px] mb-1.5">
               <span>{Math.round(pct)}% הושלם</span>
               <button
+                ref={btnRef}
                 onClick={() => setPickerOpen(p => !p)}
                 className="bg-amber-200/60 dark:bg-amber-800/40 hover:bg-amber-300/60 dark:hover:bg-amber-700/40 rounded-full px-2 py-0.5 text-amber-700 dark:text-amber-300 transition-colors flex items-center gap-1"
               >
@@ -430,13 +446,6 @@ function WalletMonthCard({ fundName, currentMonth, onChangeMonth, monthlyTarget,
                 <ChevronDown className={cn("w-3 h-3 transition-transform", pickerOpen && "rotate-180")} />
               </button>
             </div>
-            {pickerOpen && (
-              <MonthPickerPopover
-                currentMonth={currentMonth}
-                onSelect={onChangeMonth}
-                onClose={() => setPickerOpen(false)}
-              />
-            )}
             <div className="h-2 bg-amber-200/60 dark:bg-amber-800/40 rounded-full overflow-hidden">
               <div
                 className={cn("h-full rounded-full transition-all duration-700", over ? "bg-emerald-500" : "bg-amber-500")}
@@ -515,6 +524,14 @@ function WalletMonthCard({ fundName, currentMonth, onChangeMonth, monthlyTarget,
             </ul>
           )}
         </TxModal>
+      )}
+      {pickerOpen && (
+        <MonthPickerPopover
+          anchorRef={btnRef}
+          currentMonth={currentMonth}
+          onSelect={onChangeMonth}
+          onClose={() => setPickerOpen(false)}
+        />
       )}
     </>
   );

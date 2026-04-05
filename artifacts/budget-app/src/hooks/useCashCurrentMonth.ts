@@ -1,7 +1,5 @@
 import { useState, useEffect } from "react";
 
-const KEY = "cash_current_month";
-
 export function toMonthStr(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
@@ -13,25 +11,42 @@ export function defaultDateForMonth(month: string): string {
   return `${y}-${m}-01`;
 }
 
-export function useCashCurrentMonth() {
+function keyForBid(bid: number | null) {
+  return bid ? `cash_current_month_${bid}` : "cash_current_month";
+}
+
+export function useCashCurrentMonth(bid?: number | null) {
+  const storageKey = keyForBid(bid ?? null);
+
   const [currentMonth, setCurrentMonthState] = useState<string>(() => {
-    try { return localStorage.getItem(KEY) || toMonthStr(new Date()); }
-    catch { return toMonthStr(new Date()); }
+    try {
+      return localStorage.getItem(storageKey) || toMonthStr(new Date());
+    } catch { return toMonthStr(new Date()); }
   });
 
+  // Re-initialize when bid changes
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(storageKey);
+      setCurrentMonthState(stored || toMonthStr(new Date()));
+    } catch {
+      setCurrentMonthState(toMonthStr(new Date()));
+    }
+  }, [storageKey]);
+
   const setCurrentMonth = (month: string) => {
-    try { localStorage.setItem(KEY, month); } catch { /* ignore */ }
+    try { localStorage.setItem(storageKey, month); } catch { /* ignore */ }
     setCurrentMonthState(month);
-    window.dispatchEvent(new StorageEvent("storage", { key: KEY, newValue: month }));
+    window.dispatchEvent(new StorageEvent("storage", { key: storageKey, newValue: month }));
   };
 
   useEffect(() => {
     const handler = (e: StorageEvent) => {
-      if (e.key === KEY && e.newValue) setCurrentMonthState(e.newValue);
+      if (e.key === storageKey && e.newValue) setCurrentMonthState(e.newValue);
     };
     window.addEventListener("storage", handler);
     return () => window.removeEventListener("storage", handler);
-  }, []);
+  }, [storageKey]);
 
   return { currentMonth, setCurrentMonth };
 }
