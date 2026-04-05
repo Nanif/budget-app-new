@@ -91,7 +91,7 @@ export default function DashboardPage() {
     const cf = funds.find(f => f.fundBehavior === "cash_monthly");
     setCashFund(cf ?? null);
     if (!cf) return;
-    apiFetch(`/wallet?month=${currentMonth}&fundId=${cf.id}`)
+    apiFetch(`/wallet?month=${currentMonth}&fundId=${cf.id}&bid=${activeBid}`)
       .then((d: { totals: WalletTotals; transactions: WalletTx[] }) => {
         setWalletTotals(d.totals);
         setWalletTxs(d.transactions ?? []);
@@ -502,7 +502,7 @@ function FundCard({ fund, activeBid }: { fund: FundSummary; activeBid: number })
       setTxLoading(true);
       try {
         if (WALLET_BEHAVIORS.has(fund.fundBehavior)) {
-          const d = await apiFetch(`/wallet?fundId=${fund.id}`);
+          const d = await apiFetch(`/wallet?fundId=${fund.id}&bid=${activeBid}`);
           const raw: WalletTx[] = d.transactions ?? [];
           setTxns(raw.slice(0, 20).map(t => ({
             id: t.id,

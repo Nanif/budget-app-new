@@ -14,6 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiFetch } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { useCashCurrentMonth, defaultDateForMonth } from "@/hooks/useCashCurrentMonth";
+import { useBudgetYear } from "@/contexts/BudgetYearContext";
 
 /* ── types ───────────────────────────────────────────────── */
 type DialogType = "expense" | "income" | "cash" | "charity" | null;
@@ -66,6 +67,7 @@ function FieldError({ msg }: { msg: string }) {
 export function QuickActions() {
   const { toast } = useToast();
   const { currentMonth } = useCashCurrentMonth();
+  const { activeBid } = useBudgetYear();
   const [activeDialog, setActiveDialog] = useState<DialogType>(null);
   const [saving, setSaving] = useState(false);
 
@@ -219,7 +221,7 @@ export function QuickActions() {
     }
     setSaving(true);
     try {
-      await apiFetch("/wallet", {
+      await apiFetch(`/wallet?bid=${activeBid}`, {
         method: "POST",
         body: JSON.stringify({
           fundId:      cf.fundId ? parseInt(cf.fundId) : null,

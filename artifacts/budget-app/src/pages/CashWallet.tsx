@@ -227,7 +227,7 @@ function MonthPicker({
 
 export default function CashWallet() {
   const { toast } = useToast();
-  const { activeYear } = useBudgetYear();
+  const { activeYear, activeBid } = useBudgetYear();
   const now = new Date();
 
   const { currentMonth, setCurrentMonth } = useCashCurrentMonth();
@@ -271,7 +271,7 @@ export default function CashWallet() {
     if (!fund) return;
     setLoading(true);
     try {
-      const d = await apiFetch(`/wallet?month=${month}&fundId=${fund.id}`);
+      const d = await apiFetch(`/wallet?month=${month}&fundId=${fund.id}&bid=${activeBid}`);
       setMonthData(d);
     } catch { toast({ title: "שגיאה בטעינה", variant: "destructive" }); }
     finally { setLoading(false); }
@@ -281,7 +281,7 @@ export default function CashWallet() {
     setAllTxOpen(true);
     setAllTxLoading(true);
     try {
-      const d = await apiFetch(`/wallet?fundId=${fund!.id}`);
+      const d = await apiFetch(`/wallet?fundId=${fund!.id}&bid=${activeBid}`);
       setAllTx(d.transactions);
     } catch { toast({ title: "שגיאה בטעינה", variant: "destructive" }); }
     finally { setAllTxLoading(false); }
@@ -300,7 +300,7 @@ export default function CashWallet() {
     }
     setSaving(true);
     try {
-      await apiFetch("/wallet", {
+      await apiFetch(`/wallet?bid=${activeBid}`, {
         method: "POST",
         body: JSON.stringify({
           fundId: fund.id,
