@@ -29,6 +29,10 @@ type Expense = {
   isRecurring?: boolean;
 };
 type Fund     = { id: number; name: string; colorClass: string; fundBehavior: string };
+
+const EXPENSE_BEHAVIORS = new Set([
+  "expense_monthly", "annual_categorized", "annual_large", "annual", "expense_non_budget",
+]);
 type Category = { id: number; name: string; color: string; icon: string; fundId: number | null };
 type GroupBy  = "none" | "fund" | "category" | "month";
 
@@ -145,7 +149,7 @@ export default function Expenses() {
     try {
       const [exp, fnd, cats] = await Promise.all([
         apiFetch("/expenses"),
-        apiFetch("/funds?all=true"),
+        apiFetch("/funds"),
         apiFetch("/categories"),
       ]);
       setExpenses(exp.map((e: any) => ({ ...e, amount: parseFloat(e.amount) })));
@@ -299,6 +303,9 @@ export default function Expenses() {
       return next;
     });
   };
+
+  /* ── expense-eligible funds only ─────────────────────────── */
+  const expenseFunds = useMemo(() => funds.filter(f => EXPENSE_BEHAVIORS.has(f.fundBehavior)), [funds]);
 
   /* ── available categories filtered by fund ───────────────── */
   const availableCats = useMemo(() => {
@@ -518,7 +525,7 @@ export default function Expenses() {
         form={form}
         setField={setField}
         touch={touch}
-        funds={funds}
+        funds={expenseFunds}
         availableCats={availableCats}
         errName={errName}
         errAmount={errAmount}
