@@ -132,7 +132,6 @@ export default function Categories() {
   };
 
   const handleToggle = async (cat: Category) => {
-    if (cat.isSystem) { toast({ title: "לא ניתן לשנות קטגוריה מובנית", variant: "destructive" }); return; }
     try {
       const updated = await apiFetch(`/categories/${cat.id}/toggle`, { method: "PATCH" });
       setCats(prev => prev.map(c => c.id === cat.id ? { ...c, isActive: updated.isActive } : c));
@@ -463,22 +462,18 @@ function CategoryRow({ cat, onEdit, onToggle, onDelete }: {
 
       {/* Actions */}
       <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-        {!cat.isSystem && (
-          <button onClick={() => onToggle(cat)} title={cat.isActive ? "השהה" : "הפעל"}
-            className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors">
-            {cat.isActive ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-          </button>
-        )}
+        <button onClick={() => onToggle(cat)} title={cat.isActive ? "השהה" : "הפעל"}
+          className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors">
+          {cat.isActive ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+        </button>
         <button onClick={() => onEdit(cat)} title="ערוך"
           className="p-1.5 rounded-lg hover:bg-blue-50 text-muted-foreground hover:text-blue-600 transition-colors">
           <Pencil className="w-3.5 h-3.5" />
         </button>
-        {!cat.isSystem && (
-          <button onClick={() => onDelete(cat.id)} title="מחק"
-            className="p-1.5 rounded-lg hover:bg-rose-50 text-muted-foreground hover:text-rose-600 transition-colors">
-            <Trash2 className="w-3.5 h-3.5" />
-          </button>
-        )}
+        <button onClick={() => onDelete(cat.id)} title="מחק"
+          className="p-1.5 rounded-lg hover:bg-rose-50 text-muted-foreground hover:text-rose-600 transition-colors">
+          <Trash2 className="w-3.5 h-3.5" />
+        </button>
       </div>
     </div>
   );

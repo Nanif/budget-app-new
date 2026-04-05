@@ -104,7 +104,7 @@ export default function DashboardPage() {
         setWalletTxs(d.transactions ?? []);
       })
       .catch(() => {});
-  }, [funds, currentMonth, cashFundId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [funds, currentMonth, cashFundId, activeBid]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const titheTarget = income.netIncome * (budgetYear.tithePercentage / 100);
   const titheGiven  = tithes.filter(t => t.isTithe).reduce((s, t) => s + t.amount, 0);

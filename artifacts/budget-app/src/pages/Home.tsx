@@ -282,7 +282,7 @@ function DebtsCard({ debts, onAdd, onUpdate, onDelete }: {
                 className="p-1.5 rounded-lg bg-rose-600 text-white hover:bg-rose-700 transition-colors">
                 {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
               </button>
-              <button onClick={() => setOpen(false)} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground transition-colors text-xs">ביטול</button>
+              <button onClick={() => { setName(""); setAmount(""); setOpen(false); }} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground transition-colors text-xs">ביטול</button>
             </div>
           </div>
         ) : (
@@ -448,7 +448,7 @@ function RemindersCard({ tasks, onAdd, onToggle, onUpdate, onDelete }: {
                 className="p-1.5 rounded-lg bg-amber-500 text-white hover:bg-amber-600 transition-colors">
                 {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
               </button>
-              <button onClick={() => setOpen(false)} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground transition-colors text-xs">ביטול</button>
+              <button onClick={() => { setTitle(""); setOpen(false); }} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground transition-colors text-xs">ביטול</button>
             </div>
           </div>
         ) : (
@@ -606,7 +606,7 @@ function NotesCard({ notes, onAdd, onUpdate, onDelete }: {
                   className="p-1.5 rounded-lg bg-yellow-500 text-white hover:bg-yellow-600 transition-colors">
                   {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
                 </button>
-                <button onClick={() => setOpen(false)} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground transition-colors text-xs">ביטול</button>
+                <button onClick={() => { setNoteTitle(""); setNoteContent(""); setOpen(false); }} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground transition-colors text-xs">ביטול</button>
               </div>
             </div>
           </div>
