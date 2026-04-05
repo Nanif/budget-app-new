@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db, cashEnvelopeTransactionsTable, fundsTable } from "@workspace/db";
-import { eq, and, gte, lte, desc, sum, sql } from "drizzle-orm";
+import { eq, and, desc, sum, sql } from "drizzle-orm";
 
 const router = Router();
 const DEFAULT_USER_ID = 1;
@@ -19,13 +19,7 @@ router.get("/", async (req, res) => {
     ];
     if (fundId) conditions.push(eq(cashEnvelopeTransactionsTable.fundId, parseInt(String(fundId))));
     if (month) {
-      const [y, m] = String(month).split("-");
-      const start = `${y}-${m}-01`;
-      // Use actual last day of the month (avoids "2026-02-31" errors for Feb/30-day months)
-      const lastDay = new Date(parseInt(y), parseInt(m), 0).getDate();
-      const end = `${y}-${m}-${String(lastDay).padStart(2, "0")}`;
-      conditions.push(gte(cashEnvelopeTransactionsTable.date, start));
-      conditions.push(lte(cashEnvelopeTransactionsTable.date, end));
+      conditions.push(eq(cashEnvelopeTransactionsTable.activeMonth, String(month)));
     }
 
     const rows = await db
@@ -34,7 +28,7 @@ router.get("/", async (req, res) => {
       .where(and(...conditions))
       .orderBy(desc(cashEnvelopeTransactionsTable.date));
 
-    const deposits = rows.filter(r => r.type === "deposit").reduce((s, r) => s + parseNum(r.amount), 0);
+    const deposits    = rows.filter(r => r.type === "deposit").reduce((s, r) => s + parseNum(r.amount), 0);
     const withdrawals = rows.filter(r => r.type === "withdrawal").reduce((s, r) => s + parseNum(r.amount), 0);
 
     res.json({
@@ -50,21 +44,21 @@ router.get("/", async (req, res) => {
 // GET /api/wallet/summary?year=YYYY — monthly breakdown
 router.get("/summary", async (req, res) => {
   try {
-    const year = req.query.year ? parseInt(String(req.query.year)) : new Date().getFullYear();
+    const year = req.query.year ? String(req.query.year) : String(new Date().getFullYear());
     const rows = await db
       .select({
-        month: sql<string>`to_char(${cashEnvelopeTransactionsTable.date}::date, 'YYYY-MM')`,
-        type: cashEnvelopeTransactionsTable.type,
+        month: cashEnvelopeTransactionsTable.activeMonth,
+        type:  cashEnvelopeTransactionsTable.type,
         total: sum(cashEnvelopeTransactionsTable.amount),
       })
       .from(cashEnvelopeTransactionsTable)
       .where(and(
         eq(cashEnvelopeTransactionsTable.userId, DEFAULT_USER_ID),
         eq(cashEnvelopeTransactionsTable.budgetYearId, getBYID(req)),
-        sql`EXTRACT(YEAR FROM ${cashEnvelopeTransactionsTable.date}::date) = ${year}`,
+        sql`${cashEnvelopeTransactionsTable.activeMonth} LIKE ${year + "-%"}`,
       ))
       .groupBy(
-        sql`to_char(${cashEnvelopeTransactionsTable.date}::date, 'YYYY-MM')`,
+        cashEnvelopeTransactionsTable.activeMonth,
         cashEnvelopeTransactionsTable.type,
       );
     res.json(rows.map(r => ({ ...r, total: parseFloat(r.total || "0") })));
@@ -76,7 +70,7 @@ router.get("/summary", async (req, res) => {
 // POST /api/wallet
 router.post("/", async (req, res) => {
   try {
-    const { fundId, type, amount, description, date } = req.body;
+    const { fundId, type, amount, description, date, activeMonth } = req.body;
 
     if (!type || amount === undefined || amount === null || !date) {
       res.status(400).json({ error: "חסרים שדות: type, amount, date" });
@@ -96,6 +90,7 @@ router.post("/", async (req, res) => {
       amount: String(amountNum),
       description: description ? String(description) : (type === "deposit" ? "הפקדה" : "משיכה"),
       date: String(date),
+      activeMonth: activeMonth ? String(activeMonth) : null,
     }).returning();
 
     res.status(201).json({ ...created, amount: parseNum(created.amount) });

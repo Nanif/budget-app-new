@@ -308,6 +308,7 @@ export default function CashWallet() {
           amount: parseFloat(form.amount),
           description: form.description || (txType === "deposit" ? "ניתן" : "נלקח"),
           date: form.date || new Date().toISOString().split("T")[0],
+          activeMonth: currentMonth,
         }),
       });
       toast({ title: txType === "deposit" ? "ניתן נרשם ✓" : "נלקח נרשם ✓" });

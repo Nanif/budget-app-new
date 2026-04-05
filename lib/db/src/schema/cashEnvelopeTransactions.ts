@@ -14,6 +14,7 @@ export const cashEnvelopeTransactionsTable = pgTable("cash_envelope_transactions
   amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
   description: text("description").notNull().default(""),
   date: date("date").notNull(),
+  activeMonth: text("active_month"),
   relatedExpenseId: integer("related_expense_id"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),

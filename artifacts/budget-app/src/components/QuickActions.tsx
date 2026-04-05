@@ -227,6 +227,7 @@ export function QuickActions() {
           amount:      parseFloat(cf.amount),
           description: cf.description.trim() || (cf.type === "deposit" ? "ניתן" : "נלקח"),
           date:        cf.date || today(),
+          activeMonth: currentMonth,
         }),
       });
       toast({ title: cf.type === "deposit" ? "ניתן נרשם ✓" : "נלקח נרשם ✓" });
