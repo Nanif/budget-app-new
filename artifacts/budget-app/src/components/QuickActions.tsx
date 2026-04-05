@@ -46,7 +46,7 @@ const today = () => new Date().toISOString().split("T")[0];
 const ACTIONS = [
   { id: "expense" as DialogType, label: "הוצאה",      icon: TrendingDown,   color: "bg-rose-500",    hoverBg: "hover:bg-rose-50",    iconText: "text-rose-600"    },
   { id: "income"  as DialogType, label: "הכנסה",      icon: TrendingUp,     color: "bg-emerald-500", hoverBg: "hover:bg-emerald-50", iconText: "text-emerald-600" },
-  { id: "cash"    as DialogType, label: "לקחת/לתת",   icon: Wallet,         color: "bg-amber-500",   hoverBg: "hover:bg-amber-50",   iconText: "text-amber-600"   },
+  { id: "cash"    as DialogType, label: "שוטף- לקחת/לתת",   icon: Wallet,         color: "bg-amber-500",   hoverBg: "hover:bg-amber-50",   iconText: "text-amber-600"   },
   { id: "charity" as DialogType, label: "תרומה",      icon: HeartHandshake, color: "bg-violet-500",  hoverBg: "hover:bg-violet-50",  iconText: "text-violet-600"  },
 ];
 
