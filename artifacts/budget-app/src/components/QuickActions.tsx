@@ -67,8 +67,8 @@ function FieldError({ msg }: { msg: string }) {
 ══════════════════════════════════════════════════════════ */
 export function QuickActions() {
   const { toast } = useToast();
-  const { currentMonth } = useCashCurrentMonth();
   const { activeBid } = useBudgetYear();
+  const { currentMonth } = useCashCurrentMonth(activeBid);
   const { cashFundId } = useCashFund();
   const [activeDialog, setActiveDialog] = useState<DialogType>(null);
   const [saving, setSaving] = useState(false);
