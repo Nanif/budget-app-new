@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import { useBudgetYear } from "@/contexts/BudgetYearContext";
 import { useCashFund } from "@/hooks/useCashFund";
+import { useCashCurrentMonth } from "@/hooks/useCashCurrentMonth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -109,6 +110,7 @@ export default function Expenses() {
   const { toast } = useToast();
   const { activeBid } = useBudgetYear();
   const { cashFundId } = useCashFund();
+  const { currentMonth } = useCashCurrentMonth(activeBid);
 
   /* ── data ────────────────────────────────────────────────── */
   const [expenses,   setExpenses]   = useState<Expense[]>([]);
@@ -260,7 +262,6 @@ export default function Expenses() {
         setExpenses(prev => [parsed, ...prev]);
         /* also record withdrawal from cash fund if checked */
         if (form.takenFromCash && cashFundId) {
-          const activeMonth = form.date.slice(0, 7);
           await apiFetch(`/wallet?bid=${activeBid}`, {
             method: "POST",
             body: JSON.stringify({
@@ -269,7 +270,7 @@ export default function Expenses() {
               amount:      parseFloat(form.amount),
               description: form.name.trim(),
               date:        form.date,
-              activeMonth,
+              activeMonth: currentMonth,
             }),
           });
         }
