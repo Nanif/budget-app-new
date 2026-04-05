@@ -5,9 +5,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Save, Tag, Plus, Pencil, Trash2, Check, X, Loader2 } from "lucide-react";
+import { Save, Tag, Plus, Pencil, Trash2, Check, X, Loader2, Wallet } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { useCashFund } from "@/hooks/useCashFund";
+import { useBudgetYear } from "@/contexts/BudgetYearContext";
 
 /* ── Types ─────────────────────────────────────────────────── */
 type AppSettings = {
@@ -18,6 +20,9 @@ type AppSettings = {
 };
 type Category = {
   id: number; name: string; color: string; type: string; isSystem: boolean; isActive: boolean;
+};
+type FundSummary = {
+  id: number; name: string; fundBehavior: string; monthlyAllocation: number;
 };
 
 const COLOR_SWATCHES = [
@@ -123,9 +128,67 @@ export default function Settings() {
         </div>
       </form>
 
+      {/* ══ Cash Fund ════════════════════════════════════════════ */}
+      <CashFundSection />
+
       {/* ══ Categories ═══════════════════════════════════════════ */}
       <CategoriesSection />
     </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════
+   CASH FUND SECTION
+═══════════════════════════════════════════════════════════ */
+function CashFundSection() {
+  const { activeBid } = useBudgetYear();
+  const { cashFundId, setCashFundId } = useCashFund();
+  const [funds, setFunds] = useState<FundSummary[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!activeBid) return;
+    setLoading(true);
+    apiFetch(`/funds?bid=${activeBid}`)
+      .then((data: FundSummary[]) => setFunds(data.filter(f => f.fundBehavior === "cash_monthly")))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [activeBid]);
+
+  if (loading || funds.length === 0) return null;
+
+  const activeFund = funds.find(f => f.id === cashFundId) ?? funds[0];
+
+  return (
+    <Card className="border-amber-100 shadow-sm">
+      <CardHeader className="bg-amber-50/50 border-b border-amber-100">
+        <div className="flex items-center gap-2">
+          <Wallet className="w-4 h-4 text-amber-600" />
+          <div>
+            <CardTitle className="text-amber-900">קופת שוטף נוכחית</CardTitle>
+            <CardDescription className="text-amber-700">בחר איזו קופה תוצג בדשבורד</CardDescription>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="p-4">
+        <div className="flex flex-wrap gap-2">
+          {funds.map(f => (
+            <button
+              key={f.id}
+              onClick={() => setCashFundId(f.id)}
+              className={cn(
+                "px-4 py-2 rounded-xl text-sm font-medium border-2 transition-all",
+                (cashFundId === f.id || (!cashFundId && activeFund?.id === f.id))
+                  ? "border-amber-500 bg-amber-100 text-amber-900"
+                  : "border-border bg-background text-foreground hover:bg-muted"
+              )}
+            >
+              {f.name}
+            </button>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
