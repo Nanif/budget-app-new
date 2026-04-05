@@ -13,7 +13,7 @@ import {
   Plus, Pencil, Trash2, Search, X, ChevronDown, ChevronRight,
   HeartHandshake, Loader2, Check, AlertTriangle, Filter,
   CalendarDays, ShieldAlert, StickyNote, CircleDollarSign,
-  Landmark, Percent, Target, Gift, Info, Receipt,
+  Landmark, Percent, Target, Info, Receipt,
 } from "lucide-react";
 
 
@@ -37,7 +37,6 @@ const GROUP_OPTIONS: { value: GroupBy; label: string }[] = [
   { value: "none",  label: "ללא קיבוץ" },
   { value: "month", label: "לפי חודש"  },
   { value: "year",  label: "לפי שנה"   },
-  { value: "type",  label: "לפי סוג"   },
 ];
 
 /* ═══════════════════════════════════════════════════════════
@@ -86,7 +85,7 @@ function TitheProgressBar({ given, target }: { given: number; target: number }) 
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <Target className="w-4 h-4 text-violet-600" />
-          <p className="font-semibold text-sm">התקדמות מעשרות</p>
+          <p className="font-semibold text-sm">התקדמות תרומות</p>
           {surplus && (
             <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-semibold">
               עודף!
@@ -138,7 +137,6 @@ export default function Charity() {
   const [search,      setSearch]      = useState("");
   const [dateFrom,    setDateFrom]    = useState("");
   const [dateTo,      setDateTo]      = useState("");
-  const [typeFilter,  setTypeFilter]  = useState<"all" | "tithe" | "donation">("all");
   const [monthFilter, setMonthFilter] = useState("all");
   const [yearFilter,  setYearFilter]  = useState("all");
   const [groupBy,     setGroupBy]     = useState<GroupBy>("none");
@@ -177,10 +175,9 @@ export default function Charity() {
   const titheRate    = parseFloat(String(budgetYear.tithePercentage)) / 100 || 0.1;
   const netIncome    = incomeSummary.netIncome;
   const titheTarget  = netIncome * titheRate;
-  const titheGiven   = entries.filter(e => e.isTithe).reduce((s, e) => s + e.amount, 0);
   const totalGiven   = entries.reduce((s, e) => s + e.amount, 0);
-  const remaining    = titheTarget - titheGiven;
-  const pct          = titheTarget > 0 ? Math.min(100, (titheGiven / titheTarget) * 100) : 0;
+  const remaining    = titheTarget - totalGiven;
+  const pct          = titheTarget > 0 ? Math.min(100, (totalGiven / titheTarget) * 100) : 0;
 
   /* ── unique years ─────────────────────────────────────────── */
   const uniqueYears = useMemo(() =>
@@ -194,13 +191,11 @@ export default function Charity() {
           !e.description.toLowerCase().includes(search.toLowerCase())) return false;
       if (dateFrom && e.date < dateFrom) return false;
       if (dateTo   && e.date > dateTo)   return false;
-      if (typeFilter === "tithe"    && !e.isTithe)  return false;
-      if (typeFilter === "donation" &&  e.isTithe)  return false;
       if (monthFilter !== "all" && String(new Date(e.date).getMonth() + 1) !== monthFilter) return false;
       if (yearFilter  !== "all" && getYear(e.date) !== yearFilter) return false;
       return true;
     });
-  }, [entries, search, dateFrom, dateTo, typeFilter, monthFilter, yearFilter]);
+  }, [entries, search, dateFrom, dateTo, monthFilter, yearFilter]);
 
   /* ── filtered totals ─────────────────────────────────────── */
   const filteredTotal = filtered.reduce((s, e) => s + e.amount, 0);
@@ -215,7 +210,6 @@ export default function Charity() {
       let key = "", label = "";
       if (groupBy === "month") { key = monthKey(e.date); label = monthLabel(key); }
       if (groupBy === "year")  { key = getYear(e.date); label = `שנת ${key}`; }
-      if (groupBy === "type")  { key = e.isTithe ? "tithe" : "donation"; label = e.isTithe ? "מעשר" : "תרומה"; }
       if (!map[key]) map[key] = { key, label, items: [] };
       map[key].items.push(e);
     }
@@ -224,17 +218,17 @@ export default function Charity() {
       .map(g => ({ ...g, total: g.items.reduce((s, e) => s + e.amount, 0) }));
   }, [filtered, groupBy, filteredTotal]);
 
-  const hasFilters = search || dateFrom || dateTo || typeFilter !== "all" ||
+  const hasFilters = search || dateFrom || dateTo ||
     monthFilter !== "all" || yearFilter !== "all";
   const clearFilters = () => {
     setSearch(""); setDateFrom(""); setDateTo("");
-    setTypeFilter("all"); setMonthFilter("all"); setYearFilter("all");
+    setMonthFilter("all"); setYearFilter("all");
   };
 
   /* ── dialog helpers ──────────────────────────────────────── */
-  const openAdd = (isTithe = true) => {
+  const openAdd = () => {
     setEditItem(null);
-    setForm({ ...EMPTY_FORM, isTithe });
+    setForm({ ...EMPTY_FORM, isTithe: true });
     setTouched(new Set()); setSubmitTried(false);
     setDialog(true);
   };
@@ -282,7 +276,7 @@ export default function Charity() {
         const created = await apiFetch("/charity", { method: "POST", body: JSON.stringify(payload) });
         const parsed  = { ...created, amount: parseFloat(created.amount) };
         setEntries(prev => [parsed, ...prev]);
-        toast({ title: form.isTithe ? "מעשר נרשם" : "תרומה נרשמה" });
+        toast({ title: "תרומה נרשמה" });
       }
       setDialog(false);
     } catch { toast({ title: "שגיאה בשמירה", variant: "destructive" }); }
@@ -310,19 +304,10 @@ export default function Charity() {
   ═══════════════════════════════════════════════════════════ */
   return (
     <div className="space-y-5" dir="rtl">
-      <PageHeader title="צדקה ומעשרות" description="מעקב אחר מעשרות ותרומות ביחס להכנסה נטו">
-        <div className="flex gap-2">
-          <Button
-            onClick={() => openAdd(false)}
-            variant="outline"
-            className="rounded-xl gap-1.5 border-rose-200 text-rose-600 hover:bg-rose-50"
-          >
-            <Gift className="w-4 h-4" /> תרומה
-          </Button>
-          <Button onClick={() => openAdd(true)} className="rounded-xl gap-1.5 bg-violet-600 hover:bg-violet-700">
-            <HeartHandshake className="w-4 h-4" /> מעשר
-          </Button>
-        </div>
+      <PageHeader title="צדקה ותרומות" description="מעקב אחר תרומות ביחס להכנסה נטו">
+        <Button onClick={openAdd} className="rounded-xl gap-1.5 bg-violet-600 hover:bg-violet-700">
+          <Plus className="w-4 h-4" /> הוסף תרומה
+        </Button>
       </PageHeader>
 
       {/* ══ KPI STRIP ══════════════════════════════════════════ */}
@@ -337,7 +322,7 @@ export default function Charity() {
         />
         <KpiCard
           icon={<Percent className="w-4 h-4" />}
-          label="אחוז מעשר"
+          label="אחוז יעד תרומות"
           value={`${parseFloat(String(budgetYear.tithePercentage))}%`}
           sub="כפי שהוגדר בתקציב"
           iconBg="bg-violet-100 text-violet-600"
@@ -345,7 +330,7 @@ export default function Charity() {
         />
         <KpiCard
           icon={<Target className="w-4 h-4" />}
-          label="יעד מעשרות"
+          label="יעד תרומות"
           value={fmt(titheTarget)}
           sub={`${pct.toFixed(0)}% הושלם`}
           iconBg="bg-amber-100 text-amber-600"
@@ -354,14 +339,14 @@ export default function Charity() {
         <KpiCard
           icon={<HeartHandshake className="w-4 h-4" />}
           label="נתרם בפועל"
-          value={fmt(titheGiven)}
-          sub={`${entries.filter(e => e.isTithe).length} תשלומי מעשר`}
+          value={fmt(totalGiven)}
+          sub={`${entries.length} תרומות`}
           iconBg="bg-emerald-100 text-emerald-600"
           valueColor="text-emerald-600"
         />
         <KpiCard
           icon={remaining > 0 ? <CircleDollarSign className="w-4 h-4" /> : <Check className="w-4 h-4" />}
-          label={remaining > 0 ? "נותר לתת" : "עודף מעשרות"}
+          label={remaining > 0 ? "נותר לתת" : "עודף תרומות"}
           value={fmt(Math.abs(remaining))}
           sub={remaining > 0 ? "עדיין נדרש" : "חרגת מהיעד — כל הכבוד!"}
           iconBg={remaining > 0 ? "bg-rose-100 text-rose-600" : "bg-emerald-100 text-emerald-600"}
@@ -370,7 +355,7 @@ export default function Charity() {
       </div>
 
       {/* ══ PROGRESS BAR ═══════════════════════════════════════ */}
-      <TitheProgressBar given={titheGiven} target={titheTarget} />
+      <TitheProgressBar given={totalGiven} target={titheTarget} />
 
       {/* Info banner when no income */}
       {netIncome === 0 && (
@@ -401,18 +386,6 @@ export default function Charity() {
             <Input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
               className="rounded-xl h-9 text-sm w-[130px]" dir="ltr" />
           </div>
-
-          {/* Type */}
-          <Select value={typeFilter} onValueChange={v => setTypeFilter(v as any)}>
-            <SelectTrigger className="rounded-xl h-9 text-sm w-[130px]">
-              <SelectValue placeholder="סוג" />
-            </SelectTrigger>
-            <SelectContent dir="rtl">
-              <SelectItem value="all">מעשר + תרומה</SelectItem>
-              <SelectItem value="tithe">מעשרות בלבד</SelectItem>
-              <SelectItem value="donation">תרומות בלבד</SelectItem>
-            </SelectContent>
-          </Select>
 
           {/* Month */}
           <Select value={monthFilter} onValueChange={setMonthFilter}>
@@ -462,7 +435,6 @@ export default function Charity() {
             {search && <FilterPill label={`חיפוש: "${search}"`} onRemove={() => setSearch("")} />}
             {dateFrom && <FilterPill label={`מ-${dateFrom}`} onRemove={() => setDateFrom("")} />}
             {dateTo   && <FilterPill label={`עד-${dateTo}`}  onRemove={() => setDateTo("")} />}
-            {typeFilter !== "all" && <FilterPill label={typeFilter === "tithe" ? "מעשרות" : "תרומות"} onRemove={() => setTypeFilter("all")} />}
             {monthFilter !== "all" && <FilterPill label={MONTH_HE[parseInt(monthFilter) - 1]} onRemove={() => setMonthFilter("all")} />}
             {yearFilter  !== "all" && <FilterPill label={`שנת ${yearFilter}`} onRemove={() => setYearFilter("all")} />}
           </div>
@@ -475,17 +447,16 @@ export default function Charity() {
           {[1,2,3,4].map(i => <div key={i} className="h-14 bg-muted animate-pulse rounded-xl" />)}
         </div>
       ) : filtered.length === 0 ? (
-        <EmptyState hasFilters={!!hasFilters} onClear={clearFilters} onAdd={() => openAdd(true)} />
+        <EmptyState hasFilters={!!hasFilters} onClear={clearFilters} onAdd={openAdd} />
       ) : (
         <div className="bg-card border border-border/60 rounded-2xl overflow-hidden shadow-sm">
           {/* Header */}
           <div
             className="grid text-xs font-bold text-muted-foreground uppercase tracking-wider px-4 py-3 border-b border-border/50 bg-muted/30"
-            style={{ gridTemplateColumns: "100px 1fr 80px 110px 1fr 72px" }}
+            style={{ gridTemplateColumns: "100px 1fr 110px 1fr 72px" }}
           >
             <span>תאריך</span>
             <span>תיאור / נמען</span>
-            <span>סוג</span>
             <span className="text-left" dir="ltr">סכום</span>
             <span>הערה</span>
             <span className="text-center">פעולות</span>
@@ -529,10 +500,9 @@ export default function Charity() {
           {/* Footer */}
           <div
             className="grid items-center px-4 py-3 border-t border-border/50 bg-muted/20 text-sm"
-            style={{ gridTemplateColumns: "100px 1fr 80px 110px 1fr 72px" }}
+            style={{ gridTemplateColumns: "100px 1fr 110px 1fr 72px" }}
           >
             <span className="text-muted-foreground font-medium">{filtered.length} רשומות</span>
-            <span />
             <span />
             <div dir="ltr">
               <div className="font-bold text-violet-600 tabular-nums">{fmt(filteredTotal)}</div>
@@ -617,21 +587,15 @@ function TitheRow({ entry, onEdit, onDelete }: {
   return (
     <div
       className="grid items-center px-4 py-3 border-b border-border/30 hover:bg-muted/20 transition-colors group text-sm"
-      style={{ gridTemplateColumns: "100px 1fr 80px 110px 1fr 72px" }}
+      style={{ gridTemplateColumns: "100px 1fr 110px 1fr 72px" }}
     >
       {/* תאריך */}
       <span className="text-muted-foreground text-xs tabular-nums">{fmtDate(entry.date)}</span>
 
       {/* תיאור / נמען */}
       <div className="flex items-center gap-2 min-w-0">
-        <div className={cn(
-          "w-8 h-8 rounded-xl flex items-center justify-center shrink-0",
-          entry.isTithe ? "bg-violet-100" : "bg-rose-100"
-        )}>
-          {entry.isTithe
-            ? <HeartHandshake className="w-4 h-4 text-violet-600" />
-            : <Gift className="w-4 h-4 text-rose-500" />
-          }
+        <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 bg-violet-100">
+          <HeartHandshake className="w-4 h-4 text-violet-600" />
         </div>
         <span className="font-medium truncate">{entry.recipient}</span>
         {entry.receiptNumber && (
@@ -641,21 +605,8 @@ function TitheRow({ entry, onEdit, onDelete }: {
         )}
       </div>
 
-      {/* סוג */}
-      <span className={cn(
-        "text-xs font-semibold px-2 py-0.5 rounded-full w-fit",
-        entry.isTithe
-          ? "bg-violet-100 text-violet-700"
-          : "bg-rose-100 text-rose-600"
-      )}>
-        {entry.isTithe ? "מעשר" : "תרומה"}
-      </span>
-
       {/* סכום */}
-      <span
-        className={cn("font-bold tabular-nums", entry.isTithe ? "text-violet-600" : "text-rose-600")}
-        dir="ltr"
-      >
+      <span className="font-bold tabular-nums text-violet-600" dir="ltr">
         {fmt(entry.amount)}
       </span>
 
@@ -683,9 +634,9 @@ function EmptyState({ hasFilters, onClear, onAdd }: { hasFilters: boolean; onCle
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center border-2 border-dashed border-border/50 rounded-2xl bg-muted/10">
       <HeartHandshake className="w-10 h-10 text-muted-foreground/30 mb-3" />
-      <p className="font-semibold text-muted-foreground">אין רשומות תרומה</p>
+      <p className="font-semibold text-muted-foreground">אין תרומות רשומות</p>
       <p className="text-sm text-muted-foreground/70 mt-1">
-        {hasFilters ? "אין תוצאות לפילטרים הנוכחיים" : "הוסף את המעשר הראשון שלך"}
+        {hasFilters ? "אין תוצאות לפילטרים הנוכחיים" : "הוסף את התרומה הראשונה שלך"}
       </p>
       <div className="flex gap-2 mt-4">
         {hasFilters && (
@@ -694,7 +645,7 @@ function EmptyState({ hasFilters, onClear, onAdd }: { hasFilters: boolean; onCle
           </Button>
         )}
         <Button size="sm" onClick={onAdd} className="rounded-xl gap-1.5 bg-violet-600 hover:bg-violet-700">
-          <Plus className="w-3.5 h-3.5" /> מעשר חדש
+          <Plus className="w-3.5 h-3.5" /> תרומה חדשה
         </Button>
       </div>
     </div>
@@ -729,10 +680,7 @@ function TitheDialog({
     if (open) setTimeout(() => amountRef.current?.focus(), 80);
   }, [open]);
 
-  const isEdit   = !!editItem;
-  const isTithe  = form.isTithe;
-  const accentCls = isTithe ? "bg-violet-600" : "bg-rose-600";
-  const ringCls   = isTithe ? "focus-visible:ring-violet-300" : "focus-visible:ring-rose-300";
+  const isEdit = !!editItem;
 
   return (
     <Dialog open={open} onOpenChange={v => !v && onClose()}>
@@ -741,58 +689,25 @@ function TitheDialog({
         dir="rtl"
       >
         {/* Header */}
-        <div className={cn(
-          "flex items-center gap-3 px-6 pt-6 pb-4 border-b border-border/40",
-          isTithe
-            ? "bg-gradient-to-l from-violet-50/60 to-white"
-            : "bg-gradient-to-l from-rose-50/60 to-white"
-        )}>
-          <div className={cn("w-10 h-10 rounded-2xl flex items-center justify-center shadow-sm shrink-0", accentCls)}>
-            {isTithe ? <HeartHandshake className="w-5 h-5 text-white" /> : <Gift className="w-5 h-5 text-white" />}
+        <div className="flex items-center gap-3 px-6 pt-6 pb-4 border-b border-border/40 bg-gradient-to-l from-violet-50/60 to-white">
+          <div className="w-10 h-10 rounded-2xl flex items-center justify-center shadow-sm shrink-0 bg-violet-600">
+            <HeartHandshake className="w-5 h-5 text-white" />
           </div>
           <div>
             <DialogTitle className="text-lg font-bold text-foreground leading-tight">
-              {isEdit
-                ? (isTithe ? "עריכת מעשר" : "עריכת תרומה")
-                : (isTithe ? "מעשר חדש"   : "תרומה חדשה")
-              }
+              {isEdit ? "עריכת תרומה" : "תרומה חדשה"}
             </DialogTitle>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              {isTithe ? "רישום תשלום מעשר" : "רישום תרומה כללית"}
-            </p>
+            <p className="text-xs text-muted-foreground mt-0.5">רישום תרומה</p>
           </div>
         </div>
 
         {/* Body */}
         <div className="px-6 py-5 space-y-5 max-h-[70vh] overflow-y-auto">
 
-          {/* Type toggle */}
-          <div className="grid grid-cols-2 gap-2 p-1 bg-muted/60 rounded-2xl">
-            {([
-              { v: true,  label: "מעשר",  Icon: HeartHandshake, cls: "bg-violet-600" },
-              { v: false, label: "תרומה", Icon: Gift,            cls: "bg-rose-600"  },
-            ] as const).map(t => (
-              <button
-                key={String(t.v)}
-                type="button"
-                onClick={() => setField("isTithe", t.v)}
-                className={cn(
-                  "flex items-center justify-center gap-1.5 py-2 rounded-xl text-sm font-semibold transition-all",
-                  form.isTithe === t.v
-                    ? `${t.cls} text-white shadow-sm`
-                    : "text-muted-foreground hover:text-foreground"
-                )}
-              >
-                <t.Icon className="w-4 h-4" />
-                {t.label}
-              </button>
-            ))}
-          </div>
-
           {/* Amount */}
           <div>
             <Label className="text-sm font-semibold flex items-center gap-1 mb-1.5">
-              <CircleDollarSign className={cn("w-3.5 h-3.5", isTithe ? "text-violet-600" : "text-rose-600")} />
+              <CircleDollarSign className="w-3.5 h-3.5 text-violet-600" />
               סכום <span className="text-rose-500">*</span>
             </Label>
             <div className="relative">
@@ -806,7 +721,7 @@ function TitheDialog({
                 placeholder="0.00"
                 className={cn(
                   "pr-9 text-2xl font-bold h-14 rounded-2xl tabular-nums text-left",
-                  errAmount ? "border-rose-400 focus-visible:ring-rose-300 bg-rose-50/40" : ringCls
+                  errAmount ? "border-rose-400 focus-visible:ring-rose-300 bg-rose-50/40" : "focus-visible:ring-violet-300"
                 )}
               />
             </div>
@@ -816,17 +731,16 @@ function TitheDialog({
           {/* Recipient */}
           <div>
             <Label className="text-sm font-semibold flex items-center gap-1 mb-1.5">
-              {isTithe ? "נמען / ארגון" : "תיאור התרומה"}
-              <span className="text-rose-500">*</span>
+              נמען / ארגון <span className="text-rose-500">*</span>
             </Label>
             <Input
               value={form.recipient}
               onChange={e => setField("recipient", e.target.value)}
               onBlur={() => touch("recipient")}
-              placeholder={isTithe ? "שם הארגון או האדם..." : "לדוגמה: עמותה, צדקה..."}
+              placeholder="שם הארגון או האדם..."
               className={cn(
                 "rounded-2xl",
-                errRecipient ? "border-rose-400 focus-visible:ring-rose-300 bg-rose-50/40" : ringCls
+                errRecipient ? "border-rose-400 focus-visible:ring-rose-300 bg-rose-50/40" : "focus-visible:ring-violet-300"
               )}
             />
             <FieldError msg={errRecipient} />
@@ -835,7 +749,7 @@ function TitheDialog({
           {/* Date */}
           <div>
             <Label className="text-sm font-semibold flex items-center gap-1 mb-1.5">
-              <CalendarDays className={cn("w-3.5 h-3.5", isTithe ? "text-violet-600" : "text-rose-600")} />
+              <CalendarDays className="w-3.5 h-3.5 text-violet-600" />
               תאריך <span className="text-rose-500">*</span>
             </Label>
             <Input
@@ -845,7 +759,7 @@ function TitheDialog({
               onBlur={() => touch("date")}
               className={cn(
                 "rounded-2xl max-w-[200px]",
-                errDate ? "border-rose-400 focus-visible:ring-rose-300 bg-rose-50/40" : ringCls
+                errDate ? "border-rose-400 focus-visible:ring-rose-300 bg-rose-50/40" : "focus-visible:ring-violet-300"
               )}
             />
             <FieldError msg={errDate} />
@@ -854,7 +768,7 @@ function TitheDialog({
           {/* Receipt number */}
           <div>
             <Label className="text-sm font-semibold flex items-center gap-1 mb-1.5">
-              <Receipt className={cn("w-3.5 h-3.5", isTithe ? "text-violet-600" : "text-rose-600")} />
+              <Receipt className="w-3.5 h-3.5 text-violet-600" />
               מספר קבלה
               <span className="text-xs font-normal text-muted-foreground mr-1">(אופציונלי)</span>
             </Label>
@@ -862,7 +776,7 @@ function TitheDialog({
               value={form.receiptNumber}
               onChange={e => setField("receiptNumber", e.target.value)}
               placeholder="מספר קבלה לתיעוד..."
-              className={cn("rounded-2xl", ringCls)}
+              className="rounded-2xl focus-visible:ring-violet-300"
               dir="ltr"
             />
           </div>
@@ -870,7 +784,7 @@ function TitheDialog({
           {/* Notes */}
           <div>
             <Label className="text-sm font-semibold flex items-center gap-1 mb-1.5">
-              <StickyNote className={cn("w-3.5 h-3.5", isTithe ? "text-violet-600" : "text-rose-600")} />
+              <StickyNote className="w-3.5 h-3.5 text-violet-600" />
               הערה
               <span className="text-xs font-normal text-muted-foreground mr-1">(אופציונלי)</span>
             </Label>
@@ -879,12 +793,7 @@ function TitheDialog({
               onChange={e => setField("description", e.target.value)}
               placeholder="הערות נוספות..."
               rows={2}
-              className={cn(
-                "w-full rounded-2xl border border-input bg-background px-3 py-2 text-sm",
-                "ring-offset-background placeholder:text-muted-foreground resize-none",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
-                isTithe ? "focus-visible:ring-violet-300" : "focus-visible:ring-rose-300"
-              )}
+              className="w-full rounded-2xl border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground resize-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-violet-300"
             />
           </div>
         </div>
@@ -897,16 +806,13 @@ function TitheDialog({
           <Button
             onClick={onSave}
             disabled={saving}
-            className={cn(
-              "rounded-2xl flex-1 h-10 text-white shadow-sm",
-              isTithe ? "bg-violet-600 hover:bg-violet-700" : "bg-rose-600 hover:bg-rose-700"
-            )}
+            className="rounded-2xl flex-1 h-10 text-white shadow-sm bg-violet-600 hover:bg-violet-700"
           >
             {saving
               ? <Loader2 className="w-4 h-4 animate-spin ml-1.5" />
               : <Check className="w-4 h-4 ml-1.5" />
             }
-            {isEdit ? "שמור שינויים" : (isTithe ? "שמור מעשר" : "שמור תרומה")}
+            {isEdit ? "שמור שינויים" : "שמור תרומה"}
           </Button>
         </div>
       </DialogContent>
