@@ -14,6 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiFetch } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { useCashCurrentMonth, defaultDateForMonth } from "@/hooks/useCashCurrentMonth";
+import { useCashFund } from "@/hooks/useCashFund";
 import { useBudgetYear } from "@/contexts/BudgetYearContext";
 
 /* ── types ───────────────────────────────────────────────── */
@@ -68,6 +69,7 @@ export function QuickActions() {
   const { toast } = useToast();
   const { currentMonth } = useCashCurrentMonth();
   const { activeBid } = useBudgetYear();
+  const { cashFundId } = useCashFund();
   const [activeDialog, setActiveDialog] = useState<DialogType>(null);
   const [saving, setSaving] = useState(false);
 
@@ -80,8 +82,9 @@ export function QuickActions() {
     apiFetch("/categories").then(setCategories).catch(() => {});
   }, []);
 
-  const expenseFunds = funds.filter(f => EXPENSE_BEHAVIORS.has(f.fundBehavior));
-  const cashFunds    = funds.filter(f => CASH_BEHAVIORS.has(f.fundBehavior));
+  const expenseFunds  = funds.filter(f => EXPENSE_BEHAVIORS.has(f.fundBehavior));
+  const cashFunds     = funds.filter(f => CASH_BEHAVIORS.has(f.fundBehavior));
+  const cashFundName  = cashFundId ? (funds.find(f => f.id === cashFundId)?.name ?? "קופת שוטף") : null;
 
   const close = () => setActiveDialog(null);
 
@@ -91,10 +94,12 @@ export function QuickActions() {
   type ExpenseForm = {
     name: string; notes: string; amount: string; date: string;
     paymentMethod: string; fundId: string; categoryId: string; isRecurring: boolean;
+    takenFromCash: boolean;
   };
   const EXPENSE_EMPTY: ExpenseForm = {
     name: "", notes: "", amount: "", date: today(),
     paymentMethod: "credit", fundId: "", categoryId: "", isRecurring: false,
+    takenFromCash: false,
   };
   const [ef, setEf] = useState<ExpenseForm>(EXPENSE_EMPTY);
   const [eTouched, setETouched] = useState<Partial<Record<keyof ExpenseForm, boolean>>>({});
@@ -136,7 +141,21 @@ export function QuickActions() {
           isRecurring:   ef.isRecurring,
         }),
       });
-      toast({ title: "הוצאה נרשמה ✓" });
+      /* also record withdrawal from cash fund if checked */
+      if (ef.takenFromCash && cashFundId) {
+        await apiFetch(`/wallet?bid=${activeBid}`, {
+          method: "POST",
+          body: JSON.stringify({
+            fundId:      cashFundId,
+            type:        "withdrawal",
+            amount:      parseFloat(ef.amount),
+            description: ef.name.trim(),
+            date:        ef.date,
+            activeMonth: ef.date.slice(0, 7),
+          }),
+        });
+      }
+      toast({ title: ef.takenFromCash && cashFundId ? "הוצאה נרשמה + נלקח מקופת שוטף ✓" : "הוצאה נרשמה ✓" });
       close();
     } catch { toast({ title: "שגיאה בשמירה", variant: "destructive" }); }
     finally { setSaving(false); }
@@ -515,6 +534,30 @@ export function QuickActions() {
                 <p className="text-xs text-muted-foreground">סמן אם הוצאה זו מתרחשת באופן קבוע</p>
               </div>
             </label>
+
+            {/* Taken from cash fund */}
+            {cashFundName && (
+              <label className="flex items-center gap-3 cursor-pointer group select-none">
+                <span
+                  onClick={() => efSet("takenFromCash", !ef.takenFromCash)}
+                  className={cn(
+                    "w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition-colors",
+                    ef.takenFromCash ? "bg-amber-500 border-amber-500" : "border-border group-hover:border-amber-400"
+                  )}
+                >
+                  {ef.takenFromCash && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
+                </span>
+                <div>
+                  <span className="text-sm font-medium flex items-center gap-1.5">
+                    <Wallet className="w-3.5 h-3.5 text-amber-500" />
+                    נלקח מקופת שוטף
+                  </span>
+                  <p className="text-xs text-muted-foreground">
+                    תירשם תנועת "נלקח" בקופה <span className="font-medium text-foreground">{cashFundName}</span>
+                  </p>
+                </div>
+              </label>
+            )}
           </div>
 
           {/* Footer */}

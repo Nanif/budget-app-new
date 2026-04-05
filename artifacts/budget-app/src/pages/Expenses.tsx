@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import { useBudgetYear } from "@/contexts/BudgetYearContext";
+import { useCashFund } from "@/hooks/useCashFund";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -70,6 +71,7 @@ function todayStr() { return new Date().toISOString().split("T")[0]; }
 type ExpenseForm = {
   name: string; notes: string; amount: string; date: string;
   paymentMethod: string; fundId: string; categoryId: string; isRecurring: boolean;
+  takenFromCash: boolean;
 };
 function formToPayload(f: ExpenseForm) {
   return {
@@ -91,11 +93,13 @@ function expenseToForm(e: Expense): ExpenseForm {
     fundId: e.fundId ? String(e.fundId) : "",
     categoryId: e.categoryId ? String(e.categoryId) : "",
     isRecurring: e.isRecurring ?? false,
+    takenFromCash: false,
   };
 }
 const EMPTY_FORM: ExpenseForm = {
   name: "", notes: "", amount: "", date: todayStr(),
   paymentMethod: "credit", fundId: "", categoryId: "", isRecurring: false,
+  takenFromCash: false,
 };
 
 /* ═══════════════════════════════════════════════════════════
@@ -104,6 +108,7 @@ const EMPTY_FORM: ExpenseForm = {
 export default function Expenses() {
   const { toast } = useToast();
   const { activeBid } = useBudgetYear();
+  const { cashFundId } = useCashFund();
 
   /* ── data ────────────────────────────────────────────────── */
   const [expenses,   setExpenses]   = useState<Expense[]>([]);
@@ -253,7 +258,22 @@ export default function Expenses() {
         const created = await apiFetch("/expenses", { method: "POST", body: JSON.stringify(payload) });
         const parsed  = { ...created, amount: parseFloat(created.amount) };
         setExpenses(prev => [parsed, ...prev]);
-        toast({ title: "הוצאה נוספה" });
+        /* also record withdrawal from cash fund if checked */
+        if (form.takenFromCash && cashFundId) {
+          const activeMonth = form.date.slice(0, 7);
+          await apiFetch(`/wallet?bid=${activeBid}`, {
+            method: "POST",
+            body: JSON.stringify({
+              fundId:      cashFundId,
+              type:        "withdrawal",
+              amount:      parseFloat(form.amount),
+              description: form.name.trim(),
+              date:        form.date,
+              activeMonth,
+            }),
+          });
+        }
+        toast({ title: form.takenFromCash && cashFundId ? "הוצאה נוספה + נלקח מקופת שוטף" : "הוצאה נוספה" });
       }
       setDialog(false);
     } catch { toast({ title: "שגיאה בשמירה", variant: "destructive" }); }
@@ -505,6 +525,7 @@ export default function Expenses() {
         errDate={errDate}
         saving={saving}
         onSave={saveExpense}
+        cashFundName={cashFundId ? (funds.find(f => f.id === cashFundId)?.name ?? "קופת שוטף") : null}
       />
 
       {/* ══ DELETE CONFIRM ══════════════════════════════════════ */}
@@ -547,7 +568,7 @@ function ExpenseDialog({
   open, onClose, editItem, form, setField, touch,
   funds, availableCats,
   errName, errAmount, errFund, errDate,
-  saving, onSave,
+  saving, onSave, cashFundName,
 }: {
   open: boolean; onClose: () => void;
   editItem: Expense | null;
@@ -557,6 +578,7 @@ function ExpenseDialog({
   funds: Fund[]; availableCats: Category[];
   errName: string; errAmount: string; errFund: string; errDate: string;
   saving: boolean; onSave: () => void;
+  cashFundName: string | null;
 }) {
   const amountRef = useRef<HTMLInputElement>(null);
   /* auto-focus amount when dialog opens */
@@ -777,6 +799,32 @@ function ExpenseDialog({
               <p className="text-xs text-muted-foreground">סמן אם הוצאה זו מתרחשת באופן קבוע</p>
             </div>
           </label>
+
+          {/* Taken from cash fund — only for new expenses */}
+          {!isEdit && cashFundName && (
+            <label className="flex items-center gap-3 cursor-pointer group select-none">
+              <span
+                onClick={() => setField("takenFromCash", !form.takenFromCash)}
+                className={cn(
+                  "w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition-colors",
+                  form.takenFromCash
+                    ? "bg-amber-500 border-amber-500"
+                    : "border-border group-hover:border-amber-400"
+                )}
+              >
+                {form.takenFromCash && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
+              </span>
+              <div>
+                <span className="text-sm font-medium flex items-center gap-1.5">
+                  <Wallet className="w-3.5 h-3.5 text-amber-500" />
+                  נלקח מקופת שוטף
+                </span>
+                <p className="text-xs text-muted-foreground">
+                  תירשם תנועת "נלקח" בקופה <span className="font-medium text-foreground">{cashFundName}</span>
+                </p>
+              </div>
+            </label>
+          )}
         </div>
 
         {/* ── Footer ────────────────────────────────────────────── */}
