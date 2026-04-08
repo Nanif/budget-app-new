@@ -309,18 +309,19 @@ function RemindersCard({ tasks, onAdd, onToggle, onUpdate, onDelete }: {
   const { toast } = useToast();
   const [open, setOpen]         = useState(false);
   const [title, setTitle]       = useState("");
-  const [priority, setPriority] = useState("medium");
   const [saving, setSaving]     = useState(false);
   const [togglingId, setTogglingId]   = useState<number | null>(null);
   const [deletingId, setDeletingId]   = useState<number | null>(null);
+  const [highlightingId, setHighlightingId] = useState<number | null>(null);
   const [editId, setEditId]           = useState<number | null>(null);
   const [editTitle, setEditTitle]     = useState("");
   const editRef = useRef<HTMLInputElement>(null);
 
   const sorted = [...tasks].sort((a, b) => {
-    const order: Record<string, number> = { high: 0, medium: 1, low: 2 };
     if (a.status !== b.status) return a.status === "done" ? 1 : -1;
-    return (order[a.priority] ?? 1) - (order[b.priority] ?? 1);
+    const aH = a.priority === "high" ? 0 : 1;
+    const bH = b.priority === "high" ? 0 : 1;
+    return aH - bH;
   });
 
   const openEdit = (t: Task) => {
@@ -349,11 +350,18 @@ function RemindersCard({ tasks, onAdd, onToggle, onUpdate, onDelete }: {
     finally { setDeletingId(null); }
   };
 
+  const handleHighlight = async (task: Task) => {
+    setHighlightingId(task.id);
+    try { await onUpdate(task.id, { priority: task.priority === "high" ? "medium" : "high" }); }
+    catch { toast({ title: "שגיאה", variant: "destructive" }); }
+    finally { setHighlightingId(null); }
+  };
+
   const handleAdd = async () => {
     if (!title.trim()) { toast({ title: "כותרת נדרשת", variant: "destructive" }); return; }
     setSaving(true);
     try {
-      await onAdd(title.trim(), priority);
+      await onAdd(title.trim(), "medium");
       setTitle(""); setOpen(false);
     } catch { toast({ title: "שגיאה", variant: "destructive" }); }
     finally { setSaving(false); }
@@ -397,22 +405,34 @@ function RemindersCard({ tasks, onAdd, onToggle, onUpdate, onDelete }: {
               ) : (
                 /* View row */
                 <>
-                  <span className={cn("text-[10px] px-1.5 py-0.5 rounded-full border mt-0.5 shrink-0", PRIORITY_COLOR[task.priority])}>
-                    {task.priority === "high" ? "דחוף" : task.priority === "low" ? "נמוך" : "רגיל"}
-                  </span>
-                  <p className={cn("flex-1 text-sm leading-snug", task.status === "done" && "line-through")}>{task.title}</p>
+                  <p className={cn(
+                    "flex-1 text-sm leading-snug",
+                    task.status === "done" && "line-through",
+                    task.priority === "high" && task.status !== "done" && "font-semibold text-amber-700"
+                  )}>{task.priority === "high" && task.status !== "done" && "★ "}{task.title}</p>
 
                   {/* Actions — visible on hover */}
                   <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                    {/* הבלט */}
+                    <button onClick={() => handleHighlight(task)} disabled={highlightingId === task.id}
+                      title={task.priority === "high" ? "הסר הבלטה" : "הבלט משימה"}
+                      className={cn("p-1 rounded transition-colors",
+                        task.priority === "high"
+                          ? "text-amber-500 hover:bg-amber-50"
+                          : "text-muted-foreground hover:bg-amber-50 hover:text-amber-500")}>
+                      {highlightingId === task.id
+                        ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        : <Sun className="w-3.5 h-3.5" />}
+                    </button>
                     {/* הזרח / toggle */}
                     <button onClick={() => handleToggle(task.id)} disabled={togglingId === task.id}
-                      title={task.status === "done" ? "בטל סימון" : "הזרח"}
-                      className="p-1 rounded hover:bg-amber-50 text-muted-foreground hover:text-amber-600 transition-colors">
+                      title={task.status === "done" ? "בטל סימון" : "סמן כבוצע"}
+                      className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors">
                       {togglingId === task.id
                         ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
                         : task.status === "done"
                           ? <Circle className="w-3.5 h-3.5" />
-                          : <Sun className="w-3.5 h-3.5" />}
+                          : <Check className="w-3.5 h-3.5" />}
                     </button>
                     {/* מחיקה */}
                     <button onClick={() => handleDelete(task.id)} disabled={deletingId === task.id}
@@ -430,26 +450,15 @@ function RemindersCard({ tasks, onAdd, onToggle, onUpdate, onDelete }: {
       {/* Quick-add */}
       <div className="border-t border-border/50 px-4 py-3 shrink-0">
         {open ? (
-          <div className="space-y-2">
-            <div className="flex gap-1.5">
-              {[{ v: "high", l: "דחוף" }, { v: "medium", l: "רגיל" }, { v: "low", l: "נמוך" }].map(p => (
-                <button key={p.v} onClick={() => setPriority(p.v)}
-                  className={cn("flex-1 text-xs py-1.5 rounded-lg border font-medium transition-colors",
-                    priority === p.v ? "bg-foreground text-background border-foreground" : "border-border text-muted-foreground")}>
-                  {p.l}
-                </button>
-              ))}
-            </div>
-            <div className="flex gap-2 items-center">
-              <Input value={title} onChange={e => setTitle(e.target.value)}
-                placeholder="משימה חדשה..." className="rounded-lg h-8 text-sm flex-1" autoFocus
-                onKeyDown={e => e.key === "Enter" && handleAdd()} />
-              <button onClick={handleAdd} disabled={saving}
-                className="p-1.5 rounded-lg bg-amber-500 text-white hover:bg-amber-600 transition-colors">
-                {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
-              </button>
-              <button onClick={() => { setTitle(""); setOpen(false); }} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground transition-colors text-xs">ביטול</button>
-            </div>
+          <div className="flex gap-2 items-center">
+            <Input value={title} onChange={e => setTitle(e.target.value)}
+              placeholder="משימה חדשה..." className="rounded-lg h-8 text-sm flex-1" autoFocus
+              onKeyDown={e => e.key === "Enter" && handleAdd()} />
+            <button onClick={handleAdd} disabled={saving}
+              className="p-1.5 rounded-lg bg-amber-500 text-white hover:bg-amber-600 transition-colors">
+              {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+            </button>
+            <button onClick={() => { setTitle(""); setOpen(false); }} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground transition-colors text-xs">ביטול</button>
           </div>
         ) : (
           <button onClick={() => setOpen(true)}
