@@ -112,7 +112,7 @@ export default function Home() {
   if (loading) {
     return (
       <div dir="rtl">
-        <PageHeader title="דף הבית" description="פתקים, תזכורות וחובות" />
+        <PageHeader title="לוח" description="פתקים, תזכורות וחובות" />
         <div className="grid grid-cols-3 gap-4 h-[calc(100vh-200px)]">
           {[1, 2, 3].map(i => <div key={i} className="bg-muted animate-pulse rounded-2xl h-full" />)}
         </div>
@@ -122,7 +122,7 @@ export default function Home() {
 
   return (
     <div dir="rtl" className="flex flex-col h-[calc(100vh-80px)]">
-      <PageHeader title="דף הבית" description="פתקים, תזכורות וחובות" />
+      <PageHeader title="לוח" description="פתקים, תזכורות וחובות" />
       <div className="grid grid-cols-3 gap-4 flex-1 min-h-0">
       <DebtsCard
         debts={debts}
