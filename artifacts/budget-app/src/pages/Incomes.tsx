@@ -97,7 +97,6 @@ function monthLabel(k: string) {
   return `${MONTH_HE[parseInt(m) - 1]} ${y}`;
 }
 function getMonth(d: string) { return String(new Date(d).getMonth() + 1); }
-function getYear(d: string)  { return String(new Date(d).getFullYear()); }
 
 /* ═══════════════════════════════════════════════════════════
    MAIN PAGE
@@ -158,9 +157,7 @@ export default function Incomes() {
   }, [entries, search, dateFrom, dateTo, monthFilter, typeFilter]);
 
   /* ── KPIs ─────────────────────────────────────────────────── */
-  const now = new Date();
   const curMonthKey = monthKey(todayStr());
-  const curYear = String(now.getFullYear());
 
   const incomeOnly   = entries.filter(e => e.entryType === "income");
   const totalIncome  = incomeOnly.reduce((s, e) => s + e.amount, 0);
@@ -170,10 +167,6 @@ export default function Incomes() {
 
   const thisMonthIncome = incomeOnly
     .filter(e => monthKey(e.date) === curMonthKey)
-    .reduce((s, e) => s + e.amount, 0);
-
-  const ytdIncome = incomeOnly
-    .filter(e => getYear(e.date) === curYear)
     .reduce((s, e) => s + e.amount, 0);
 
   /* ── grouped ─────────────────────────────────────────────── */
@@ -295,7 +288,7 @@ export default function Incomes() {
       </PageHeader>
 
       {/* ══ KPI STRIP ══════════════════════════════════════════ */}
-      <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <KpiCard
           icon={<Landmark className="w-4 h-4" />}
           label='סה"כ הכנסות'
@@ -319,14 +312,6 @@ export default function Incomes() {
           sub={monthLabel(curMonthKey)}
           iconBg="bg-blue-100 text-blue-600"
           valueColor="text-blue-600"
-        />
-        <KpiCard
-          icon={<TrendingUp className="w-4 h-4" />}
-          label="שנה עד כה"
-          value={fmt(ytdIncome)}
-          sub={`שנת ${curYear}`}
-          iconBg="bg-violet-100 text-violet-600"
-          valueColor="text-violet-600"
         />
       </div>
 
