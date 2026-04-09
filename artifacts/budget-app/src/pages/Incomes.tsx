@@ -159,8 +159,11 @@ export default function Incomes() {
   /* ── KPIs ─────────────────────────────────────────────────── */
   const curMonthKey = monthKey(todayStr());
 
-  const incomeOnly   = entries.filter(e => e.entryType === "income");
-  const totalIncome  = incomeOnly.reduce((s, e) => s + e.amount, 0);
+  const incomeOnly      = entries.filter(e => e.entryType === "income");
+  const deductionsOnly  = entries.filter(e => e.entryType === "work_deduction");
+  const totalIncome     = incomeOnly.reduce((s, e) => s + e.amount, 0);
+  const totalDeductions = deductionsOnly.reduce((s, e) => s + e.amount, 0);
+  const netIncome       = totalIncome - totalDeductions;
 
   const monthsWithIncome = new Set(incomeOnly.map(e => monthKey(e.date))).size;
   const avgMonthly = monthsWithIncome > 0 ? totalIncome / monthsWithIncome : 0;
