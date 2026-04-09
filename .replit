@@ -30,4 +30,3 @@ channel = "stable-25_05"
 [userenv]
 
 [userenv.shared]
-VITE_ACCESS_TOKEN = "L7IY6pHvF9PjJzwDLoiUwQoH95mMZ2Km"
