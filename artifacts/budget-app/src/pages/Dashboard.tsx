@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
 import { Link } from "wouter";
+import { PageHeader } from "@/components/PageHeader";
 import { useBudgetYear } from "@/contexts/BudgetYearContext";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
@@ -147,6 +148,7 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-8" dir="rtl">
+      <PageHeader title="דשבורד" description="סקירה כוללת של מצבך הפיננסי" />
 
       {/* ══ שורה עליונה: מעשרות/שוטף + גרף ══════════════════════ */}
       <div className="grid grid-cols-1 lg:grid-cols-[380px_1fr] gap-6 items-start">
