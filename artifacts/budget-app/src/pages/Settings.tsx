@@ -60,7 +60,6 @@ function BudgetYearsSection() {
     name: `שנת תקציב ${nextYear}`,
     startDate: `${nextYear}-01-01`,
     endDate:   `${nextYear}-12-31`,
-    totalBudget: "",
     tithePercentage: "10",
   });
 
@@ -75,13 +74,12 @@ function BudgetYearsSection() {
         name: createForm.name,
         startDate: createForm.startDate,
         endDate:   createForm.endDate,
-        totalBudget: createForm.totalBudget || "0",
         tithePercentage: createForm.tithePercentage || "10",
         isActive: false,
       });
       toast({ title: "שנת תקציב נוצרה", description: createForm.name });
       setShowCreate(false);
-      setCreateForm({ name: `שנת תקציב ${nextYear}`, startDate: `${nextYear}-01-01`, endDate: `${nextYear}-12-31`, totalBudget: "", tithePercentage: "10" });
+      setCreateForm({ name: `שנת תקציב ${nextYear}`, startDate: `${nextYear}-01-01`, endDate: `${nextYear}-12-31`, tithePercentage: "10" });
     } catch (e: any) {
       toast({ title: "שגיאה", description: e.message, variant: "destructive" });
     } finally { setSaving(false); }
@@ -89,7 +87,7 @@ function BudgetYearsSection() {
 
   /* edit */
   const [editTarget, setEditTarget] = useState<BudgetYear | null>(null);
-  const [editForm, setEditForm] = useState({ name: "", startDate: "", endDate: "", totalBudget: "", tithePercentage: "" });
+  const [editForm, setEditForm] = useState({ name: "", startDate: "", endDate: "", tithePercentage: "" });
 
   const openEdit = (year: BudgetYear) => {
     setEditTarget(year);
@@ -97,7 +95,6 @@ function BudgetYearsSection() {
       name: year.name,
       startDate: year.startDate?.split("T")[0] || "",
       endDate:   year.endDate?.split("T")[0] || "",
-      totalBudget: String(year.totalBudget || ""),
       tithePercentage: String(year.tithePercentage || "10"),
     });
   };
@@ -110,7 +107,6 @@ function BudgetYearsSection() {
         name: editForm.name,
         startDate: editForm.startDate,
         endDate:   editForm.endDate,
-        totalBudget: editForm.totalBudget || "0",
         tithePercentage: editForm.tithePercentage || "10",
         isActive: editTarget.isActive,
         userId: editTarget.userId,
@@ -153,15 +149,9 @@ function BudgetYearsSection() {
           <Input type="date" value={form.endDate} onChange={e => setForm(f => ({ ...f, endDate: e.target.value }))} className="rounded-xl" />
         </div>
       </div>
-      <div className="grid grid-cols-2 gap-3">
-        <div className="space-y-1.5">
-          <Label>תקציב שנתי (₪)</Label>
-          <Input type="number" value={form.totalBudget} onChange={e => setForm(f => ({ ...f, totalBudget: e.target.value }))} placeholder="0" className="rounded-xl" dir="ltr" />
-        </div>
-        <div className="space-y-1.5">
-          <Label>אחוז מעשר (%)</Label>
-          <Input type="number" value={form.tithePercentage} onChange={e => setForm(f => ({ ...f, tithePercentage: e.target.value }))} min={0} max={100} className="rounded-xl" dir="ltr" />
-        </div>
+      <div className="space-y-1.5">
+        <Label>אחוז מעשר (%)</Label>
+        <Input type="number" value={form.tithePercentage} onChange={e => setForm(f => ({ ...f, tithePercentage: e.target.value }))} min={0} max={100} className="rounded-xl" dir="ltr" />
       </div>
     </div>
   );

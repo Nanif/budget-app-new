@@ -151,7 +151,7 @@ export default function Budget() {
 
   /* ── year edit ───────────────────────────────────────────── */
   const [yearEdit,   setYearEdit]   = useState(false);
-  const [yearForm,   setYearForm]   = useState({ name: "", totalBudget: "", tithePercentage: "" });
+  const [yearForm,   setYearForm]   = useState({ name: "", tithePercentage: "" });
   const [yearSaving, setYearSaving] = useState(false);
 
   /* ── fund dialog ─────────────────────────────────────────── */
@@ -222,7 +222,7 @@ export default function Budget() {
   /* ── year edit helpers ───────────────────────────────────── */
   const openYearEdit = () => {
     if (!year) return;
-    setYearForm({ name: year.name, totalBudget: String(year.totalBudget), tithePercentage: String(year.tithePercentage) });
+    setYearForm({ name: year.name, tithePercentage: String(year.tithePercentage) });
     setYearEdit(true);
   };
   const saveYear = async () => {
@@ -232,7 +232,6 @@ export default function Budget() {
         method: "PUT",
         body: JSON.stringify({
           name: yearForm.name,
-          totalBudget: parseFloat(yearForm.totalBudget) || 0,
           tithePercentage: parseFloat(yearForm.tithePercentage) || 0,
         }),
       });
@@ -411,12 +410,6 @@ export default function Budget() {
             <div className="space-y-1.5">
               <Label className="font-semibold">שם השנה</Label>
               <Input value={yearForm.name} onChange={e => setYearForm(p => ({ ...p, name: e.target.value }))} className="rounded-xl" />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="font-semibold">יעד תקציב ידני (₪)</Label>
-              <Input type="number" dir="ltr" value={yearForm.totalBudget}
-                onChange={e => setYearForm(p => ({ ...p, totalBudget: e.target.value }))}
-                placeholder="0" className="rounded-xl" />
             </div>
             <div className="space-y-1.5">
               <Label className="font-semibold">אחוז מעשרות (%)</Label>
