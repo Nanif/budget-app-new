@@ -105,11 +105,12 @@ function ExtraItem({
 
 /* ─── Add Record Form (Dialog) ───────────────────────────── */
 function AddRecordDialog({
-  open, onClose, assets, onSave,
+  open, onClose, assets, onSave, latestRecord,
 }: {
   open: boolean;
   onClose: () => void;
   assets: AssetRecord[];
+  latestRecord?: NwRecord | null;
   onSave: (recordedAt: string, items: { debts: NwItem[]; savings: NwItem[] }) => Promise<void>;
 }) {
   const liabilities = assets.filter(a => isLiability(a.type));
@@ -127,10 +128,16 @@ function AddRecordDialog({
   useEffect(() => {
     if (!open) return;
     const dv: Record<number,string> = {};
-    liabilities.forEach(a => { dv[a.id] = String(a.currentAmount || 0); });
+    liabilities.forEach(a => {
+      const fromRecord = latestRecord?.items.debts.find(d => d.name === a.name);
+      dv[a.id] = String(fromRecord ? fromRecord.amount : (a.currentAmount || 0));
+    });
     setDebtValues(dv);
     const sv: Record<number,string> = {};
-    savings.forEach(a => { sv[a.id] = String(a.currentAmount || 0); });
+    savings.forEach(a => {
+      const fromRecord = latestRecord?.items.savings.find(s => s.name === a.name);
+      sv[a.id] = String(fromRecord ? fromRecord.amount : (a.currentAmount || 0));
+    });
     setSavingValues(sv);
     setRemovedDebts([]);
     setRemovedSavings([]);
@@ -426,12 +433,13 @@ export function ProgressTrackingSection({ assets }: { assets: AssetRecord[] }) {
             </div>
 
             {/* Table header */}
-            <div className="grid grid-cols-[28px_1fr_1fr_1fr_auto] gap-3 px-5 py-2 bg-muted/30 border-b border-border/40 text-xs font-medium text-muted-foreground">
+            <div className="grid grid-cols-[24px_1fr_108px_108px_120px_32px] gap-2 px-5 py-2 bg-muted/30 border-b border-border/40 text-xs font-medium text-muted-foreground">
               <span />
               <span>תאריך</span>
-              <span>חובות</span>
-              <span>חסכונות</span>
-              <span>שווי נקי</span>
+              <span className="text-center">חובות</span>
+              <span className="text-center">חסכונות</span>
+              <span className="text-center">שווי נקי</span>
+              <span />
             </div>
 
             {records.map((rec, idx) => {
@@ -444,7 +452,7 @@ export function ProgressTrackingSection({ assets }: { assets: AssetRecord[] }) {
               return (
                 <div key={rec.id} className="border-b border-border/40 last:border-0">
                   <div
-                    className="grid grid-cols-[28px_1fr_1fr_1fr_auto] gap-3 px-5 py-3.5 items-center hover:bg-muted/20 cursor-pointer transition-colors"
+                    className="grid grid-cols-[24px_1fr_108px_108px_120px_32px] gap-2 px-5 py-3.5 items-center hover:bg-muted/20 cursor-pointer transition-colors"
                     onClick={() => hasDet && toggleExpand(rec.id)}
                   >
                     <div className={cn(
@@ -469,28 +477,27 @@ export function ProgressTrackingSection({ assets }: { assets: AssetRecord[] }) {
                       )}
                     </div>
 
-                    <span className="text-sm text-rose-600 tabular-nums" dir="ltr">
+                    <span className="text-sm text-rose-600 tabular-nums text-center block" dir="ltr">
                       −{fmt(rec.totalDebts)}
                     </span>
-                    <span className="text-sm text-emerald-600 tabular-nums" dir="ltr">
+                    <span className="text-sm text-emerald-600 tabular-nums text-center block" dir="ltr">
                       +{fmt(rec.totalSavings)}
                     </span>
 
-                    <div className="flex items-center gap-3">
-                      <span className={cn(
-                        "text-sm font-bold tabular-nums",
-                        rec.netWorth >= 0 ? "text-emerald-700" : "text-rose-700"
-                      )} dir="ltr">
-                        {rec.netWorth >= 0 ? "+" : "−"}{fmt(rec.netWorth)}
-                      </span>
-                      <button
-                        className="text-muted-foreground/40 hover:text-rose-500 transition-colors p-1 rounded-lg hover:bg-rose-50"
-                        title="מחק"
-                        onClick={e => { e.stopPropagation(); setDeleteId(rec.id); }}
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
+                    <span className={cn(
+                      "text-sm font-bold tabular-nums text-center block",
+                      rec.netWorth >= 0 ? "text-emerald-700" : "text-rose-700"
+                    )} dir="ltr">
+                      {rec.netWorth >= 0 ? "+" : "−"}{fmt(rec.netWorth)}
+                    </span>
+
+                    <button
+                      className="text-muted-foreground/40 hover:text-rose-500 transition-colors p-1 rounded-lg hover:bg-rose-50 justify-self-center"
+                      title="מחק"
+                      onClick={e => { e.stopPropagation(); setDeleteId(rec.id); }}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
                   </div>
 
                   {/* Expanded detail */}
@@ -556,6 +563,7 @@ export function ProgressTrackingSection({ assets }: { assets: AssetRecord[] }) {
         open={showForm}
         onClose={() => setShowForm(false)}
         assets={assets}
+        latestRecord={records[0] ?? null}
         onSave={handleSave}
       />
 
