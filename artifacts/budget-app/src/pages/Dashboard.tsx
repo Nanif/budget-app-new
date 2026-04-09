@@ -250,28 +250,27 @@ function IncomeProgressChart({ income, budgetYear, funds }: {
   let cumExpected = 0;
   let cumActual   = 0;
   const data: any[]   = [];
-  let todayEntryName: string | null = null;
+  let todayX: number | null = null;
   let todayGap: number | null = null;
 
-  for (const m of months) {
+  for (let i = 0; i < months.length; i++) {
+    const m = months[i];
     const prevCumExpected = cumExpected;
     cumExpected += monthlyTarget;
-    const [yr, mo] = m.split("-").map(Number);
-    const shortYr   = yr !== new Date().getFullYear() ? ` '${String(yr).slice(2)}` : "";
-    const monthName = MONTH_NAMES_SHORT[mo - 1] + shortYr;
 
     if (m < todayStr) {
       cumActual += (netByMonth[m] ?? 0);
-      data.push({ name: monthName, צפוי: Math.round(cumExpected), בפועל: Math.round(cumActual), isToday: false });
+      data.push({ x: i + 1, צפוי: Math.round(cumExpected), בפועל: Math.round(cumActual), isToday: false });
     } else if (m === todayStr) {
       cumActual += (netByMonth[m] ?? 0);
-      const todayExpected = Math.round(prevCumExpected + monthlyTarget * todayProgress);
-      todayEntryName = `${todayDay}/${mo}`;
-      todayGap = Math.round(cumActual) - todayExpected;
-      data.push({ name: todayEntryName, צפוי: todayExpected, בפועל: Math.round(cumActual), isToday: true });
-      data.push({ name: monthName, צפוי: Math.round(cumExpected), בפועל: null, isToday: false });
+      const tX        = i + todayProgress;
+      const tExpected = Math.round(prevCumExpected + monthlyTarget * todayProgress);
+      todayX   = tX;
+      todayGap = Math.round(cumActual) - tExpected;
+      data.push({ x: tX, צפוי: tExpected, בפועל: Math.round(cumActual), isToday: true });
+      data.push({ x: i + 1, צפוי: Math.round(cumExpected), בפועל: null, isToday: false });
     } else {
-      data.push({ name: monthName, צפוי: Math.round(cumExpected), בפועל: null, isToday: false });
+      data.push({ x: i + 1, צפוי: Math.round(cumExpected), בפועל: null, isToday: false });
     }
   }
 
@@ -326,7 +325,16 @@ function IncomeProgressChart({ income, budgetYear, funds }: {
           <LineChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.5} />
             <XAxis
-              dataKey="name"
+              type="number"
+              dataKey="x"
+              domain={[0, months.length]}
+              ticks={months.map((_, i) => i + 0.5)}
+              tickFormatter={(v: number) => {
+                const idx = Math.round(v - 0.5);
+                if (idx < 0 || idx >= months.length) return "";
+                const [, mo] = months[idx].split("-").map(Number);
+                return MONTH_NAMES_SHORT[mo - 1];
+              }}
               tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
               axisLine={false}
               tickLine={false}
@@ -341,7 +349,7 @@ function IncomeProgressChart({ income, budgetYear, funds }: {
             />
             <Tooltip
               formatter={(value: number, name: string) => [fmt(value), name]}
-              labelStyle={{ fontFamily: "inherit", fontSize: 12, color: "hsl(var(--foreground))" }}
+              labelFormatter={() => ""}
               contentStyle={{
                 background: "hsl(var(--card))",
                 border: "1px solid hsl(var(--border))",
@@ -354,9 +362,9 @@ function IncomeProgressChart({ income, budgetYear, funds }: {
               wrapperStyle={{ fontSize: 12, paddingTop: 8, direction: "rtl" }}
               iconType="plainline"
             />
-            {todayEntryName && (
+            {todayX !== null && (
               <ReferenceLine
-                x={todayEntryName}
+                x={todayX}
                 stroke="hsl(var(--muted-foreground))"
                 strokeDasharray="4 2"
                 opacity={0.5}
