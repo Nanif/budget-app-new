@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { YearSwitcher } from "@/components/YearSwitcher";
+import { MonthSwitcher } from "@/components/MonthSwitcher";
 
 type NavItem = {
   href: string;
@@ -73,8 +74,11 @@ export function Sidebar() {
         </div>
       </div>
 
-      <div className="px-4 mb-3">
+      <div className="px-4 mb-1">
         <YearSwitcher />
+      </div>
+      <div className="px-4 mb-3">
+        <MonthSwitcher />
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 space-y-0.5">

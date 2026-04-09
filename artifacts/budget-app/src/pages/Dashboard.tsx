@@ -170,9 +170,6 @@ export default function DashboardPage() {
             <WalletMonthCard
               fundName={cashFund.name}
               currentMonth={currentMonth}
-              onChangeMonth={setCurrentMonth}
-              minMonth={activeYear?.startDate ? activeYear.startDate.slice(0, 7) : undefined}
-              maxMonth={activeYear?.endDate ? activeYear.endDate.slice(0, 7) : undefined}
               monthlyTarget={cashFund.monthlyAllocation}
               totals={walletTotals}
               transactions={walletTransactions}
@@ -637,14 +634,11 @@ function MonthPickerPopover({ anchorRef, currentMonth, minMonth, maxMonth, onSel
 /* ═══════════════════════════════════════════════════════════
    CARD: קופת שוטף — חודש נוכחי
 ═══════════════════════════════════════════════════════════ */
-function WalletMonthCard({ fundName, currentMonth, onChangeMonth, minMonth, maxMonth, monthlyTarget, totals, transactions }: {
-  fundName: string; currentMonth: string; onChangeMonth: (m: string) => void;
-  minMonth?: string; maxMonth?: string;
+function WalletMonthCard({ fundName, currentMonth, monthlyTarget, totals, transactions }: {
+  fundName: string; currentMonth: string;
   monthlyTarget: number; totals: WalletTotals | null; transactions: WalletTx[];
 }) {
-  const [modalOpen, setModalOpen]       = useState(false);
-  const [pickerOpen, setPickerOpen]     = useState(false);
-  const btnRef = useRef<HTMLButtonElement>(null);
+  const [modalOpen, setModalOpen] = useState(false);
 
   const [cmYear, cmMonthNum] = currentMonth.split("-").map(Number);
   const monthLabel = `${MONTH_NAMES_HE[cmMonthNum - 1]} ${cmYear}`;
@@ -683,14 +677,9 @@ function WalletMonthCard({ fundName, currentMonth, onChangeMonth, minMonth, maxM
           <div className="mt-4 relative">
             <div className="flex justify-between text-amber-500 dark:text-amber-400 text-[11px] mb-1.5">
               <span>{Math.round(pct)}% הושלם</span>
-              <button
-                ref={btnRef}
-                onClick={() => setPickerOpen(p => !p)}
-                className="bg-amber-200/60 dark:bg-amber-800/40 hover:bg-amber-300/60 dark:hover:bg-amber-700/40 rounded-full px-2 py-0.5 text-amber-700 dark:text-amber-300 transition-colors flex items-center gap-1"
-              >
+              <span className="bg-amber-200/60 dark:bg-amber-800/40 rounded-full px-2 py-0.5 text-amber-700 dark:text-amber-300">
                 {monthLabel}
-                <ChevronDown className={cn("w-3 h-3 transition-transform", pickerOpen && "rotate-180")} />
-              </button>
+              </span>
             </div>
             <div className="h-2 bg-amber-200/60 dark:bg-amber-800/40 rounded-full overflow-hidden">
               <div
@@ -770,16 +759,6 @@ function WalletMonthCard({ fundName, currentMonth, onChangeMonth, minMonth, maxM
             </ul>
           )}
         </TxModal>
-      )}
-      {pickerOpen && (
-        <MonthPickerPopover
-          anchorRef={btnRef}
-          currentMonth={currentMonth}
-          minMonth={minMonth}
-          maxMonth={maxMonth}
-          onSelect={onChangeMonth}
-          onClose={() => setPickerOpen(false)}
-        />
       )}
     </>
   );
