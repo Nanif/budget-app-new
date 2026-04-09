@@ -11,7 +11,7 @@ import { useCashFund } from "@/hooks/useCashFund";
 import {
   HeartHandshake, ArrowLeft, Plus, Check, Loader2,
   Wallet, ArrowDownLeft, ArrowUpRight, ChevronDown, Sparkles, X,
-  ChevronRight, ChevronLeft, TrendingUp,
+  ChevronRight, ChevronLeft, TrendingUp, Scale, TrendingDown,
 } from "lucide-react";
 import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid,
@@ -32,6 +32,7 @@ type FundSummary   = {
   budgetAmount: number; actualAmount: number; remaining: number;
   usagePercent: number; status: "ok" | "warning" | "over"; hasTxn: boolean;
 };
+type NwRecord = { id: number; recordedAt: string; totalSavings: number; totalDebts: number; netWorth: number; };
 
 /* ── Helpers ────────────────────────────────────────────────── */
 function fmt(n: number) {
@@ -73,20 +74,23 @@ export default function DashboardPage() {
   const [walletTotals, setWalletTotals]     = useState<WalletTotals | null>(null);
   const [walletTransactions, setWalletTxs] = useState<WalletTx[]>([]);
   const [cashFund, setCashFund]             = useState<FundSummary | null>(null);
+  const [nwRecords, setNwRecords]           = useState<NwRecord[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [inc, by, tth, fnd] = await Promise.all([
+      const [inc, by, tth, fnd, nwr] = await Promise.all([
         apiFetch("/incomes/summary"),
         apiFetch("/budget-year"),
         apiFetch("/charity"),
         apiFetch("/funds/summary"),
+        apiFetch("/net-worth-records"),
       ]);
       setIncome(inc);
       setBudgetYear(by);
       setTithes(tth);
       setFunds(fnd);
+      setNwRecords(nwr);
     } catch {
       toast({ title: "שגיאה בטעינה", variant: "destructive" });
     } finally {
@@ -174,6 +178,7 @@ export default function DashboardPage() {
               transactions={walletTransactions}
             />
           )}
+          <NetWorthSummaryCard records={nwRecords} />
         </div>
 
         {/* גרף התקדמות הכנסות */}
@@ -951,5 +956,92 @@ function FundCard({ fund, activeBid }: { fund: FundSummary; activeBid: number })
         </TxModal>
       )}
     </>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════
+   CARD: שווי נטו עדכני
+═══════════════════════════════════════════════════════════ */
+function NetWorthSummaryCard({ records }: { records: NwRecord[] }) {
+  if (records.length === 0) return null;
+
+  const latest  = records[0];
+  const prev    = records[1] ?? null;
+  const delta   = prev !== null ? latest.netWorth - prev.netWorth : null;
+  const isPos   = latest.netWorth >= 0;
+  const deltaPos = delta !== null && delta >= 0;
+
+  function fmtDate(iso: string) {
+    const [y, m, d] = iso.split("-");
+    return `${d}.${m}.${y}`;
+  }
+
+  return (
+    <div className="rounded-3xl overflow-hidden border border-border/50 shadow-sm bg-card flex flex-col">
+      <div className={cn(
+        "px-5 pt-5 pb-4 relative overflow-hidden border-b",
+        isPos
+          ? "bg-gradient-to-l from-teal-50 to-emerald-100 border-teal-100 dark:from-teal-950/40 dark:to-emerald-900/30 dark:border-teal-800/30"
+          : "bg-gradient-to-l from-amber-50 to-orange-100 border-amber-100 dark:from-amber-950/40 dark:to-orange-900/30 dark:border-amber-800/30"
+      )}>
+        <div className="flex items-start justify-between">
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <div className={cn("w-7 h-7 rounded-xl flex items-center justify-center",
+                isPos ? "bg-teal-100 dark:bg-teal-800/40" : "bg-amber-100 dark:bg-amber-800/40"
+              )}>
+                <Scale className={cn("w-4 h-4", isPos ? "text-teal-600 dark:text-teal-400" : "text-amber-600 dark:text-amber-400")} />
+              </div>
+              <span className={cn("font-semibold text-sm", isPos ? "text-teal-900 dark:text-teal-100" : "text-amber-900 dark:text-amber-100")}>
+                שווי נטו
+              </span>
+            </div>
+            <p className={cn("text-2xl font-bold tabular-nums tracking-tight",
+              isPos ? "text-teal-900 dark:text-teal-100" : "text-amber-900 dark:text-amber-100"
+            )} dir="ltr">
+              {isPos ? "+" : "−"}{fmt(Math.abs(latest.netWorth))}
+            </p>
+            <p className={cn("text-xs mt-0.5", isPos ? "text-teal-500 dark:text-teal-400" : "text-amber-500 dark:text-amber-400")}>
+              נכון ל-{fmtDate(latest.recordedAt)}
+            </p>
+          </div>
+          {delta !== null && (
+            <div className="text-left">
+              <div className={cn("flex items-center gap-1 text-sm font-bold tabular-nums",
+                deltaPos ? "text-emerald-600" : "text-rose-500"
+              )}>
+                {deltaPos
+                  ? <TrendingUp className="w-4 h-4" />
+                  : <TrendingDown className="w-4 h-4" />
+                }
+                <span dir="ltr">{deltaPos ? "+" : "−"}{fmt(Math.abs(delta))}</span>
+              </div>
+              <p className="text-[11px] text-muted-foreground mt-0.5 text-left">
+                מהרישום הקודם
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 divide-x divide-x-reverse divide-border/40 border-b border-border/40">
+        <div className="py-3 px-4 text-center">
+          <p className="text-[10px] text-muted-foreground mb-0.5">סך נכסים</p>
+          <p className="text-sm font-bold tabular-nums text-emerald-600">{fmt(latest.totalSavings)}</p>
+        </div>
+        <div className="py-3 px-4 text-center">
+          <p className="text-[10px] text-muted-foreground mb-0.5">סך חובות</p>
+          <p className="text-sm font-bold tabular-nums text-rose-500">{fmt(latest.totalDebts)}</p>
+        </div>
+      </div>
+
+      <div className="px-4 py-2.5">
+        <Link href="/savings">
+          <span className="flex items-center gap-1 text-xs text-muted-foreground hover:text-teal-600 transition-colors">
+            מעקב התקדמות בפועל <ArrowLeft className="w-3 h-3" />
+          </span>
+        </Link>
+      </div>
+    </div>
   );
 }
