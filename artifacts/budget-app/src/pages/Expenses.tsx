@@ -394,7 +394,7 @@ export default function Expenses() {
             </SelectTrigger>
             <SelectContent dir="rtl">
               <SelectItem value="all">כל הקופות</SelectItem>
-              {funds.map(f => <SelectItem key={f.id} value={String(f.id)}>{f.name}</SelectItem>)}
+              {expenseFunds.map(f => <SelectItem key={f.id} value={String(f.id)}>{f.name}</SelectItem>)}
             </SelectContent>
           </Select>
 
