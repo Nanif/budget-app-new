@@ -242,28 +242,40 @@ function IncomeProgressChart({ income, budgetYear, funds }: {
     else if (e.entryType === "work_deduction") netByMonth[e.month] -= e.total;
   }
 
+  const todayDate     = new Date();
+  const todayDay      = todayDate.getDate();
+  const todayDaysInM  = new Date(todayDate.getFullYear(), todayDate.getMonth() + 1, 0).getDate();
+  const todayProgress = todayDay / todayDaysInM;
+
   let cumExpected = 0;
   let cumActual   = 0;
+  const data: any[]   = [];
+  let todayEntryName: string | null = null;
+  let todayGap: number | null = null;
 
-  const data = months.map((m) => {
+  for (const m of months) {
+    const prevCumExpected = cumExpected;
     cumExpected += monthlyTarget;
-    const isPast = m <= todayStr;
-    if (isPast) cumActual += (netByMonth[m] ?? 0);
     const [yr, mo] = m.split("-").map(Number);
-    return {
-      name: MONTH_NAMES_SHORT[mo - 1] + (yr !== new Date().getFullYear() ? ` '${String(yr).slice(2)}` : ""),
-      month: m,
-      צפוי: Math.round(cumExpected),
-      בפועל: isPast ? Math.round(cumActual) : null,
-      isCurrent: m === todayStr,
-    };
-  });
+    const shortYr   = yr !== new Date().getFullYear() ? ` '${String(yr).slice(2)}` : "";
+    const monthName = MONTH_NAMES_SHORT[mo - 1] + shortYr;
 
-  const currentIdx = months.indexOf(todayStr);
-  const currentData = currentIdx >= 0 ? data[currentIdx] : null;
-  const gap = currentData && currentData.בפועל != null
-    ? currentData.בפועל - currentData.צפוי
-    : null;
+    if (m < todayStr) {
+      cumActual += (netByMonth[m] ?? 0);
+      data.push({ name: monthName, צפוי: Math.round(cumExpected), בפועל: Math.round(cumActual), isToday: false });
+    } else if (m === todayStr) {
+      cumActual += (netByMonth[m] ?? 0);
+      const todayExpected = Math.round(prevCumExpected + monthlyTarget * todayProgress);
+      todayEntryName = `${todayDay}/${mo}`;
+      todayGap = Math.round(cumActual) - todayExpected;
+      data.push({ name: todayEntryName, צפוי: todayExpected, בפועל: Math.round(cumActual), isToday: true });
+      data.push({ name: monthName, צפוי: Math.round(cumExpected), בפועל: null, isToday: false });
+    } else {
+      data.push({ name: monthName, צפוי: Math.round(cumExpected), בפועל: null, isToday: false });
+    }
+  }
+
+  const gap = todayGap;
 
   const fmtY = (v: number) => {
     if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
@@ -342,9 +354,9 @@ function IncomeProgressChart({ income, budgetYear, funds }: {
               wrapperStyle={{ fontSize: 12, paddingTop: 8, direction: "rtl" }}
               iconType="plainline"
             />
-            {currentData && (
+            {todayEntryName && (
               <ReferenceLine
-                x={currentData.name}
+                x={todayEntryName}
                 stroke="hsl(var(--muted-foreground))"
                 strokeDasharray="4 2"
                 opacity={0.5}
@@ -366,7 +378,7 @@ function IncomeProgressChart({ income, budgetYear, funds }: {
               stroke="#10b981"
               strokeWidth={2.5}
               dot={(props: any) => {
-                if (!props.payload.isCurrent) return <circle key={props.key} cx={props.cx} cy={props.cy} r={0} />;
+                if (!props.payload.isToday) return <circle key={props.key} cx={props.cx} cy={props.cy} r={0} />;
                 return <circle key={props.key} cx={props.cx} cy={props.cy} r={5} fill="#10b981" stroke="#fff" strokeWidth={2} />;
               }}
               connectNulls={false}
