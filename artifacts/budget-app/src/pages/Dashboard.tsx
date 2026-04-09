@@ -11,12 +11,17 @@ import { useCashFund } from "@/hooks/useCashFund";
 import {
   HeartHandshake, ArrowLeft, Plus, Check, Loader2,
   Wallet, ArrowDownLeft, ArrowUpRight, ChevronDown, Sparkles, X,
-  ChevronRight, ChevronLeft,
+  ChevronRight, ChevronLeft, TrendingUp,
 } from "lucide-react";
+import {
+  ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid,
+  Tooltip, ReferenceLine, Legend,
+} from "recharts";
 
 /* ── Types ─────────────────────────────────────────────────── */
-type IncomeSummary = { totalIncome: number; totalDeductions: number; netIncome: number };
-type BudgetYear    = { tithePercentage: number };
+type MonthlyEntry  = { month: string; entryType: string; total: number };
+type IncomeSummary = { totalIncome: number; totalDeductions: number; netIncome: number; monthly: MonthlyEntry[] };
+type BudgetYear    = { tithePercentage: number; totalBudget: number; startDate: string; endDate: string };
 type Tithe         = { id: number; amount: number; recipient: string; isTithe: boolean; date: string };
 type WalletTotals  = { deposits: number; withdrawals: number; net: number };
 type WalletTx      = { id: number; type: "deposit" | "withdrawal"; amount: number; date: string; description: string };
@@ -60,8 +65,8 @@ export default function DashboardPage() {
   const { currentMonth, setCurrentMonth } = useCashCurrentMonth(activeBid);
   const { cashFundId } = useCashFund();
 
-  const [income, setIncome]         = useState<IncomeSummary>({ totalIncome: 0, totalDeductions: 0, netIncome: 0 });
-  const [budgetYear, setBudgetYear] = useState<BudgetYear>({ tithePercentage: 10 });
+  const [income, setIncome]         = useState<IncomeSummary>({ totalIncome: 0, totalDeductions: 0, netIncome: 0, monthly: [] });
+  const [budgetYear, setBudgetYear] = useState<BudgetYear>({ tithePercentage: 10, totalBudget: 0, startDate: "", endDate: "" });
   const [tithes, setTithes]         = useState<Tithe[]>([]);
   const [funds, setFunds]           = useState<FundSummary[]>([]);
   const [loading, setLoading]       = useState(true);
@@ -123,8 +128,11 @@ export default function DashboardPage() {
   if (loading) {
     return (
       <div className="space-y-4" dir="rtl">
-        <div className="space-y-4 max-w-xl">
-          {[1, 2].map(i => <div key={i} className="h-44 bg-muted animate-pulse rounded-3xl" />)}
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-6">
+          <div className="h-80 bg-muted animate-pulse rounded-3xl" />
+          <div className="space-y-4">
+            {[1, 2].map(i => <div key={i} className="h-44 bg-muted animate-pulse rounded-3xl" />)}
+          </div>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
           {[1,2,3,4].map(i => <div key={i} className="h-40 bg-muted animate-pulse rounded-2xl" />)}
@@ -136,33 +144,44 @@ export default function DashboardPage() {
   return (
     <div className="space-y-8" dir="rtl">
 
-      {/* ══ מעשרות — קופת שוטף (מוערם) ═══════════════════════════ */}
-      <div className="space-y-4 max-w-xl">
-        <TitheCard
+      {/* ══ שורה עליונה: גרף + מעשרות/שוטף ══════════════════════ */}
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-6 items-start">
+
+        {/* גרף התקדמות הכנסות */}
+        <IncomeProgressChart
           income={income}
           budgetYear={budgetYear}
-          tithes={tithes}
-          titheTarget={titheTarget}
-          titheGiven={titheGiven}
-          titheLeft={titheLeft}
-          tithePct={tithePct}
-          onAdd={async (payload) => {
-            const created = await apiFetch("/charity", { method: "POST", body: JSON.stringify(payload) });
-            setTithes(prev => [{ ...created, amount: parseFloat(String(created.amount)) }, ...prev]);
-          }}
+          funds={funds}
         />
-        {cashFund && (
-          <WalletMonthCard
-            fundName={cashFund.name}
-            currentMonth={currentMonth}
-            onChangeMonth={setCurrentMonth}
-            minMonth={activeYear?.startDate ? activeYear.startDate.slice(0, 7) : undefined}
-            maxMonth={activeYear?.endDate ? activeYear.endDate.slice(0, 7) : undefined}
-            monthlyTarget={cashFund.monthlyAllocation}
-            totals={walletTotals}
-            transactions={walletTransactions}
+
+        {/* מעשרות — קופת שוטף (מוערם) */}
+        <div className="space-y-4">
+          <TitheCard
+            income={income}
+            budgetYear={budgetYear}
+            tithes={tithes}
+            titheTarget={titheTarget}
+            titheGiven={titheGiven}
+            titheLeft={titheLeft}
+            tithePct={tithePct}
+            onAdd={async (payload) => {
+              const created = await apiFetch("/charity", { method: "POST", body: JSON.stringify(payload) });
+              setTithes(prev => [{ ...created, amount: parseFloat(String(created.amount)) }, ...prev]);
+            }}
           />
-        )}
+          {cashFund && (
+            <WalletMonthCard
+              fundName={cashFund.name}
+              currentMonth={currentMonth}
+              onChangeMonth={setCurrentMonth}
+              minMonth={activeYear?.startDate ? activeYear.startDate.slice(0, 7) : undefined}
+              maxMonth={activeYear?.endDate ? activeYear.endDate.slice(0, 7) : undefined}
+              monthlyTarget={cashFund.monthlyAllocation}
+              totals={walletTotals}
+              transactions={walletTransactions}
+            />
+          )}
+        </div>
       </div>
 
       {/* ══ קופות ════════════════════════════════════════════= */}
@@ -173,6 +192,188 @@ export default function DashboardPage() {
           <FundGroup title="מחוץ לתקציב"   funds={nonBudgetFunds} activeBid={activeBid} accent="slate" />
         </div>
       )}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════
+   CHART: התקדמות הכנסות שנתית
+═══════════════════════════════════════════════════════════ */
+const MONTH_NAMES_SHORT = ["ינו","פבר","מרץ","אפר","מאי","יוני","יולי","אוג","ספט","אוק","נוב","דצמ"];
+
+const NON_BUDGET_CHART = new Set(["non_budget", "fixed_non_budget", "expense_non_budget"]);
+
+function IncomeProgressChart({ income, budgetYear, funds }: {
+  income: IncomeSummary;
+  budgetYear: BudgetYear;
+  funds: FundSummary[];
+}) {
+  const { startDate, endDate } = budgetYear;
+
+  const totalBudget = funds
+    .filter(f => !NON_BUDGET_CHART.has(f.fundBehavior))
+    .reduce((s, f) => s + (f.budgetAmount ?? 0), 0);
+
+  const todayStr = (() => {
+    const n = new Date();
+    return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}`;
+  })();
+
+  const months: string[] = (() => {
+    if (!startDate || !endDate) return [];
+    const result: string[] = [];
+    const start = new Date(startDate);
+    const end   = new Date(endDate);
+    let cur = new Date(start.getFullYear(), start.getMonth(), 1);
+    while (cur <= end) {
+      result.push(`${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, "0")}`);
+      cur.setMonth(cur.getMonth() + 1);
+    }
+    return result;
+  })();
+
+  const numMonths = months.length || 12;
+  const monthlyTarget = totalBudget / numMonths;
+
+  const netByMonth: Record<string, number> = {};
+  for (const e of income.monthly) {
+    if (!netByMonth[e.month]) netByMonth[e.month] = 0;
+    if (e.entryType === "income") netByMonth[e.month] += e.total;
+    else if (e.entryType === "work_deduction") netByMonth[e.month] -= e.total;
+  }
+
+  let cumExpected = 0;
+  let cumActual   = 0;
+
+  const data = months.map((m) => {
+    cumExpected += monthlyTarget;
+    const isPast = m <= todayStr;
+    if (isPast) cumActual += (netByMonth[m] ?? 0);
+    const [yr, mo] = m.split("-").map(Number);
+    return {
+      name: MONTH_NAMES_SHORT[mo - 1] + (yr !== new Date().getFullYear() ? ` '${String(yr).slice(2)}` : ""),
+      month: m,
+      צפוי: Math.round(cumExpected),
+      בפועל: isPast ? Math.round(cumActual) : null,
+      isCurrent: m === todayStr,
+    };
+  });
+
+  const currentIdx = months.indexOf(todayStr);
+  const currentData = currentIdx >= 0 ? data[currentIdx] : null;
+  const gap = currentData && currentData.בפועל != null
+    ? currentData.בפועל - currentData.צפוי
+    : null;
+
+  const fmtY = (v: number) => {
+    if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
+    if (v >= 1_000) return `${Math.round(v / 1_000)}K`;
+    return String(v);
+  };
+
+  if (!totalBudget || months.length === 0) {
+    return (
+      <div className="rounded-3xl border border-border/50 shadow-sm bg-card flex items-center justify-center h-64 text-muted-foreground text-sm">
+        הגדר מסגרת תקציב כדי לראות את גרף ההתקדמות
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-3xl border border-border/50 shadow-sm bg-card overflow-hidden">
+      {/* Header */}
+      <div className="bg-gradient-to-l from-emerald-50 to-teal-100 dark:from-emerald-950/40 dark:to-teal-900/30 px-5 pt-5 pb-4 border-b border-emerald-100 dark:border-emerald-800/30">
+        <div className="flex items-start justify-between">
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-7 h-7 rounded-xl bg-emerald-100 dark:bg-emerald-800/40 flex items-center justify-center">
+                <TrendingUp className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+              </div>
+              <span className="font-semibold text-sm text-emerald-900 dark:text-emerald-100">התקדמות הכנסות שנתית</span>
+            </div>
+            <p className="text-emerald-600 dark:text-emerald-400 text-xs">
+              יעד שנתי: {fmt(totalBudget)} · ממוצע חודשי: {fmt(Math.round(monthlyTarget))}
+            </p>
+          </div>
+          {gap !== null && (
+            <div className="text-left">
+              <p className={cn("text-xl font-bold tabular-nums", gap >= 0 ? "text-emerald-600" : "text-rose-500")}>
+                {gap >= 0 ? "+" : ""}{fmt(gap)}
+              </p>
+              <p className="text-emerald-500 dark:text-emerald-400 text-xs mt-0.5 text-left">
+                {gap >= 0 ? "קדימה מהיעד ✓" : "מאחור מהיעד"}
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Chart */}
+      <div className="p-4 pt-5" style={{ height: 260 }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.5} />
+            <XAxis
+              dataKey="name"
+              tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+              axisLine={false}
+              tickLine={false}
+            />
+            <YAxis
+              tickFormatter={fmtY}
+              tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+              axisLine={false}
+              tickLine={false}
+              width={48}
+              orientation="right"
+            />
+            <Tooltip
+              formatter={(value: number, name: string) => [fmt(value), name]}
+              labelStyle={{ fontFamily: "inherit", fontSize: 12, color: "hsl(var(--foreground))" }}
+              contentStyle={{
+                background: "hsl(var(--card))",
+                border: "1px solid hsl(var(--border))",
+                borderRadius: 12,
+                fontSize: 12,
+                direction: "rtl",
+              }}
+            />
+            <Legend
+              wrapperStyle={{ fontSize: 12, paddingTop: 8, direction: "rtl" }}
+              iconType="plainline"
+            />
+            {currentData && (
+              <ReferenceLine
+                x={currentData.name}
+                stroke="hsl(var(--muted-foreground))"
+                strokeDasharray="4 2"
+                opacity={0.5}
+                label={{ value: "היום", position: "top", fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+              />
+            )}
+            <Line
+              type="monotone"
+              dataKey="צפוי"
+              stroke="#94a3b8"
+              strokeWidth={2}
+              strokeDasharray="6 3"
+              dot={false}
+              connectNulls
+            />
+            <Line
+              type="monotone"
+              dataKey="בפועל"
+              stroke="#10b981"
+              strokeWidth={2.5}
+              dot={(props: any) => {
+                if (!props.payload.isCurrent) return <circle key={props.key} cx={props.cx} cy={props.cy} r={0} />;
+                return <circle key={props.key} cx={props.cx} cy={props.cy} r={5} fill="#10b981" stroke="#fff" strokeWidth={2} />;
+              }}
+              connectNulls={false}
+            />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
     </div>
   );
 }
