@@ -12,15 +12,8 @@ export function MonthSwitcher() {
   const { currentMonth, setCurrentMonth } = useCashCurrentMonth(activeBid);
   const [open, setOpen] = useState(false);
 
-  const todayStr = (() => {
-    const n = new Date();
-    return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}`;
-  })();
-
   const minMonth = activeYear?.startDate ? activeYear.startDate.slice(0, 7) : "2000-01";
-  const maxMonth = activeYear?.endDate
-    ? (activeYear.endDate.slice(0, 7) < todayStr ? activeYear.endDate.slice(0, 7) : todayStr)
-    : todayStr;
+  const maxMonth = activeYear?.endDate ? activeYear.endDate.slice(0, 7) : "2099-12";
 
   const minYear = parseInt(minMonth.slice(0, 4), 10);
   const maxYear = parseInt(maxMonth.slice(0, 4), 10);
