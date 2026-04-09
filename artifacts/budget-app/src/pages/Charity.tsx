@@ -295,7 +295,7 @@ export default function Charity() {
   ═══════════════════════════════════════════════════════════ */
   return (
     <div className="space-y-5" dir="rtl">
-      <PageHeader title="צדקה ותרומות" description="מעקב אחר תרומות ביחס להכנסה נטו">
+      <PageHeader title="מעשרות" description="מעקב אחר תרומות ביחס להכנסה נטו">
         <div className="flex gap-2">
           <Button
             onClick={() => setRecurringOpen(true)}
