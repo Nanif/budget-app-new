@@ -4,15 +4,27 @@ import { cn } from "@/lib/utils";
 import {
   Popover, PopoverContent, PopoverTrigger,
 } from "@/components/ui/popover";
-import { Check, ChevronDown, Calendar } from "lucide-react";
+import { Check, ChevronDown, Calendar, Loader2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 export function YearSwitcher() {
-  const { years, activeBid, activeYear, setViewedYear } = useBudgetYear();
+  const { years, activeBid, activeYear, setViewedYear, activateYear } = useBudgetYear();
+  const { toast } = useToast();
   const [open, setOpen] = useState(false);
+  const [loadingId, setLoadingId] = useState<number | null>(null);
 
-  const handleSelect = (year: BudgetYear) => {
-    setViewedYear(year.id);
-    setOpen(false);
+  const handleSelect = async (year: BudgetYear) => {
+    if (year.id === activeBid) { setOpen(false); return; }
+    setLoadingId(year.id);
+    try {
+      await activateYear(year.id);
+      setViewedYear(year.id);
+    } catch {
+      toast({ title: "שגיאה במעבר שנה", variant: "destructive" });
+    } finally {
+      setLoadingId(null);
+      setOpen(false);
+    }
   };
 
   return (
@@ -48,11 +60,11 @@ export function YearSwitcher() {
                   : "hover:bg-muted text-foreground"
               )}
             >
-              <Check className={cn("w-3.5 h-3.5 shrink-0", year.id === activeBid ? "opacity-100" : "opacity-0")} />
+              {loadingId === year.id
+                ? <Loader2 className="w-3.5 h-3.5 shrink-0 animate-spin" />
+                : <Check className={cn("w-3.5 h-3.5 shrink-0", year.id === activeBid ? "opacity-100" : "opacity-0")} />
+              }
               <span className="flex-1 truncate text-xs">{year.name}</span>
-              {year.isActive && (
-                <span className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full font-medium shrink-0">פעיל</span>
-              )}
             </div>
           ))}
         </div>

@@ -4,6 +4,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Layout } from "@/components/Layout";
 import { BudgetYearProvider } from "@/contexts/BudgetYearContext";
+import { AccessGuard } from "@/components/AccessGuard";
 import NotFound from "@/pages/not-found";
 
 import Home from "@/pages/Home";
@@ -49,14 +50,16 @@ function Router() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <BudgetYearProvider>
-        <TooltipProvider>
-          <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-            <Router />
-          </WouterRouter>
-          <Toaster />
-        </TooltipProvider>
-      </BudgetYearProvider>
+      <AccessGuard>
+        <BudgetYearProvider>
+          <TooltipProvider>
+            <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+              <Router />
+            </WouterRouter>
+            <Toaster />
+          </TooltipProvider>
+        </BudgetYearProvider>
+      </AccessGuard>
     </QueryClientProvider>
   );
 }

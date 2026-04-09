@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Save, Tag, Plus, Pencil, Trash2, Check, X, Loader2, Wallet, Star, CalendarRange } from "lucide-react";
+import { Save, Tag, Plus, Pencil, Trash2, Check, X, Loader2, Wallet, CalendarRange } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -150,11 +150,10 @@ export default function Settings() {
 ═══════════════════════════════════════════════════════════ */
 function BudgetYearsSection() {
   const { toast } = useToast();
-  const { years, createYear, updateYear, deleteYear, activateYear } = useBudgetYear();
+  const { years, createYear, updateYear, deleteYear } = useBudgetYear();
 
-  const [saving, setSaving]       = useState(false);
-  const [activatingId, setActivatingId] = useState<number | null>(null);
-  const [deleting, setDeleting]   = useState(false);
+  const [saving, setSaving]   = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   /* create */
   const [showCreate, setShowCreate] = useState(false);
@@ -240,18 +239,6 @@ function BudgetYearsSection() {
     } finally { setDeleting(false); }
   };
 
-  /* activate */
-  const handleActivate = async (year: BudgetYear) => {
-    if (year.isActive) return;
-    setActivatingId(year.id);
-    try {
-      await activateYear(year.id);
-      toast({ title: "שנה הופעלה", description: `${year.name} הוגדרה כשנה הפעילה` });
-    } catch (e: any) {
-      toast({ title: "שגיאה", description: e.message, variant: "destructive" });
-    } finally { setActivatingId(null); }
-  };
-
   const YearFormFields = ({ form, setForm }: { form: typeof createForm; setForm: React.Dispatch<React.SetStateAction<typeof createForm>> }) => (
     <div className="space-y-4 py-2">
       <div className="space-y-1.5">
@@ -308,9 +295,6 @@ function BudgetYearsSection() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-medium truncate">{year.name}</span>
-                    {year.isActive && (
-                      <span className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full font-medium shrink-0">פעיל</span>
-                    )}
                   </div>
                   {(year.startDate || year.endDate) && (
                     <p className="text-xs text-muted-foreground mt-0.5">
@@ -319,17 +303,6 @@ function BudgetYearsSection() {
                   )}
                 </div>
                 <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  {!year.isActive && (
-                    <button
-                      onClick={() => handleActivate(year)}
-                      title="הגדר כשנה פעילה"
-                      className="p-1.5 rounded-lg hover:bg-amber-100 text-muted-foreground hover:text-amber-600 transition-colors"
-                    >
-                      {activatingId === year.id
-                        ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        : <Star className="w-3.5 h-3.5" />}
-                    </button>
-                  )}
                   <button
                     onClick={() => openEdit(year)}
                     title="עריכה"
