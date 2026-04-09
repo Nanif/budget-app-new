@@ -178,15 +178,17 @@ export default function DashboardPage() {
               transactions={walletTransactions}
             />
           )}
-          <NetWorthSummaryCard records={nwRecords} />
         </div>
 
-        {/* גרף התקדמות הכנסות */}
-        <IncomeProgressChart
-          income={income}
-          budgetYear={budgetYear}
-          funds={funds}
-        />
+        {/* גרף התקדמות הכנסות + שווי נטו */}
+        <div className="space-y-4">
+          <IncomeProgressChart
+            income={income}
+            budgetYear={budgetYear}
+            funds={funds}
+          />
+          <NetWorthSummaryCard records={nwRecords} />
+        </div>
       </div>
 
       {/* ══ קופות ════════════════════════════════════════════= */}
@@ -666,11 +668,6 @@ function WalletMonthCard({ fundName, currentMonth, onChangeMonth, minMonth, maxM
                   <Wallet className="w-4 h-4 text-amber-600 dark:text-amber-400" />
                 </div>
                 <span className="font-semibold text-sm text-amber-900 dark:text-amber-100">{fundName}</span>
-                {transactions.length > 0 && (
-                  <span className="text-[10px] bg-amber-200/60 dark:bg-amber-800/40 text-amber-700 dark:text-amber-300 rounded-full px-1.5 py-0.5 font-medium">
-                    {transactions.length}
-                  </span>
-                )}
               </div>
               <p className="text-amber-900 dark:text-amber-100 text-2xl font-bold tabular-nums tracking-tight">{fmt(net)}</p>
               <p className="text-amber-500 dark:text-amber-400 text-xs mt-0.5">ניתן החודש</p>
