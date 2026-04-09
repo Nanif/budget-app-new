@@ -26,7 +26,7 @@ type TitheEntry = {
 };
 type IncomeSummary = { totalIncome: number; totalDeductions: number; netIncome: number };
 type BudgetYear    = { tithePercentage: number | string };
-type GroupBy = "none" | "month" | "year" | "type";
+type GroupBy = "none" | "month";
 
 /* ═══════════════════════════════════════════════════════════
    CONSTANTS
@@ -36,7 +36,6 @@ const MONTH_HE = ["ינואר","פברואר","מרץ","אפריל","מאי","י
 const GROUP_OPTIONS: { value: GroupBy; label: string }[] = [
   { value: "none",  label: "ללא קיבוץ" },
   { value: "month", label: "לפי חודש"  },
-  { value: "year",  label: "לפי שנה"   },
 ];
 
 /* ═══════════════════════════════════════════════════════════
@@ -202,7 +201,6 @@ export default function Charity() {
     for (const e of filtered) {
       let key = "", label = "";
       if (groupBy === "month") { key = monthKey(e.date); label = monthLabel(key); }
-      if (groupBy === "year")  { key = getYear(e.date); label = `שנת ${key}`; }
       if (!map[key]) map[key] = { key, label, items: [] };
       map[key].items.push(e);
     }

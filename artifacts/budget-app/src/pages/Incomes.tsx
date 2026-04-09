@@ -25,7 +25,7 @@ type Income = {
   id: number; amount: number; source: string; description: string;
   date: string; entryType: "income" | "work_deduction";
 };
-type GroupBy = "none" | "month" | "year" | "source" | "type";
+type GroupBy = "none" | "month" | "source" | "type";
 
 /* ═══════════════════════════════════════════════════════════
    CONSTANTS
@@ -47,7 +47,6 @@ const SOURCE_CATEGORIES: { value: string; label: string }[] = [
 const GROUP_OPTIONS: { value: GroupBy; label: string }[] = [
   { value: "none",   label: "ללא קיבוץ" },
   { value: "month",  label: "לפי חודש" },
-  { value: "year",   label: "לפי שנה" },
   { value: "source", label: "לפי מקור" },
   { value: "type",   label: "לפי סוג" },
 ];
@@ -207,7 +206,6 @@ export default function Incomes() {
     for (const e of filtered) {
       let key = "", label = "";
       if (groupBy === "month")  { key = monthKey(e.date); label = monthLabel(key); }
-      if (groupBy === "year")   { key = getYear(e.date);  label = `שנת ${key}`; }
       if (groupBy === "source") { key = parseSource(e.description) || "ללא מקור"; label = key; }
       if (groupBy === "type")   { key = e.entryType; label = e.entryType === "income" ? "הכנסות" : "ניכויים"; }
       if (!map[key]) map[key] = { key, label, items: [] };
