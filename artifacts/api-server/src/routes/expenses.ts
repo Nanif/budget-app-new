@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { db, expensesTable, categoriesTable, insertExpenseSchema } from "@workspace/db";
-import { eq, desc, and, sum } from "drizzle-orm";
+import { db, expensesTable, categoriesTable, fundsTable, insertExpenseSchema } from "@workspace/db";
+import { eq, desc, and, or, sum, isNull } from "drizzle-orm";
 
 const router = Router();
 const DEFAULT_USER_ID = 1;
@@ -9,13 +9,29 @@ function getBYID(req: any): number { const b = parseInt(String(req.query.bid)); 
 
 function parseNum(v: string | null) { return v ? parseFloat(v) : 0; }
 
+const NON_BUDGET_BEHAVIORS = new Set(["non_budget", "fixed_non_budget", "expense_non_budget"]);
+
+async function isNonBudgetFund(fundId: number | undefined | null): Promise<boolean> {
+  if (!fundId) return false;
+  const [fund] = await db.select({ fundBehavior: fundsTable.fundBehavior })
+    .from(fundsTable).where(eq(fundsTable.id, fundId)).limit(1);
+  return fund ? NON_BUDGET_BEHAVIORS.has(fund.fundBehavior) : false;
+}
+
+function yearCondition(bid: number) {
+  return or(
+    eq(expensesTable.budgetYearId, bid),
+    isNull(expensesTable.budgetYearId),
+  )!;
+}
+
 // GET /api/expenses?fundId=N
 router.get("/", async (req, res) => {
   try {
     const { fundId } = req.query;
     const conditions: any[] = [
       eq(expensesTable.userId, DEFAULT_USER_ID),
-      eq(expensesTable.budgetYearId, getBYID(req)),
+      yearCondition(getBYID(req)),
     ];
     if (fundId) conditions.push(eq(expensesTable.fundId, parseInt(String(fundId))));
 
@@ -58,7 +74,7 @@ router.get("/by-fund", async (req, res) => {
       .from(expensesTable)
       .where(and(
         eq(expensesTable.userId, DEFAULT_USER_ID),
-        eq(expensesTable.budgetYearId, getBYID(req)),
+        yearCondition(getBYID(req)),
       ))
       .groupBy(expensesTable.fundId);
     res.json(rows.map(r => ({ fundId: r.fundId, total: parseNum(r.total ?? null) })));
@@ -74,7 +90,7 @@ router.get("/summary", async (req, res) => {
     const { fundId } = req.query;
     const conditions: any[] = [
       eq(expensesTable.userId, DEFAULT_USER_ID),
-      eq(expensesTable.budgetYearId, getBYID(req)),
+      yearCondition(getBYID(req)),
     ];
     if (fundId) conditions.push(eq(expensesTable.fundId, parseInt(String(fundId))));
 
@@ -105,7 +121,13 @@ router.get("/summary", async (req, res) => {
 // POST /api/expenses
 router.post("/", async (req, res) => {
   try {
-    const raw = { ...req.body, userId: DEFAULT_USER_ID, budgetYearId: getBYID(req) };
+    const fundId = req.body?.fundId ? parseInt(String(req.body.fundId)) : null;
+    const nonBudget = await isNonBudgetFund(fundId);
+    const raw = {
+      ...req.body,
+      userId: DEFAULT_USER_ID,
+      ...(nonBudget ? {} : { budgetYearId: getBYID(req) }),
+    };
     const body = Object.fromEntries(Object.entries(raw).filter(([_, v]) => v !== null && v !== ""));
     const parsed = insertExpenseSchema.safeParse(body);
     if (!parsed.success) {
@@ -124,8 +146,14 @@ router.post("/", async (req, res) => {
 router.put("/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-    const raw = { ...req.body, userId: DEFAULT_USER_ID, budgetYearId: getBYID(req) };
-    const body = Object.fromEntries(Object.entries(raw).filter(([_, v]) => v !== null && v !== ""));
+    const fundId = req.body?.fundId ? parseInt(String(req.body.fundId)) : null;
+    const nonBudget = await isNonBudgetFund(fundId);
+    const raw = {
+      ...req.body,
+      userId: DEFAULT_USER_ID,
+      ...(nonBudget ? { budgetYearId: null } : { budgetYearId: getBYID(req) }),
+    };
+    const body = Object.fromEntries(Object.entries(raw).filter(([_, v]) => v !== ""));
     const parsed = insertExpenseSchema.safeParse(body);
     if (!parsed.success) {
       res.status(400).json({ error: "Invalid input", details: parsed.error.issues });
