@@ -102,8 +102,18 @@ router.delete("/:id", async (req, res) => {
   }
 });
 
-// POST /recurring-templates/apply — apply selected templates to actual income/tithe entries
-// Body: { bid, items: [{ templateId, amount, date }], type: 'income' | 'tithe' }
+const MONTHS_HE = [
+  "ינואר","פברואר","מרץ","אפריל","מאי","יוני",
+  "יולי","אוגוסט","ספטמבר","אוקטובר","נובמבר","דצמבר",
+];
+function hebrewMonthLabel(dateStr: string): string {
+  const d = new Date(dateStr);
+  return `${MONTHS_HE[d.getMonth()]}`;
+}
+
+// POST /recurring-templates/apply
+// Combines all selected items into a single transaction per entryType group (income) or one for tithe.
+// Body: { items: [{ templateId, amount, date, entryType, name, notes }], type: 'income' | 'tithe' }
 router.post("/apply", async (req, res) => {
   try {
     const byid = getBYID(req);
@@ -116,35 +126,64 @@ router.post("/apply", async (req, res) => {
       res.status(400).json({ error: "type חייב להיות income או tithe" }); return;
     }
 
+    // Filter valid items only
+    const valid = items.filter(
+      (i: any) => i.amount && !isNaN(parseFloat(String(i.amount))) && parseFloat(String(i.amount)) > 0 && i.date
+    );
+    if (valid.length === 0) {
+      res.status(400).json({ error: "לא נמצאו פריטים תקינים" }); return;
+    }
+
+    const date = valid[0].date;
+    const monthLabel = hebrewMonthLabel(date);
     const created: any[] = [];
 
-    for (const item of items) {
-      const { templateId, amount, date, entryType, name, notes } = item;
-      if (!amount || isNaN(parseFloat(String(amount))) || parseFloat(String(amount)) <= 0) continue;
-      if (!date) continue;
+    if (type === "income") {
+      // Group by entryType — create one transaction per group
+      const groups: Record<string, typeof valid> = {};
+      for (const item of valid) {
+        const et = item.entryType || "income";
+        if (!groups[et]) groups[et] = [];
+        groups[et].push(item);
+      }
 
-      if (type === "income") {
-        const description = name?.trim() + (notes?.trim() ? "\n\n" + notes.trim() : "");
+      for (const [entryType, groupItems] of Object.entries(groups)) {
+        const totalAmount = groupItems.reduce((s: number, i: any) => s + parseFloat(String(i.amount)), 0);
+        const entryLabel = entryType === "work_deduction" ? "ניכויים" : "הכנסות";
+        const transactionName = `קבועות ${entryLabel} - ${monthLabel}`;
+        const noteLines = groupItems.map(
+          (i: any) => `• ${i.name}${i.notes ? ` (${i.notes})` : ""}: ₪${parseFloat(String(i.amount)).toLocaleString("he-IL")}`
+        );
+        const description = transactionName + "\n\n" + noteLines.join("\n");
+
         const [row] = await db.insert(incomesTable).values({
           userId: DEFAULT_USER_ID,
           budgetYearId: byid,
-          amount: String(parseFloat(String(amount))),
+          amount: String(totalAmount),
           description,
           date,
-          entryType: entryType || "income",
-        }).returning();
-        created.push({ ...row, amount: parseNum(row.amount) });
-      } else {
-        const [row] = await db.insert(titheGivenTable).values({
-          userId: DEFAULT_USER_ID,
-          budgetYearId: byid,
-          amount: String(parseFloat(String(amount))),
-          recipient: name?.trim() || "",
-          description: notes?.trim() || "",
-          date,
+          entryType,
         }).returning();
         created.push({ ...row, amount: parseNum(row.amount) });
       }
+    } else {
+      // Tithe — one combined transaction
+      const totalAmount = valid.reduce((s: number, i: any) => s + parseFloat(String(i.amount)), 0);
+      const recipient = `קבועות - ${monthLabel}`;
+      const noteLines = valid.map(
+        (i: any) => `• ${i.name}${i.notes ? ` (${i.notes})` : ""}: ₪${parseFloat(String(i.amount)).toLocaleString("he-IL")}`
+      );
+      const description = noteLines.join("\n");
+
+      const [row] = await db.insert(titheGivenTable).values({
+        userId: DEFAULT_USER_ID,
+        budgetYearId: byid,
+        amount: String(totalAmount),
+        recipient,
+        description,
+        date,
+      }).returning();
+      created.push({ ...row, amount: parseNum(row.amount) });
     }
 
     res.status(201).json({ created, count: created.length });

@@ -141,18 +141,26 @@ function TemplateFormRow({
   );
 }
 
+const MONTHS_HE = ["ינואר","פברואר","מרץ","אפריל","מאי","יוני","יולי","אוגוסט","ספטמבר","אוקטובר","נובמבר","דצמבר"];
+function heMonthLabel(dateStr: string) {
+  const d = new Date(dateStr);
+  return MONTHS_HE[d.getMonth()] || "";
+}
+
 /* ═══════════════════════════════════════════════════
    APPLY STEP
 ═══════════════════════════════════════════════════ */
 function ApplyStep({
-  items, onBack, onApply, applying,
+  items, onBack, onApply, applying, type,
 }: {
   items: ApplyItem[];
   onBack: () => void;
   onApply: (items: ApplyItem[]) => void;
   applying: boolean;
+  type: RecurringType;
 }) {
-  const [list, setList] = useState<ApplyItem[]>(items);
+  const [list, setList]   = useState<ApplyItem[]>(items);
+  const [date, setDate]   = useState(todayStr());
 
   const toggle = (id: number) =>
     setList(prev => prev.map(i => i.id === id ? { ...i, selected: !i.selected } : i));
@@ -160,16 +168,22 @@ function ApplyStep({
   const setAmount = (id: number, v: string) =>
     setList(prev => prev.map(i => i.id === id ? { ...i, applyAmount: v } : i));
 
-  const setDate = (id: number, v: string) =>
-    setList(prev => prev.map(i => i.id === id ? { ...i, applyDate: v } : i));
+  const selected   = list.filter(i => i.selected);
+  const totalAmt   = selected.reduce((s, i) => s + (parseFloat(i.applyAmount) || 0), 0);
+  const monthLabel = heMonthLabel(date);
 
-  const selected = list.filter(i => i.selected);
-  const canApply = selected.length > 0 && selected.every(
-    i => i.applyAmount && !isNaN(parseFloat(i.applyAmount)) && parseFloat(i.applyAmount) > 0 && i.applyDate
-  );
+  const canApply = selected.length > 0 && !!date &&
+    selected.every(i => i.applyAmount && !isNaN(parseFloat(i.applyAmount)) && parseFloat(i.applyAmount) > 0);
+
+  const handleApply = () => {
+    onApply(list.map(i => ({ ...i, applyDate: date })));
+  };
+
+  const entryLabel = (et: string) => et === "work_deduction" ? "ניכוי" : "";
 
   return (
     <div className="space-y-3">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <p className="text-sm font-semibold">בחר פעולות להחלה</p>
         <Button variant="ghost" size="sm" className="h-7 text-xs gap-1" onClick={onBack}>
@@ -177,6 +191,18 @@ function ApplyStep({
         </Button>
       </div>
 
+      {/* Shared date */}
+      <div>
+        <Label className="text-xs mb-1 block">תאריך הרשומה</Label>
+        <Input
+          type="date" dir="ltr"
+          value={date}
+          onChange={e => setDate(e.target.value)}
+          className="h-8 text-sm rounded-lg w-full"
+        />
+      </div>
+
+      {/* Items list */}
       <div className="space-y-2">
         {list.map(item => (
           <div
@@ -188,7 +214,7 @@ function ApplyStep({
                 : "border-border/60 bg-card opacity-60"
             )}
           >
-            <div className="flex items-center gap-2 mb-2">
+            <div className="flex items-center gap-2">
               <button
                 onClick={() => toggle(item.id)}
                 className={cn(
@@ -199,31 +225,22 @@ function ApplyStep({
                 {item.selected && <Check className="w-3 h-3 text-white" />}
               </button>
               <span className="font-medium text-sm flex-1">{item.name}</span>
-              <span className="text-xs text-muted-foreground">{fmt(item.amount)}</span>
+              {type === "income" && entryLabel(item.entryType) && (
+                <span className="text-[10px] bg-rose-100 text-rose-600 px-1.5 py-0.5 rounded-full font-medium">
+                  {entryLabel(item.entryType)}
+                </span>
+              )}
+              {item.selected ? (
+                <Input
+                  type="number" min={0} dir="ltr"
+                  value={item.applyAmount}
+                  onChange={e => setAmount(item.id, e.target.value)}
+                  className="h-7 text-sm rounded-lg w-24 text-left"
+                />
+              ) : (
+                <span className="text-xs text-muted-foreground tabular-nums">{fmt(item.amount)}</span>
+              )}
             </div>
-
-            {item.selected && (
-              <div className="grid grid-cols-2 gap-2 mt-1">
-                <div>
-                  <Label className="text-xs mb-1 block">סכום (₪)</Label>
-                  <Input
-                    type="number" min={0} dir="ltr"
-                    value={item.applyAmount}
-                    onChange={e => setAmount(item.id, e.target.value)}
-                    className="h-7 text-sm rounded-lg"
-                  />
-                </div>
-                <div>
-                  <Label className="text-xs mb-1 block">תאריך</Label>
-                  <Input
-                    type="date" dir="ltr"
-                    value={item.applyDate}
-                    onChange={e => setDate(item.id, e.target.value)}
-                    className="h-7 text-sm rounded-lg"
-                  />
-                </div>
-              </div>
-            )}
           </div>
         ))}
       </div>
@@ -232,8 +249,24 @@ function ApplyStep({
         <p className="text-xs text-muted-foreground text-center py-1">יש לסמן לפחות פעולה אחת</p>
       )}
 
+      {/* Preview of resulting transaction */}
+      {selected.length > 0 && date && (
+        <div className="bg-muted/50 border border-border/60 rounded-xl p-3 space-y-1.5">
+          <p className="text-xs text-muted-foreground font-medium">תצוגה מקדימה של הרשומה:</p>
+          <p className="text-sm font-semibold">
+            {type === "tithe" ? `קבועות - ${monthLabel}` : `קבועות הכנסות - ${monthLabel}`}
+          </p>
+          <p className="text-xs text-emerald-700 font-bold tabular-nums">{fmt(totalAmt)}</p>
+          <div className="text-xs text-muted-foreground space-y-0.5 mt-1 pt-1 border-t border-border/40">
+            {selected.map(i => (
+              <p key={i.id}>• {i.name}: {fmt(parseFloat(i.applyAmount) || 0)}</p>
+            ))}
+          </div>
+        </div>
+      )}
+
       <Button
-        onClick={() => onApply(list)}
+        onClick={handleApply}
         disabled={!canApply || applying}
         className="w-full gap-2 bg-emerald-600 hover:bg-emerald-700 rounded-xl"
       >
@@ -241,7 +274,7 @@ function ApplyStep({
           ? <Loader2 className="w-4 h-4 animate-spin" />
           : <Check className="w-4 h-4" />
         }
-        החל {selected.length > 0 ? `${selected.length} פעולות` : "פעולות"}
+        {canApply ? `החל — ${fmt(totalAmt)}` : "החל פעולות"}
       </Button>
     </div>
   );
@@ -374,7 +407,8 @@ export function RecurringPanel({ open, onClose, type, onApplied }: Props) {
       const result = await apiFetch("/recurring-templates/apply", {
         method: "POST", body: JSON.stringify(payload),
       });
-      toast({ title: `${result.count} פעולות הוחלו בהצלחה` });
+      const label = heMonthLabel(selected[0]?.applyDate || todayStr());
+      toast({ title: `קבועות - ${label} נוצרו בהצלחה` });
       setApplyMode(false);
       onApplied();
     } catch {
@@ -401,6 +435,7 @@ export function RecurringPanel({ open, onClose, type, onApplied }: Props) {
               onBack={() => setApplyMode(false)}
               onApply={handleApply}
               applying={applying}
+              type={type}
             />
           ) : (
             <>
