@@ -1,11 +1,11 @@
 import { useState, useEffect } from "react";
 import { PageHeader } from "@/components/PageHeader";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { Save, Tag, Plus, Pencil, Trash2, Check, X, Loader2, Wallet, CalendarRange } from "lucide-react";
+import { Tag, Plus, Pencil, Trash2, Check, X, Loader2, CalendarRange } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -13,21 +13,11 @@ import {
 } from "@/components/ui/alert-dialog";
 import { apiFetch } from "@/lib/api";
 import { cn } from "@/lib/utils";
-import { useCashFund } from "@/hooks/useCashFund";
 import { useBudgetYear, BudgetYear } from "@/contexts/BudgetYearContext";
 
 /* ── Types ─────────────────────────────────────────────────── */
-type AppSettings = {
-  id: number; userId: number; currency: string; locale: string; userName: string;
-  monthlyBudget: number; tithePercentage: number; incomeBaseForTithe: number;
-  activeBudgetYearId?: number | null; dateFormat: string; firstDayOfWeek: number;
-  showDecimal: boolean; darkMode: boolean;
-};
 type Category = {
   id: number; name: string; color: string; type: string; isSystem: boolean; isActive: boolean;
-};
-type FundSummary = {
-  id: number; name: string; fundBehavior: string; monthlyAllocation: number;
 };
 
 const COLOR_SWATCHES = [
@@ -40,104 +30,12 @@ const COLOR_SWATCHES = [
    MAIN PAGE
 ═══════════════════════════════════════════════════════════ */
 export default function Settings() {
-  const { toast } = useToast();
-  const [settings, setSettings] = useState<AppSettings | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
-
-  useEffect(() => {
-    apiFetch("/settings").then(setSettings).finally(() => setIsLoading(false));
-  }, []);
-
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setIsSaving(true);
-    const formData = new FormData(e.currentTarget);
-    const data = {
-      userName: formData.get("userName") as string,
-      currency: "ILS",
-      monthlyBudget: Number(formData.get("monthlyBudget")),
-      incomeBaseForTithe: Number(formData.get("incomeBaseForTithe")),
-      tithePercentage: Number(formData.get("tithePercentage")),
-    };
-    try {
-      const updated = await apiFetch("/settings", { method: "PUT", body: JSON.stringify(data) });
-      setSettings(updated);
-      toast({ title: "ההגדרות נשמרו בהצלחה!" });
-    } catch {
-      toast({ title: "שגיאה בשמירה", variant: "destructive" });
-    } finally { setIsSaving(false); }
-  };
-
-  if (isLoading) return <div className="p-8 text-center">טוען הגדרות...</div>;
-
   return (
     <div className="max-w-3xl space-y-6" dir="rtl">
-      <PageHeader title="הגדרות מערכת" description="התאם אישית את העדפות המערכת שלך" />
-
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <Card className="border-border/50 shadow-sm">
-          <CardHeader className="bg-muted/30 border-b border-border/50">
-            <CardTitle>פרטים אישיים</CardTitle>
-            <CardDescription>איך תרצה שהמערכת תקרא לך?</CardDescription>
-          </CardHeader>
-          <CardContent className="p-6">
-            <div className="max-w-md grid gap-2">
-              <Label htmlFor="userName">שם תצוגה</Label>
-              <Input id="userName" name="userName" defaultValue={settings?.userName} className="rounded-xl" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-border/50 shadow-sm">
-          <CardHeader className="bg-muted/30 border-b border-border/50">
-            <CardTitle>הגדרות תקציב חודשי</CardTitle>
-            <CardDescription>יעדי התקציב שלך</CardDescription>
-          </CardHeader>
-          <CardContent className="p-6 space-y-6">
-            <div className="max-w-md grid gap-2">
-              <Label htmlFor="monthlyBudget">יעד תקציב הוצאות חודשי (₪)</Label>
-              <Input id="monthlyBudget" name="monthlyBudget" type="number" defaultValue={settings?.monthlyBudget} className="rounded-xl" dir="ltr" />
-            </div>
-            <div className="max-w-md grid gap-2">
-              <Label>מטבע ברירת מחדל</Label>
-              <Input value="₪ שקל חדש (ILS)" readOnly disabled className="rounded-xl bg-muted" />
-              <p className="text-xs text-muted-foreground">כרגע נתמך שקל חדש (₪) בלבד.</p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-border/50 shadow-sm border-blue-100">
-          <CardHeader className="bg-blue-50/50 border-b border-blue-100">
-            <CardTitle className="text-blue-900">מעשר כספים</CardTitle>
-            <CardDescription className="text-blue-700">הגדרות לחישוב אוטומטי של מעשר</CardDescription>
-          </CardHeader>
-          <CardContent className="p-6 space-y-6">
-            <div className="max-w-md grid gap-2">
-              <Label htmlFor="incomeBaseForTithe">הכנסה חודשית לחישוב מעשר (₪)</Label>
-              <Input id="incomeBaseForTithe" name="incomeBaseForTithe" type="number" defaultValue={settings?.incomeBaseForTithe} className="rounded-xl border-blue-200 focus-visible:ring-blue-500" dir="ltr" />
-              <p className="text-xs text-muted-foreground">הזן את משכורת הנטו שלך. אם מוגדר 0, יחושב לפי סך ההכנסות הרשומות.</p>
-            </div>
-            <div className="max-w-md grid gap-2">
-              <Label htmlFor="tithePercentage">אחוז הפרשה לצדקה (%)</Label>
-              <Input id="tithePercentage" name="tithePercentage" type="number" step="0.1" defaultValue={settings?.tithePercentage} className="rounded-xl border-blue-200 focus-visible:ring-blue-500" dir="ltr" />
-              <p className="text-xs text-muted-foreground">בדרך כלל 10% (מעשר) או 20% (חומש).</p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <div className="flex justify-end pt-2">
-          <Button type="submit" disabled={isSaving} className="rounded-xl shadow-sm gap-2">
-            <Save className="w-4 h-4" />{isSaving ? "שומר..." : "שמור הגדרות"}
-          </Button>
-        </div>
-      </form>
+      <PageHeader title="הגדרות" />
 
       {/* ══ Budget Years ═════════════════════════════════════════ */}
       <BudgetYearsSection />
-
-      {/* ══ Cash Fund ════════════════════════════════════════════ */}
-      <CashFundSection />
 
       {/* ══ Categories ═══════════════════════════════════════════ */}
       <CategoriesSection />
@@ -384,61 +282,6 @@ function BudgetYearsSection() {
         </AlertDialogContent>
       </AlertDialog>
     </>
-  );
-}
-
-/* ═══════════════════════════════════════════════════════════
-   CASH FUND SECTION
-═══════════════════════════════════════════════════════════ */
-function CashFundSection() {
-  const { activeBid } = useBudgetYear();
-  const { cashFundId, setCashFundId } = useCashFund();
-  const [funds, setFunds] = useState<FundSummary[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (!activeBid) return;
-    setLoading(true);
-    apiFetch(`/funds?bid=${activeBid}`)
-      .then((data: FundSummary[]) => setFunds(data.filter(f => f.fundBehavior === "cash_monthly")))
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, [activeBid]);
-
-  if (loading || funds.length === 0) return null;
-
-  const activeFund = funds.find(f => f.id === cashFundId) ?? funds[0];
-
-  return (
-    <Card className="border-amber-100 shadow-sm">
-      <CardHeader className="bg-amber-50/50 border-b border-amber-100">
-        <div className="flex items-center gap-2">
-          <Wallet className="w-4 h-4 text-amber-600" />
-          <div>
-            <CardTitle className="text-amber-900">קופת שוטף נוכחית</CardTitle>
-            <CardDescription className="text-amber-700">בחר איזו קופה תוצג בדשבורד</CardDescription>
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent className="p-4">
-        <div className="flex flex-wrap gap-2">
-          {funds.map(f => (
-            <button
-              key={f.id}
-              onClick={() => setCashFundId(f.id)}
-              className={cn(
-                "px-4 py-2 rounded-xl text-sm font-medium border-2 transition-all",
-                (cashFundId === f.id || (!cashFundId && activeFund?.id === f.id))
-                  ? "border-amber-500 bg-amber-100 text-amber-900"
-                  : "border-border bg-background text-foreground hover:bg-muted"
-              )}
-            >
-              {f.name}
-            </button>
-          ))}
-        </div>
-      </CardContent>
-    </Card>
   );
 }
 

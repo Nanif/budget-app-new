@@ -22,7 +22,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/incomes", label: "הכנסות", icon: Landmark, section: "מעקב פיננסי" },
   { href: "/charity", label: "צדקה ומעשרות", icon: HeartHandshake, section: "מעקב פיננסי" },
   { href: "/savings", label: "נכסים והתחייבויות", icon: Scale, section: "מעקב פיננסי" },
-  { href: "/settings", label: "הגדרות מערכת", icon: Settings, section: "הגדרות" },
+  { href: "/settings", label: "הגדרות", icon: Settings, section: "הגדרות" },
 ];
 
 export function Sidebar() {
