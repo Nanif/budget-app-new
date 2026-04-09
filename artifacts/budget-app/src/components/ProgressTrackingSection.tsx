@@ -127,22 +127,25 @@ function AddRecordDialog({
 
   useEffect(() => {
     if (!open) return;
-    const dv: Record<number,string> = {};
-    liabilities.forEach(a => {
-      const fromRecord = latestRecord?.items.debts.find(d => d.name === a.name);
-      dv[a.id] = String(fromRecord ? fromRecord.amount : (a.currentAmount || 0));
-    });
-    setDebtValues(dv);
-    const sv: Record<number,string> = {};
-    savings.forEach(a => {
-      const fromRecord = latestRecord?.items.savings.find(s => s.name === a.name);
-      sv[a.id] = String(fromRecord ? fromRecord.amount : (a.currentAmount || 0));
-    });
-    setSavingValues(sv);
-    setRemovedDebts([]);
-    setRemovedSavings([]);
-    setExtraDebts([]);
-    setExtraSavings([]);
+    if (latestRecord) {
+      // הסתר את שורות הנכסים הבסיסיים — הצג רק את הפריטים מהרישום האחרון
+      setRemovedDebts(liabilities.map(a => a.id));
+      setRemovedSavings(savings.map(a => a.id));
+      setExtraDebts(latestRecord.items.debts.map(d => ({ name: d.name, amount: "" })));
+      setExtraSavings(latestRecord.items.savings.map(s => ({ name: s.name, amount: "" })));
+    } else {
+      // אין רישום קודם — הצג נכסים עם שדות ריקים
+      const dv: Record<number,string> = {};
+      liabilities.forEach(a => { dv[a.id] = ""; });
+      setDebtValues(dv);
+      const sv: Record<number,string> = {};
+      savings.forEach(a => { sv[a.id] = ""; });
+      setSavingValues(sv);
+      setRemovedDebts([]);
+      setRemovedSavings([]);
+      setExtraDebts([]);
+      setExtraSavings([]);
+    }
     setDate(new Date().toISOString().split("T")[0]);
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
