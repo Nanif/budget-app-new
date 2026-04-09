@@ -144,15 +144,8 @@ export default function DashboardPage() {
   return (
     <div className="space-y-8" dir="rtl">
 
-      {/* ══ שורה עליונה: גרף + מעשרות/שוטף ══════════════════════ */}
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-6 items-start">
-
-        {/* גרף התקדמות הכנסות */}
-        <IncomeProgressChart
-          income={income}
-          budgetYear={budgetYear}
-          funds={funds}
-        />
+      {/* ══ שורה עליונה: מעשרות/שוטף + גרף ══════════════════════ */}
+      <div className="grid grid-cols-1 lg:grid-cols-[380px_1fr] gap-6 items-start">
 
         {/* מעשרות — קופת שוטף (מוערם) */}
         <div className="space-y-4">
@@ -182,6 +175,13 @@ export default function DashboardPage() {
             />
           )}
         </div>
+
+        {/* גרף התקדמות הכנסות */}
+        <IncomeProgressChart
+          income={income}
+          budgetYear={budgetYear}
+          funds={funds}
+        />
       </div>
 
       {/* ══ קופות ════════════════════════════════════════════= */}
@@ -210,9 +210,14 @@ function IncomeProgressChart({ income, budgetYear, funds }: {
 }) {
   const { startDate, endDate } = budgetYear;
 
-  const totalBudget = funds
+  const fundsBudget = funds
     .filter(f => !NON_BUDGET_CHART.has(f.fundBehavior))
     .reduce((s, f) => s + (f.budgetAmount ?? 0), 0);
+
+  const tithePct    = budgetYear.tithePercentage ?? 0;
+  const totalBudget = tithePct > 0 && tithePct < 100
+    ? fundsBudget / (1 - tithePct / 100)
+    : fundsBudget;
 
   const todayStr = (() => {
     const n = new Date();
@@ -303,7 +308,7 @@ function IncomeProgressChart({ income, budgetYear, funds }: {
               <span className="font-semibold text-sm text-emerald-900 dark:text-emerald-100">התקדמות הכנסות שנתית</span>
             </div>
             <p className="text-emerald-600 dark:text-emerald-400 text-xs">
-              יעד שנתי: {fmt(totalBudget)} · ממוצע חודשי: {fmt(Math.round(monthlyTarget))}
+              יעד שנתי (כולל מעשרות): {fmt(Math.round(totalBudget))} · ממוצע חודשי: {fmt(Math.round(monthlyTarget))}
             </p>
           </div>
           {gap !== null && (
