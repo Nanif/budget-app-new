@@ -123,7 +123,13 @@ export default function Expenses() {
   const [dateTo,    setDateTo]    = useState("");
   const [fundFilter,  setFundFilter]  = useState("all");
   const [catFilter,   setCatFilter]   = useState("all");
-  const [groupBy,     setGroupBy]     = useState<GroupBy>("none");
+  const [groupBy, setGroupBy] = useState<GroupBy>(
+    () => (localStorage.getItem("expenses_groupBy") as GroupBy) || "none"
+  );
+  const setGroupByPersist = (v: GroupBy) => {
+    localStorage.setItem("expenses_groupBy", v);
+    setGroupBy(v);
+  };
 
   /* ── dialog ──────────────────────────────────────────────── */
   const [dialog,      setDialog]      = useState(false);
@@ -419,7 +425,7 @@ export default function Expenses() {
           </Select>
 
           {/* Group by */}
-          <Select value={groupBy} onValueChange={v => setGroupBy(v as GroupBy)}>
+          <Select value={groupBy} onValueChange={v => setGroupByPersist(v as GroupBy)}>
             <SelectTrigger className="rounded-xl h-9 text-sm w-[150px]">
               <Filter className="w-3.5 h-3.5 ml-1 text-muted-foreground" />
               <SelectValue placeholder="קיבוץ" />
