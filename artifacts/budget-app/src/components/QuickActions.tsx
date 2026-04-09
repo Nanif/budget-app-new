@@ -115,9 +115,8 @@ export function QuickActions() {
   const efSet = <K extends keyof ExpenseForm>(k: K, v: ExpenseForm[K]) => setEf(p => ({ ...p, [k]: v }));
   const efTouch = (k: string) => setETouched(p => ({ ...p, [k]: true }));
 
-  const efAvailCats = categories.filter(c =>
-    ef.fundId ? (c.fundId === parseInt(ef.fundId)) : false
-  );
+  const efSelectedFund = ef.fundId ? funds.find(f => f.id === parseInt(ef.fundId)) : null;
+  const efAvailCats = efSelectedFund?.fundBehavior === "annual_categorized" ? categories : [];
 
   const errEName   = eTouched.name   && !ef.name.trim()              ? "שם ההוצאה נדרש"      : "";
   const errEAmount = eTouched.amount && (!ef.amount || parseFloat(ef.amount) <= 0) ? "הכנס סכום תקין" : "";

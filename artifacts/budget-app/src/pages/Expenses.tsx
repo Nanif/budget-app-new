@@ -307,12 +307,13 @@ export default function Expenses() {
   /* ── expense-eligible funds only ─────────────────────────── */
   const expenseFunds = useMemo(() => funds.filter(f => EXPENSE_BEHAVIORS.has(f.fundBehavior)), [funds]);
 
-  /* ── available categories filtered by fund ───────────────── */
+  /* ── available categories: only for annual_categorized funds ─ */
   const availableCats = useMemo(() => {
-    if (!form.fundId) return categories;
-    const fid = parseInt(form.fundId);
-    return categories.filter(c => !c.fundId || c.fundId === fid);
-  }, [categories, form.fundId]);
+    if (!form.fundId) return [];
+    const selectedFund = funds.find(f => f.id === parseInt(form.fundId));
+    if (selectedFund?.fundBehavior !== "annual_categorized") return [];
+    return categories;
+  }, [categories, funds, form.fundId]);
 
   /* ═══════════════════════════════════════════════════════════
      RENDER
