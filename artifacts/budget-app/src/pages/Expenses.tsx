@@ -23,7 +23,7 @@ import {
    TYPES
 ═══════════════════════════════════════════════════════════ */
 type Expense = {
-  id: number; amount: number; description: string; date: string;
+  id: number; amount: number; description: string; notes?: string | null; date: string;
   fundId: number | null; categoryId: number | null;
   categoryName?: string | null; categoryColor?: string | null;
   isRecurring?: boolean;
@@ -77,7 +77,8 @@ type ExpenseForm = {
 };
 function formToPayload(f: ExpenseForm) {
   return {
-    description: f.name + (f.notes.trim() ? "\n\n" + f.notes.trim() : ""),
+    description:  f.name,
+    notes:        f.notes.trim() || null,
     amount:       parseFloat(f.amount),
     date:         f.date,
     fundId:       f.fundId ? parseInt(f.fundId) : null,
@@ -86,9 +87,9 @@ function formToPayload(f: ExpenseForm) {
   };
 }
 function expenseToForm(e: Expense): ExpenseForm {
-  const [name, ...rest] = (e.description || "").split("\n\n");
   return {
-    name: name || "", notes: rest.join("\n\n"),
+    name: e.description || "",
+    notes: e.notes || "",
     amount: String(e.amount), date: e.date,
     fundId: e.fundId ? String(e.fundId) : "",
     categoryId: e.categoryId ? String(e.categoryId) : "",
@@ -162,7 +163,8 @@ export default function Expenses() {
   const filtered = useMemo(() => {
     return expenses.filter(e => {
       if (search && !e.description.toLowerCase().includes(search.toLowerCase()) &&
-          !(e.categoryName || "").toLowerCase().includes(search.toLowerCase())) return false;
+          !(e.categoryName || "").toLowerCase().includes(search.toLowerCase()) &&
+          !(e.notes || "").toLowerCase().includes(search.toLowerCase())) return false;
       if (dateFrom && e.date < dateFrom) return false;
       if (dateTo   && e.date > dateTo)   return false;
       if (fundFilter !== "all" && e.fundId !== parseInt(fundFilter)) return false;
@@ -862,9 +864,14 @@ function ExpenseRow({ expense, fundMap, catMap, onEdit, onDelete }: {
       <span className="text-muted-foreground text-xs font-medium">{fmtDate(expense.date)}</span>
 
       {/* Description */}
-      <span className="font-medium truncate pr-2">
-        {expense.description || <span className="text-muted-foreground italic">ללא תיאור</span>}
-      </span>
+      <div className="pr-2 min-w-0">
+        <p className="font-medium truncate">
+          {expense.description || <span className="text-muted-foreground italic">ללא תיאור</span>}
+        </p>
+        {expense.notes && (
+          <p className="text-xs text-muted-foreground/70 truncate italic mt-0.5">{expense.notes}</p>
+        )}
+      </div>
 
       {/* Category */}
       <span>

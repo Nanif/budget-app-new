@@ -19,7 +19,7 @@ import {
 
 
 type Fund = { id: number; name: string; colorClass: string; fundBehavior: string; annualAllocation: number; isActive: boolean };
-type Expense = { id: number; amount: number; description: string; date: string; fundId: number | null };
+type Expense = { id: number; amount: number; description: string; notes?: string | null; date: string; fundId: number | null };
 
 
 function fmt(n: number) {
@@ -36,7 +36,7 @@ export default function LargeExpenses() {
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editExp, setEditExp] = useState<Expense | null>(null);
-  const [form, setForm] = useState({ amount: "", description: "", date: "" });
+  const [form, setForm] = useState({ amount: "", description: "", notes: "", date: "" });
   const [saving, setSaving] = useState(false);
   const [deleteId, setDeleteId] = useState<number | null>(null);
 
@@ -63,12 +63,12 @@ export default function LargeExpenses() {
 
   const openCreate = () => {
     setEditExp(null);
-    setForm({ amount: "", description: "", date: new Date().toISOString().split("T")[0] });
+    setForm({ amount: "", description: "", notes: "", date: new Date().toISOString().split("T")[0] });
     setDialogOpen(true);
   };
   const openEdit = (e: Expense) => {
     setEditExp(e);
-    setForm({ amount: String(e.amount), description: e.description, date: e.date });
+    setForm({ amount: String(e.amount), description: e.description, notes: e.notes || "", date: e.date });
     setDialogOpen(true);
   };
 
@@ -80,6 +80,7 @@ export default function LargeExpenses() {
       const payload = {
         amount: parseFloat(form.amount),
         description: form.description,
+        notes: form.notes || null,
         date: form.date || new Date().toISOString().split("T")[0],
         fundId: fund.id,
         paymentMethod: "credit",
@@ -181,6 +182,9 @@ export default function LargeExpenses() {
                   <div className="flex-1">
                     <p className="font-semibold">{exp.description || "הוצאה גדולה"}</p>
                     <p className="text-xs text-muted-foreground mt-0.5">{new Date(exp.date).toLocaleDateString("he-IL")}</p>
+                    {exp.notes && (
+                      <p className="text-xs text-muted-foreground/70 mt-0.5 italic">{exp.notes}</p>
+                    )}
                   </div>
                   <p className="text-lg font-display font-bold text-rose-600 tabular-nums">{fmt(exp.amount)}</p>
                   <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -219,6 +223,11 @@ export default function LargeExpenses() {
               <Label className="font-semibold">תאריך</Label>
               <Input type="date" value={form.date} onChange={e => setForm(p => ({ ...p, date: e.target.value }))}
                 className="rounded-xl" dir="ltr" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="font-semibold">הערות</Label>
+              <Input value={form.notes} onChange={e => setForm(p => ({ ...p, notes: e.target.value }))}
+                placeholder="הערה אופציונלית..." className="rounded-xl" />
             </div>
           </div>
           <DialogFooter className="gap-2">

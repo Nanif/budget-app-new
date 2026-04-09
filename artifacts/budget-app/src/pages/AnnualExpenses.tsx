@@ -25,7 +25,7 @@ import {
 
 type Fund = { id: number; name: string; colorClass: string; fundBehavior: string; annualAllocation: number; isActive: boolean };
 type Category = { id: number; name: string; color: string; isActive: boolean };
-type Expense = { id: number; amount: number; description: string; date: string; categoryId: number | null; fundId: number | null; categoryName?: string; categoryColor?: string };
+type Expense = { id: number; amount: number; description: string; notes?: string | null; date: string; categoryId: number | null; fundId: number | null; categoryName?: string; categoryColor?: string };
 
 
 function fmt(n: number) {
@@ -45,7 +45,7 @@ export default function AnnualExpenses() {
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editExp, setEditExp] = useState<Expense | null>(null);
-  const [form, setForm] = useState({ amount: "", description: "", date: "", categoryId: "" });
+  const [form, setForm] = useState({ amount: "", description: "", notes: "", date: "", categoryId: "" });
   const [saving, setSaving] = useState(false);
   const [deleteId, setDeleteId] = useState<number | null>(null);
 
@@ -77,12 +77,12 @@ export default function AnnualExpenses() {
 
   const openCreate = () => {
     setEditExp(null);
-    setForm({ amount: "", description: "", date: new Date().toISOString().split("T")[0], categoryId: "" });
+    setForm({ amount: "", description: "", notes: "", date: new Date().toISOString().split("T")[0], categoryId: "" });
     setDialogOpen(true);
   };
   const openEdit = (e: Expense) => {
     setEditExp(e);
-    setForm({ amount: String(e.amount), description: e.description, date: e.date, categoryId: e.categoryId ? String(e.categoryId) : "" });
+    setForm({ amount: String(e.amount), description: e.description, notes: e.notes || "", date: e.date, categoryId: e.categoryId ? String(e.categoryId) : "" });
     setDialogOpen(true);
   };
 
@@ -94,6 +94,7 @@ export default function AnnualExpenses() {
       const payload: any = {
         amount: parseFloat(form.amount),
         description: form.description,
+        notes: form.notes || null,
         date: form.date || new Date().toISOString().split("T")[0],
         fundId: fund.id,
         paymentMethod: "credit",
@@ -253,6 +254,9 @@ export default function AnnualExpenses() {
                         <span className="text-xs px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">{exp.categoryName}</span>
                       )}
                     </div>
+                    {exp.notes && (
+                      <p className="text-xs text-muted-foreground/70 mt-0.5 truncate italic">{exp.notes}</p>
+                    )}
                   </div>
                   <p className="font-bold text-sm tabular-nums text-rose-600">{fmt(exp.amount)}</p>
                   <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -309,6 +313,11 @@ export default function AnnualExpenses() {
               <Label className="font-semibold">תאריך</Label>
               <Input type="date" value={form.date} onChange={e => setForm(p => ({ ...p, date: e.target.value }))}
                 className="rounded-xl" dir="ltr" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="font-semibold">הערות</Label>
+              <Input value={form.notes} onChange={e => setForm(p => ({ ...p, notes: e.target.value }))}
+                placeholder="הערה אופציונלית..." className="rounded-xl" />
             </div>
           </div>
           <DialogFooter className="gap-2">
