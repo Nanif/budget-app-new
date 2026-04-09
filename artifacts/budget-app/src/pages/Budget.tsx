@@ -216,7 +216,12 @@ export default function Budget() {
   const annualFunds    = activeFunds.filter(f => !MONTHLY_BEHAVIORS.has(f.fundBehavior) && !NON_BUDGET_BEHAVIORS.has(f.fundBehavior));
   const nonBudgetFunds = activeFunds.filter(f => NON_BUDGET_BEHAVIORS.has(f.fundBehavior));
   const budgetFunds    = activeFunds.filter(f => f.includeInBudget);
-  const totalBudget    = budgetFunds.reduce((s, f) => s + fundBudget(f), 0);
+  const totalBudget    = budgetFunds.reduce((s, f) => {
+    if (f.fundBehavior === "fixed_monthly" && fixedDataMap[f.id]) {
+      return s + fixedDataMap[f.id].totals.monthly * 12;
+    }
+    return s + fundBudget(f);
+  }, 0);
   const gap            = income.netIncome - totalExp;
 
   /* ── year edit helpers ───────────────────────────────────── */
