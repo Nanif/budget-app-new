@@ -13,8 +13,8 @@ import { cn } from "@/lib/utils";
 import { apiFetch } from "@/lib/api";
 import {
   Plus, Pencil, Trash2, Search, X, ChevronDown, ChevronRight,
-  Receipt, Loader2, Check, AlertTriangle, Filter, TrendingDown,
-  Tag, Wallet, CalendarDays, BarChart3, RefreshCw, StickyNote,
+  Receipt, Loader2, Check, AlertTriangle, Filter,
+  Tag, Wallet, CalendarDays, RefreshCw, StickyNote,
   ShieldAlert, CircleDollarSign,
 } from "lucide-react";
 
@@ -28,7 +28,10 @@ type Expense = {
   categoryName?: string | null; categoryColor?: string | null;
   isRecurring?: boolean;
 };
-type Fund     = { id: number; name: string; colorClass: string; fundBehavior: string };
+type Fund     = {
+  id: number; name: string; colorClass: string; fundBehavior: string;
+  budgetAmount: number; actualAmount: number; remaining: number; usagePercent: number;
+};
 
 const EXPENSE_BEHAVIORS = new Set([
   "expense_monthly", "annual_categorized", "annual_large", "annual", "expense_non_budget",
@@ -141,7 +144,7 @@ export default function Expenses() {
     try {
       const [exp, fnd, cats] = await Promise.all([
         apiFetch("/expenses"),
-        apiFetch("/funds"),
+        apiFetch(`/funds/summary?bid=${activeBid}`),
         apiFetch("/categories"),
       ]);
       setExpenses(exp.map((e: any) => ({ ...e, amount: parseFloat(e.amount) })));
@@ -169,15 +172,8 @@ export default function Expenses() {
     });
   }, [expenses, search, dateFrom, dateTo, fundFilter, catFilter]);
 
-  /* ── KPIs ────────────────────────────────────────────────── */
+  /* ── totals ──────────────────────────────────────────────── */
   const totalAmount = filtered.reduce((s, e) => s + e.amount, 0);
-  const avgAmount   = filtered.length > 0 ? totalAmount / filtered.length : 0;
-  const now         = new Date();
-  const curMonth    = monthKey(todayStr());
-  const prevMonth   = (() => { const d = new Date(now); d.setMonth(d.getMonth() - 1); return monthKey(d.toISOString().split("T")[0]); })();
-  const thisMonthTotal = expenses.filter(e => monthKey(e.date) === curMonth).reduce((s, e) => s + e.amount, 0);
-  const lastMonthTotal = expenses.filter(e => monthKey(e.date) === prevMonth).reduce((s, e) => s + e.amount, 0);
-  const monthDelta  = thisMonthTotal - lastMonthTotal;
 
   /* ── grouped data ────────────────────────────────────────── */
   const grouped: { key: string; label: string; color?: string; items: Expense[]; total: number }[] = useMemo(() => {
@@ -318,41 +314,60 @@ export default function Expenses() {
         </Button>
       </PageHeader>
 
-      {/* ══ KPI STRIP ══════════════════════════════════════════ */}
-      <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
-        <KpiCard
-          icon={<Receipt className="w-4 h-4" />}
-          label="סה״כ הוצאות"
-          value={fmt(totalAmount)}
-          sub={`${filtered.length} רשומות`}
-          iconBg="bg-rose-100 text-rose-600"
-          valueColor="text-rose-600"
-        />
-        <KpiCard
-          icon={<BarChart3 className="w-4 h-4" />}
-          label="ממוצע להוצאה"
-          value={fmt(avgAmount)}
-          sub="ממוצע לכל רשומה"
-          iconBg="bg-orange-100 text-orange-600"
-          valueColor="text-orange-600"
-        />
-        <KpiCard
-          icon={<CalendarDays className="w-4 h-4" />}
-          label="חודש נוכחי"
-          value={fmt(thisMonthTotal)}
-          sub={`${monthLabel(curMonth)}`}
-          iconBg="bg-blue-100 text-blue-600"
-          valueColor="text-blue-600"
-        />
-        <KpiCard
-          icon={<TrendingDown className="w-4 h-4" />}
-          label={monthDelta >= 0 ? "עלייה מחודש קודם" : "ירידה מחודש קודם"}
-          value={fmt(Math.abs(monthDelta))}
-          sub={`${monthLabel(prevMonth)}: ${fmt(lastMonthTotal)}`}
-          iconBg={monthDelta >= 0 ? "bg-rose-100 text-rose-600" : "bg-emerald-100 text-emerald-600"}
-          valueColor={monthDelta >= 0 ? "text-rose-600" : "text-emerald-600"}
-        />
-      </div>
+      {/* ══ FUND CARDS ═════════════════════════════════════════ */}
+      {!loading && expenseFunds.length > 0 && (
+        <div className="flex gap-3 flex-wrap">
+          {expenseFunds.map(fund => {
+            const pct  = fund.budgetAmount > 0
+              ? Math.min(100, (fund.actualAmount / fund.budgetAmount) * 100)
+              : 0;
+            const over = fund.remaining < 0;
+            return (
+              <div
+                key={fund.id}
+                className="flex-1 min-w-[160px] bg-card border border-border/60 rounded-2xl p-4 shadow-sm"
+              >
+                {/* Name */}
+                <div className="flex items-center gap-2 mb-3">
+                  <span
+                    className="w-2.5 h-2.5 rounded-full shrink-0"
+                    style={{ background: fund.colorClass }}
+                  />
+                  <span className="text-sm font-semibold truncate">{fund.name}</span>
+                </div>
+
+                {/* Numbers */}
+                <div className="flex items-end justify-between mb-2.5">
+                  <div>
+                    <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-0.5">תקציב</p>
+                    <p className="text-sm font-bold tabular-nums">{fmt(fund.budgetAmount)}</p>
+                  </div>
+                  <div className="text-left">
+                    <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-0.5">נותר</p>
+                    <p className={cn(
+                      "text-sm font-bold tabular-nums",
+                      over ? "text-rose-600" : "text-emerald-600"
+                    )}>
+                      {over ? "−" : ""}{fmt(Math.abs(fund.remaining))}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Progress bar */}
+                <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                  <div
+                    className={cn(
+                      "h-full rounded-full transition-all duration-500",
+                      over ? "bg-rose-500" : pct > 80 ? "bg-amber-500" : "bg-emerald-500"
+                    )}
+                    style={{ width: `${pct}%` }}
+                  />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* ══ FILTER BAR ═════════════════════════════════════════ */}
       <div className="bg-card border border-border/60 rounded-2xl p-4 space-y-3">
@@ -840,22 +855,6 @@ function ExpenseDialog({
 /* ═══════════════════════════════════════════════════════════
    SUB-COMPONENTS
 ═══════════════════════════════════════════════════════════ */
-
-function KpiCard({ icon, label, value, sub, iconBg, valueColor }: {
-  icon: React.ReactNode; label: string; value: string; sub: string;
-  iconBg: string; valueColor?: string;
-}) {
-  return (
-    <div className="bg-card rounded-2xl border border-border/60 p-4 shadow-sm">
-      <div className="flex items-start justify-between mb-2">
-        <p className="text-sm text-muted-foreground">{label}</p>
-        <div className={cn("w-8 h-8 rounded-xl flex items-center justify-center shrink-0", iconBg)}>{icon}</div>
-      </div>
-      <p className={cn("text-xl font-display font-bold tabular-nums", valueColor)}>{value}</p>
-      <p className="text-xs text-muted-foreground mt-1">{sub}</p>
-    </div>
-  );
-}
 
 function FilterPill({ label, onRemove }: { label: string; onRemove: () => void }) {
   return (
