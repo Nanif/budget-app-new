@@ -29,10 +29,7 @@ export default function NetWorth() {
 
   return (
     <div dir="rtl">
-      <PageHeader
-        title="מעקב התקדמות בפועל"
-        description="רישום תקופתי של שווי נטו — נכסים פחות התחייבויות"
-      />
+      <PageHeader title="נכסים והתחייבויות" />
       <div className="mt-5">
         <ProgressTrackingSection assets={records} />
       </div>

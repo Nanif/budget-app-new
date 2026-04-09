@@ -188,7 +188,7 @@ function AddRecordDialog({
           {/* Debts */}
           <div>
             <p className="text-sm font-semibold text-foreground mb-3 flex items-center gap-1.5">
-              <TrendingDown className="w-4 h-4 text-rose-500" /> התחייבויות בפועל (₪)
+              <TrendingDown className="w-4 h-4 text-rose-500" /> התחייבויות (₪)
             </p>
             <div className="space-y-2.5">
               {liabilities.filter(a => !removedDebts.includes(a.id)).map(a => (
@@ -223,7 +223,7 @@ function AddRecordDialog({
           {/* Savings */}
           <div>
             <p className="text-sm font-semibold text-foreground mb-3 flex items-center gap-1.5">
-              <TrendingUp className="w-4 h-4 text-emerald-500" /> חסכונות בפועל (₪)
+              <TrendingUp className="w-4 h-4 text-emerald-500" /> חסכונות (₪)
             </p>
             <div className="space-y-2.5">
               {savings.filter(a => !removedSavings.includes(a.id)).map(a => (
@@ -338,13 +338,7 @@ export function ProgressTrackingSection({ assets }: { assets: AssetRecord[] }) {
   return (
     <div className="space-y-5">
       {/* ── Header ───────────────────────────────────────────── */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="font-bold text-base text-foreground">מעקב התקדמות בפועל</h3>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            הוסף רישומים תקופתיים כדי לעקוב אחר השווי הנקי שלך לאורך זמן
-          </p>
-        </div>
+      <div className="flex items-center justify-end">
         <button
           onClick={() => setShowForm(true)}
           className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-medium px-4 py-2 rounded-xl transition-colors shadow-sm"
@@ -500,7 +494,7 @@ export function ProgressTrackingSection({ assets }: { assets: AssetRecord[] }) {
                     <div className="bg-muted/10 border-t border-border/30 px-10 py-4 grid grid-cols-2 gap-8">
                       <div>
                         <p className="text-xs font-semibold text-rose-600 mb-2.5 flex items-center gap-1.5">
-                          <TrendingDown className="w-3.5 h-3.5" /> פירוט התחייבויות בפועל
+                          <TrendingDown className="w-3.5 h-3.5" /> פירוט התחייבויות
                         </p>
                         <div className="space-y-2">
                           {rec.items.debts.map((d, i) => (
@@ -523,7 +517,7 @@ export function ProgressTrackingSection({ assets }: { assets: AssetRecord[] }) {
                       </div>
                       <div>
                         <p className="text-xs font-semibold text-emerald-600 mb-2.5 flex items-center gap-1.5">
-                          <TrendingUp className="w-3.5 h-3.5" /> פירוט חסכונות בפועל
+                          <TrendingUp className="w-3.5 h-3.5" /> פירוט חסכונות
                         </p>
                         <div className="space-y-2">
                           {rec.items.savings.map((s, i) => (

@@ -1016,7 +1016,7 @@ function NetWorthSummaryCard({ records }: { records: NwRecord[] }) {
       <div className="px-4 py-2.5">
         <Link href="/savings">
           <span className="flex items-center gap-1 text-xs text-muted-foreground hover:text-teal-600 transition-colors">
-            מעקב התקדמות בפועל <ArrowLeft className="w-3 h-3" />
+            נכסים והתחייבויות <ArrowLeft className="w-3 h-3" />
           </span>
         </Link>
       </div>
