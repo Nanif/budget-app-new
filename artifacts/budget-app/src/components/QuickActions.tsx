@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import {
   TrendingDown, TrendingUp, Wallet, HeartHandshake,
   Receipt, ArrowUpRight, ArrowDownRight, CircleDollarSign,
-  CalendarDays, Tag, StickyNote, RefreshCw, Check, X,
+  CalendarDays, Tag, StickyNote, Check, X,
   Loader2, ShieldAlert, ArrowDownLeft,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
@@ -79,12 +79,12 @@ export function QuickActions() {
   ═══════════════════════════════════════════════════════ */
   type ExpenseForm = {
     name: string; notes: string; amount: string; date: string;
-    fundId: string; categoryId: string; isRecurring: boolean;
+    fundId: string; categoryId: string;
     takenFromCash: boolean;
   };
   const EXPENSE_EMPTY: ExpenseForm = {
     name: "", notes: "", amount: "", date: today(),
-    fundId: "", categoryId: "", isRecurring: false,
+    fundId: "", categoryId: "",
     takenFromCash: false,
   };
   const [ef, setEf] = useState<ExpenseForm>(EXPENSE_EMPTY);
@@ -122,7 +122,7 @@ export function QuickActions() {
           date:          ef.date,
           fundId:        parseInt(ef.fundId),
           categoryId:    ef.categoryId ? parseInt(ef.categoryId) : null,
-          isRecurring:   ef.isRecurring,
+          isRecurring:   false,
         }),
       });
       /* also record withdrawal from cash fund if checked */
@@ -480,26 +480,6 @@ export function QuickActions() {
                 className="w-full rounded-2xl border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-300 focus-visible:ring-offset-2 resize-none"
               />
             </div>
-
-            {/* Recurring */}
-            <label className="flex items-center gap-3 cursor-pointer group select-none">
-              <span
-                onClick={() => efSet("isRecurring", !ef.isRecurring)}
-                className={cn(
-                  "w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition-colors",
-                  ef.isRecurring ? "bg-teal-600 border-teal-600" : "border-border group-hover:border-teal-400"
-                )}
-              >
-                {ef.isRecurring && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
-              </span>
-              <div>
-                <span className="text-sm font-medium flex items-center gap-1.5">
-                  <RefreshCw className="w-3.5 h-3.5 text-teal-600" />
-                  הוצאה חוזרת / קבועה
-                </span>
-                <p className="text-xs text-muted-foreground">סמן אם הוצאה זו מתרחשת באופן קבוע</p>
-              </div>
-            </label>
 
             {/* Taken from cash fund */}
             {cashFundName && (

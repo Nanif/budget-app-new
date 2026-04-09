@@ -14,7 +14,7 @@ import { apiFetch } from "@/lib/api";
 import {
   Plus, Pencil, Trash2, Search, X, ChevronDown, ChevronRight,
   Receipt, Loader2, Check, AlertTriangle, Filter,
-  Tag, Wallet, CalendarDays, RefreshCw, StickyNote,
+  Tag, Wallet, CalendarDays, StickyNote,
   ShieldAlert, CircleDollarSign,
 } from "lucide-react";
 
@@ -69,10 +69,10 @@ function monthLabel(k: string) {
 }
 function todayStr() { return new Date().toISOString().split("T")[0]; }
 
-/* form splits "description" → name + notes, and adds isRecurring */
+/* form splits "description" → name + notes */
 type ExpenseForm = {
   name: string; notes: string; amount: string; date: string;
-  fundId: string; categoryId: string; isRecurring: boolean;
+  fundId: string; categoryId: string;
   takenFromCash: boolean;
 };
 function formToPayload(f: ExpenseForm) {
@@ -82,7 +82,7 @@ function formToPayload(f: ExpenseForm) {
     date:         f.date,
     fundId:       f.fundId ? parseInt(f.fundId) : null,
     categoryId:   f.categoryId ? parseInt(f.categoryId) : null,
-    isRecurring:  f.isRecurring,
+    isRecurring:  false,
   };
 }
 function expenseToForm(e: Expense): ExpenseForm {
@@ -92,13 +92,12 @@ function expenseToForm(e: Expense): ExpenseForm {
     amount: String(e.amount), date: e.date,
     fundId: e.fundId ? String(e.fundId) : "",
     categoryId: e.categoryId ? String(e.categoryId) : "",
-    isRecurring: e.isRecurring ?? false,
     takenFromCash: false,
   };
 }
 const EMPTY_FORM: ExpenseForm = {
   name: "", notes: "", amount: "", date: todayStr(),
-  fundId: "", categoryId: "", isRecurring: false,
+  fundId: "", categoryId: "",
   takenFromCash: false,
 };
 
@@ -776,28 +775,6 @@ function ExpenseDialog({
               className="w-full rounded-2xl border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-300 focus-visible:ring-offset-2 resize-none"
             />
           </div>
-
-          {/* Recurring checkbox */}
-          <label className="flex items-center gap-3 cursor-pointer group select-none">
-            <span
-              onClick={() => setField("isRecurring", !form.isRecurring)}
-              className={cn(
-                "w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition-colors",
-                form.isRecurring
-                  ? "bg-teal-600 border-teal-600"
-                  : "border-border group-hover:border-teal-400"
-              )}
-            >
-              {form.isRecurring && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
-            </span>
-            <div>
-              <span className="text-sm font-medium flex items-center gap-1.5">
-                <RefreshCw className="w-3.5 h-3.5 text-teal-600" />
-                הוצאה חוזרת / קבועה
-              </span>
-              <p className="text-xs text-muted-foreground">סמן אם הוצאה זו מתרחשת באופן קבוע</p>
-            </div>
-          </label>
 
           {/* Taken from cash fund — only for new expenses */}
           {!isEdit && cashFundName && (
