@@ -138,7 +138,6 @@ export default function Charity() {
   const [dateFrom,    setDateFrom]    = useState("");
   const [dateTo,      setDateTo]      = useState("");
   const [monthFilter, setMonthFilter] = useState("all");
-  const [yearFilter,  setYearFilter]  = useState("all");
   const [groupBy,     setGroupBy]     = useState<GroupBy>("none");
 
   /* ── dialog ──────────────────────────────────────────────── */
@@ -179,11 +178,6 @@ export default function Charity() {
   const remaining    = titheTarget - totalGiven;
   const pct          = titheTarget > 0 ? Math.min(100, (totalGiven / titheTarget) * 100) : 0;
 
-  /* ── unique years ─────────────────────────────────────────── */
-  const uniqueYears = useMemo(() =>
-    Array.from(new Set(entries.map(e => getYear(e.date)))).sort().reverse(),
-  [entries]);
-
   /* ── filtered ────────────────────────────────────────────── */
   const filtered = useMemo(() => {
     return entries.filter(e => {
@@ -192,10 +186,9 @@ export default function Charity() {
       if (dateFrom && e.date < dateFrom) return false;
       if (dateTo   && e.date > dateTo)   return false;
       if (monthFilter !== "all" && String(new Date(e.date).getMonth() + 1) !== monthFilter) return false;
-      if (yearFilter  !== "all" && getYear(e.date) !== yearFilter) return false;
       return true;
     });
-  }, [entries, search, dateFrom, dateTo, monthFilter, yearFilter]);
+  }, [entries, search, dateFrom, dateTo, monthFilter]);
 
   /* ── filtered totals ─────────────────────────────────────── */
   const filteredTotal = filtered.reduce((s, e) => s + e.amount, 0);
@@ -219,10 +212,10 @@ export default function Charity() {
   }, [filtered, groupBy, filteredTotal]);
 
   const hasFilters = search || dateFrom || dateTo ||
-    monthFilter !== "all" || yearFilter !== "all";
+    monthFilter !== "all";
   const clearFilters = () => {
     setSearch(""); setDateFrom(""); setDateTo("");
-    setMonthFilter("all"); setYearFilter("all");
+    setMonthFilter("all");
   };
 
   /* ── dialog helpers ──────────────────────────────────────── */
@@ -399,17 +392,6 @@ export default function Charity() {
             </SelectContent>
           </Select>
 
-          {/* Year */}
-          <Select value={yearFilter} onValueChange={setYearFilter}>
-            <SelectTrigger className="rounded-xl h-9 text-sm w-[100px]">
-              <SelectValue placeholder="שנה" />
-            </SelectTrigger>
-            <SelectContent dir="rtl">
-              <SelectItem value="all">כל השנים</SelectItem>
-              {uniqueYears.map(y => <SelectItem key={y} value={y}>{y}</SelectItem>)}
-            </SelectContent>
-          </Select>
-
           {/* Group by */}
           <Select value={groupBy} onValueChange={v => setGroupBy(v as GroupBy)}>
             <SelectTrigger className="rounded-xl h-9 text-sm w-[145px]">
@@ -436,7 +418,6 @@ export default function Charity() {
             {dateFrom && <FilterPill label={`מ-${dateFrom}`} onRemove={() => setDateFrom("")} />}
             {dateTo   && <FilterPill label={`עד-${dateTo}`}  onRemove={() => setDateTo("")} />}
             {monthFilter !== "all" && <FilterPill label={MONTH_HE[parseInt(monthFilter) - 1]} onRemove={() => setMonthFilter("all")} />}
-            {yearFilter  !== "all" && <FilterPill label={`שנת ${yearFilter}`} onRemove={() => setYearFilter("all")} />}
           </div>
         )}
       </div>

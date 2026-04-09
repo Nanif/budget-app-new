@@ -133,7 +133,6 @@ export default function Incomes() {
   const [dateTo,       setDateTo]       = useState("");
   const [sourceFilter, setSourceFilter] = useState("all");
   const [monthFilter,  setMonthFilter]  = useState("all");
-  const [yearFilter,   setYearFilter]   = useState("all");
   const [typeFilter,   setTypeFilter]   = useState<"all" | "income" | "work_deduction">("all");
   const [groupBy,      setGroupBy]      = useState<GroupBy>("none");
 
@@ -165,9 +164,6 @@ export default function Incomes() {
   const uniqueSources = useMemo(() =>
     Array.from(new Set(entries.map(e => parseSource(e.description)).filter(Boolean))).sort(),
   [entries]);
-  const uniqueYears = useMemo(() =>
-    Array.from(new Set(entries.map(e => getYear(e.date)))).sort().reverse(),
-  [entries]);
 
   /* ── filtered ────────────────────────────────────────────── */
   const filtered = useMemo(() => {
@@ -180,11 +176,10 @@ export default function Incomes() {
       if (dateTo   && e.date > dateTo)   return false;
       if (sourceFilter !== "all" && src !== sourceFilter) return false;
       if (monthFilter  !== "all" && getMonth(e.date) !== monthFilter) return false;
-      if (yearFilter   !== "all" && getYear(e.date)  !== yearFilter)  return false;
       if (typeFilter   !== "all" && e.entryType !== typeFilter) return false;
       return true;
     });
-  }, [entries, search, dateFrom, dateTo, sourceFilter, monthFilter, yearFilter, typeFilter]);
+  }, [entries, search, dateFrom, dateTo, sourceFilter, monthFilter, typeFilter]);
 
   /* ── KPIs ─────────────────────────────────────────────────── */
   const now = new Date();
@@ -224,10 +219,10 @@ export default function Incomes() {
   }, [filtered, groupBy]);
 
   const hasFilters = search || dateFrom || dateTo || sourceFilter !== "all" ||
-    monthFilter !== "all" || yearFilter !== "all" || typeFilter !== "all";
+    monthFilter !== "all" || typeFilter !== "all";
   const clearFilters = () => {
     setSearch(""); setDateFrom(""); setDateTo("");
-    setSourceFilter("all"); setMonthFilter("all"); setYearFilter("all"); setTypeFilter("all");
+    setSourceFilter("all"); setMonthFilter("all"); setTypeFilter("all");
   };
 
   /* ── dialog helpers ──────────────────────────────────────── */
@@ -404,17 +399,6 @@ export default function Incomes() {
             </SelectContent>
           </Select>
 
-          {/* Year filter */}
-          <Select value={yearFilter} onValueChange={setYearFilter}>
-            <SelectTrigger className="rounded-xl h-9 text-sm w-[100px]">
-              <SelectValue placeholder="שנה" />
-            </SelectTrigger>
-            <SelectContent dir="rtl">
-              <SelectItem value="all">כל השנים</SelectItem>
-              {uniqueYears.map(y => <SelectItem key={y} value={y}>{y}</SelectItem>)}
-            </SelectContent>
-          </Select>
-
           {/* Type filter */}
           <Select value={typeFilter} onValueChange={v => setTypeFilter(v as any)}>
             <SelectTrigger className="rounded-xl h-9 text-sm w-[120px]">
@@ -455,7 +439,6 @@ export default function Incomes() {
             {dateTo       && <FilterPill label={`עד-${dateTo}`}                onRemove={() => setDateTo("")} />}
             {sourceFilter !== "all" && <FilterPill label={sourceFilter}        onRemove={() => setSourceFilter("all")} />}
             {monthFilter  !== "all" && <FilterPill label={MONTH_HE[parseInt(monthFilter) - 1]} onRemove={() => setMonthFilter("all")} />}
-            {yearFilter   !== "all" && <FilterPill label={`שנת ${yearFilter}`} onRemove={() => setYearFilter("all")} />}
             {typeFilter   !== "all" && <FilterPill label={typeFilter === "income" ? "הכנסות" : "ניכויים"} onRemove={() => setTypeFilter("all")} />}
           </div>
         )}
