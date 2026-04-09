@@ -165,12 +165,12 @@ export default function Incomes() {
   const totalDeductions = deductionsOnly.reduce((s, e) => s + e.amount, 0);
   const netIncome       = totalIncome - totalDeductions;
 
-  const monthsWithIncome = new Set(incomeOnly.map(e => monthKey(e.date))).size;
-  const avgMonthly = monthsWithIncome > 0 ? totalIncome / monthsWithIncome : 0;
+  const monthsWithData = new Set(entries.map(e => monthKey(e.date))).size;
+  const avgMonthly     = monthsWithData > 0 ? netIncome / monthsWithData : 0;
 
-  const thisMonthIncome = incomeOnly
+  const thisMonthNet = entries
     .filter(e => monthKey(e.date) === curMonthKey)
-    .reduce((s, e) => s + e.amount, 0);
+    .reduce((s, e) => s + (e.entryType === "income" ? e.amount : -e.amount), 0);
 
   /* ── grouped ─────────────────────────────────────────────── */
   const grouped = useMemo(() => {
@@ -294,24 +294,24 @@ export default function Incomes() {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <KpiCard
           icon={<Landmark className="w-4 h-4" />}
-          label='סה"כ הכנסות'
-          value={fmt(totalIncome)}
-          sub={`${incomeOnly.length} רשומות`}
+          label='סה"כ הכנסות נטו'
+          value={fmt(netIncome)}
+          sub={totalDeductions > 0 ? `${fmt(totalIncome)} פחות ${fmt(totalDeductions)} ניכויים` : `${incomeOnly.length} רשומות`}
           iconBg="bg-emerald-100 text-emerald-600"
           valueColor="text-emerald-600"
         />
         <KpiCard
           icon={<BarChart3 className="w-4 h-4" />}
-          label="ממוצע חודשי"
+          label="ממוצע חודשי נטו"
           value={fmt(avgMonthly)}
-          sub={`על פני ${monthsWithIncome} חודשים`}
+          sub={`על פני ${monthsWithData} חודשים`}
           iconBg="bg-teal-100 text-teal-600"
           valueColor="text-teal-600"
         />
         <KpiCard
           icon={<CalendarDays className="w-4 h-4" />}
-          label="הכנסות החודש"
-          value={fmt(thisMonthIncome)}
+          label="נטו החודש"
+          value={fmt(thisMonthNet)}
           sub={monthLabel(curMonthKey)}
           iconBg="bg-blue-100 text-blue-600"
           valueColor="text-blue-600"
