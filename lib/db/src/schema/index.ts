@@ -16,3 +16,4 @@ export * from "./tasks";
 export * from "./systemSettings";
 export * from "./fixedItems";
 export * from "./recurringTemplates";
+export * from "./netWorthRecords";

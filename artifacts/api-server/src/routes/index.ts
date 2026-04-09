@@ -75,6 +75,7 @@ import dashboardRouter     from "./dashboard";
 import settingsRouter      from "./settings";
 import fixedItemsRouter           from "./fixedItems";
 import recurringTemplatesRouter   from "./recurringTemplates";
+import netWorthRecordsRouter      from "./netWorthRecords";
 import devRouter                  from "./dev";
 
 const router = Router();
@@ -107,9 +108,10 @@ router.use("/tithe-given", charityRouter);        // alias
 router.use("/debts", debtsRouter);
 
 // Assets & balance history
-router.use("/savings",        savingsRouter);
-router.use("/assets",         savingsRouter);     // alias
-router.use("/asset-balances", assetBalancesRouter);
+router.use("/savings",             savingsRouter);
+router.use("/assets",              savingsRouter);           // alias
+router.use("/asset-balances",      assetBalancesRouter);
+router.use("/net-worth-records",   netWorthRecordsRouter);
 
 // Categories
 router.use("/categories", categoriesRouter);

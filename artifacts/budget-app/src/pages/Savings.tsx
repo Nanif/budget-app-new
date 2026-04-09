@@ -14,13 +14,13 @@ import {
   Landmark, PiggyBank, Car, Building2, BarChart3, CreditCard,
   Loader2, Check, ShieldAlert, StickyNote, AlertTriangle, X,
   CircleDollarSign, ArrowUpRight, ArrowDownRight, Scale, Wallet,
-  ChevronDown, ChevronRight, Clock, History,
+  ChevronDown, ChevronRight,
 } from "lucide-react";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { ProgressTrackingMockup } from "@/components/ProgressTrackingMockup";
+import { ProgressTrackingSection } from "@/components/ProgressTrackingSection";
 
 
 /* ═══════════════════════════════════════════════════════════
@@ -31,15 +31,6 @@ type AssetRecord = {
   currentAmount: number; targetAmount?: number | null;
   institution?: string | null; accountNumber?: string | null;
   notes: string; isActive: boolean; currency: string;
-};
-
-type Snapshot = {
-  id: number; assetId: number; userId: number;
-  balance: number; recordedAt: string; notes: string; createdAt: string;
-};
-
-type NwPoint = {
-  date: string; totalAssets: number; totalLiabilities: number; netWorth: number;
 };
 
 /* Asset types — positive net-worth contributors */
@@ -141,8 +132,8 @@ function NetWorthBar({ totalAssets, totalLiabilities }: { totalAssets: number; t
 /* ═══════════════════════════════════════════════════════════
    ITEM CARD
 ═══════════════════════════════════════════════════════════ */
-function ItemCard({ item, onEdit, onDelete, onHistory }: {
-  item: AssetRecord; onEdit: () => void; onDelete: () => void; onHistory: () => void;
+function ItemCard({ item, onEdit, onDelete }: {
+  item: AssetRecord; onEdit: () => void; onDelete: () => void;
 }) {
   const info     = getTypeInfo(item.type);
   const liab     = isLiability(item.type);
@@ -171,11 +162,6 @@ function ItemCard({ item, onEdit, onDelete, onHistory }: {
           </div>
         </div>
         <div className="opacity-0 group-hover:opacity-100 flex gap-1 transition-opacity shrink-0">
-          <button onClick={onHistory}
-            className="p-1.5 rounded-lg hover:bg-teal-50 text-muted-foreground hover:text-teal-600 transition-colors"
-            title="היסטוריה">
-            <Clock className="w-3.5 h-3.5" />
-          </button>
           <button onClick={onEdit}
             className="p-1.5 rounded-lg hover:bg-blue-50 text-muted-foreground hover:text-blue-600 transition-colors">
             <Pencil className="w-3.5 h-3.5" />
@@ -240,11 +226,11 @@ function ItemCard({ item, onEdit, onDelete, onHistory }: {
    SECTION
 ═══════════════════════════════════════════════════════════ */
 function Section({
-  title, total, items, color, onAdd, onEdit, onDelete, onHistory, Icon, addLabel,
+  title, total, items, color, onAdd, onEdit, onDelete, Icon, addLabel,
 }: {
   title: string; total: number; items: AssetRecord[]; color: string;
   onAdd: () => void; onEdit: (item: AssetRecord) => void;
-  onDelete: (item: AssetRecord) => void; onHistory: (item: AssetRecord) => void;
+  onDelete: (item: AssetRecord) => void;
   Icon: React.ElementType; addLabel: string;
 }) {
   const [collapsed, setCollapsed] = useState(false);
@@ -288,8 +274,7 @@ function Section({
           ) : (
             items.map(item => (
               <ItemCard key={item.id} item={item}
-                onEdit={() => onEdit(item)} onDelete={() => onDelete(item)}
-                onHistory={() => onHistory(item)} />
+                onEdit={() => onEdit(item)} onDelete={() => onDelete(item)} />
             ))
           )}
         </div>
@@ -511,264 +496,6 @@ function EntryDialog({
   );
 }
 
-/* ═══════════════════════════════════════════════════════════
-   SNAPSHOT DIALOG
-═══════════════════════════════════════════════════════════ */
-function SnapshotDialog({
-  item, snaps, loading, onClose, onAdd, onDelete,
-}: {
-  item: AssetRecord | null;
-  snaps: Snapshot[];
-  loading: boolean;
-  onClose: () => void;
-  onAdd: (balance: string, date: string, notes: string) => Promise<void>;
-  onDelete: (id: number) => Promise<void>;
-}) {
-  const [bal, setBal]     = useState("");
-  const [date, setDate]   = useState(() => new Date().toISOString().slice(0, 10));
-  const [notes, setNotes] = useState("");
-  const [saving, setSaving]   = useState(false);
-  const [delId,  setDelId]    = useState<number | null>(null);
-  const [deleting, setDeleting] = useState(false);
-
-  if (!item) return null;
-  const liab = isLiability(item.type);
-  const info = getTypeInfo(item.type);
-  const label = liab ? "יתרת חוב" : "יתרת נכס";
-
-  const handleAdd = async () => {
-    if (!bal || parseFloat(bal) < 0) return;
-    setSaving(true);
-    try { await onAdd(bal, date, notes); setBal(""); setNotes(""); }
-    finally { setSaving(false); }
-  };
-
-  const handleDelete = async () => {
-    if (delId === null) return;
-    setDeleting(true);
-    try { await onDelete(delId); setDelId(null); }
-    finally { setDeleting(false); }
-  };
-
-  return (
-    <Dialog open={!!item} onOpenChange={v => !v && onClose()}>
-      <DialogContent className="max-w-xl rounded-3xl p-0 overflow-hidden shadow-2xl border border-border/60" dir="rtl">
-
-        {/* Header */}
-        <div className={cn(
-          "flex items-center gap-3 px-6 pt-5 pb-4 border-b border-border/40",
-          liab ? "bg-gradient-to-l from-rose-50/60 to-white" : "bg-gradient-to-l from-teal-50/60 to-white"
-        )}>
-          <div className={cn("w-9 h-9 rounded-xl flex items-center justify-center shrink-0", info.bg)}>
-            <History className={cn("w-5 h-5", info.color)} />
-          </div>
-          <div>
-            <p className="font-bold text-base">{item.name}</p>
-            <p className="text-xs text-muted-foreground">{info.label} — היסטוריית תמונות מצב</p>
-          </div>
-        </div>
-
-        <div className="px-6 py-4 space-y-5 max-h-[70vh] overflow-y-auto">
-
-          {/* Add snapshot form */}
-          <div className={cn(
-            "rounded-2xl border p-4 space-y-3",
-            liab ? "bg-rose-50/40 border-rose-200/60" : "bg-teal-50/40 border-teal-200/60"
-          )}>
-            <p className="text-sm font-semibold flex items-center gap-1.5">
-              <Plus className="w-4 h-4" /> הוסף תמונת מצב חדשה
-            </p>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label className="text-xs text-muted-foreground mb-1 block">תאריך</Label>
-                <Input type="date" value={date} onChange={e => setDate(e.target.value)}
-                  className="rounded-xl h-9 text-sm" />
-              </div>
-              <div>
-                <Label className="text-xs text-muted-foreground mb-1 block">{label} (₪)</Label>
-                <Input type="number" min="0" placeholder="0" value={bal}
-                  onChange={e => setBal(e.target.value)} className="rounded-xl h-9 text-sm" />
-              </div>
-            </div>
-            <div>
-              <Label className="text-xs text-muted-foreground mb-1 block">הערה (אופציונלי)</Label>
-              <Input value={notes} onChange={e => setNotes(e.target.value)}
-                placeholder="תיאור קצר..." className="rounded-xl h-9 text-sm" />
-            </div>
-            <Button onClick={handleAdd} disabled={saving || !bal}
-              size="sm" className={cn("w-full rounded-xl h-9 text-white text-sm",
-                liab ? "bg-rose-600 hover:bg-rose-700" : "bg-teal-600 hover:bg-teal-700")}>
-              {saving ? <Loader2 className="w-4 h-4 animate-spin ml-1" /> : <Check className="w-4 h-4 ml-1" />}
-              שמור תמונת מצב
-            </Button>
-          </div>
-
-          {/* History table */}
-          <div>
-            <p className="text-sm font-semibold mb-2 flex items-center gap-1.5">
-              <Clock className="w-4 h-4 text-muted-foreground" /> היסטוריה ({snaps.length} רשומות)
-            </p>
-            {loading ? (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
-              </div>
-            ) : snaps.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground text-sm border-2 border-dashed rounded-2xl">
-                אין תמונות מצב שמורות
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {snaps.map((s, i) => {
-                  const prev = snaps[i + 1];
-                  const delta = prev ? s.balance - prev.balance : null;
-                  return (
-                    <div key={s.id} className="flex items-center gap-3 rounded-xl border border-border/50 bg-card px-4 py-3 text-sm group">
-                      <div className="w-2 h-2 rounded-full shrink-0 bg-teal-400" />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between">
-                          <span className="font-medium text-xs text-muted-foreground">{s.recordedAt}</span>
-                          {delta !== null && (
-                            <span className={cn("text-xs font-medium", delta >= 0 ? "text-emerald-600" : "text-rose-600")}>
-                              {delta >= 0 ? "+" : ""}
-                              {new Intl.NumberFormat("he-IL", { style: "currency", currency: "ILS", maximumFractionDigits: 0 }).format(delta)}
-                            </span>
-                          )}
-                        </div>
-                        <p className={cn("font-bold tabular-nums", liab ? "text-rose-600" : "text-emerald-600")}>
-                          {new Intl.NumberFormat("he-IL", { style: "currency", currency: "ILS", maximumFractionDigits: 0 }).format(s.balance)}
-                        </p>
-                        {s.notes && <p className="text-xs text-muted-foreground truncate mt-0.5">{s.notes}</p>}
-                      </div>
-                      <button onClick={() => setDelId(s.id)}
-                        className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-rose-50 text-muted-foreground hover:text-rose-600 transition-all shrink-0">
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="px-6 pb-5">
-          <Button variant="outline" onClick={onClose} className="w-full rounded-2xl">
-            <X className="w-4 h-4 ml-1.5" /> סגור
-          </Button>
-        </div>
-      </DialogContent>
-
-      {/* Delete confirm */}
-      <AlertDialog open={delId !== null} onOpenChange={v => !v && setDelId(null)}>
-        <AlertDialogContent dir="rtl" className="rounded-2xl">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-rose-600 flex items-center gap-2">
-              <AlertTriangle className="w-5 h-5" /> מחיקת תמונת מצב
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              האם למחוק את תמונת המצב הזו? פעולה זו אינה ניתנת לביטול.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter className="gap-2">
-            <AlertDialogCancel className="rounded-xl">ביטול</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} disabled={deleting}
-              className="rounded-xl bg-rose-600 hover:bg-rose-700">
-              {deleting ? <Loader2 className="w-4 h-4 animate-spin ml-1" /> : <Trash2 className="w-4 h-4 ml-1" />}
-              מחק
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </Dialog>
-  );
-}
-
-/* ═══════════════════════════════════════════════════════════
-   NET WORTH HISTORY SECTION
-═══════════════════════════════════════════════════════════ */
-function NetWorthHistorySection({ history, loading }: { history: NwPoint[]; loading: boolean }) {
-  const [collapsed, setCollapsed] = useState(false);
-
-  const fmtNum = (n: number) =>
-    new Intl.NumberFormat("he-IL", { style: "currency", currency: "ILS", maximumFractionDigits: 0 }).format(Math.abs(n));
-
-  return (
-    <div className="bg-card border border-border/60 rounded-2xl shadow-sm overflow-hidden">
-      <button
-        onClick={() => setCollapsed(c => !c)}
-        className="w-full flex items-center justify-between px-5 py-4 hover:bg-muted/20 transition-colors"
-      >
-        <div className="flex items-center gap-2">
-          {collapsed ? <ChevronRight className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
-          <BarChart3 className="w-4 h-4 text-primary" />
-          <span className="font-semibold text-sm">היסטוריית שווי נטו</span>
-          {history.length > 0 && (
-            <span className="text-xs bg-muted px-2 py-0.5 rounded-full text-muted-foreground">{history.length} נקודות</span>
-          )}
-        </div>
-        <span className="text-xs text-muted-foreground">לחץ להרחבה</span>
-      </button>
-
-      {!collapsed && (
-        <div className="px-5 pb-5">
-          {loading ? (
-            <div className="flex items-center justify-center py-10">
-              <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
-            </div>
-          ) : history.length === 0 ? (
-            <div className="text-center py-10 text-sm text-muted-foreground border-2 border-dashed rounded-2xl">
-              <History className="w-8 h-8 mx-auto mb-2 text-muted-foreground/30" />
-              <p>אין נקודות היסטוריה עדיין</p>
-              <p className="text-xs mt-1">הוסף תמונות מצב לנכסים וחובות כדי לצפות בהיסטוריה</p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-border/40 text-xs text-muted-foreground">
-                    <th className="text-right py-2 pb-3 font-medium">תאריך</th>
-                    <th className="text-left py-2 pb-3 font-medium px-3">נכסים</th>
-                    <th className="text-left py-2 pb-3 font-medium px-3">חובות</th>
-                    <th className="text-left py-2 pb-3 font-medium px-3">שווי נטו</th>
-                    <th className="text-left py-2 pb-3 font-medium">שינוי</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {[...history].reverse().map((pt, i, arr) => {
-                    const prev = arr[i + 1];
-                    const delta = prev ? pt.netWorth - prev.netWorth : null;
-                    return (
-                      <tr key={pt.date} className="border-b border-border/20 last:border-0 hover:bg-muted/20 transition-colors">
-                        <td className="py-3 text-muted-foreground text-xs font-mono">{pt.date}</td>
-                        <td className="py-3 px-3 text-emerald-600 font-medium tabular-nums" dir="ltr">
-                          {fmtNum(pt.totalAssets)}
-                        </td>
-                        <td className="py-3 px-3 text-rose-600 font-medium tabular-nums" dir="ltr">
-                          {fmtNum(pt.totalLiabilities)}
-                        </td>
-                        <td className={cn("py-3 px-3 font-bold tabular-nums", pt.netWorth >= 0 ? "text-teal-600" : "text-amber-600")} dir="ltr">
-                          {pt.netWorth < 0 ? "−" : "+"}{fmtNum(pt.netWorth)}
-                        </td>
-                        <td className="py-3">
-                          {delta !== null ? (
-                            <span className={cn("text-xs font-medium px-2 py-0.5 rounded-full",
-                              delta >= 0 ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-700")}>
-                              {delta >= 0 ? "↑" : "↓"} {fmtNum(delta)}
-                            </span>
-                          ) : <span className="text-xs text-muted-foreground/50">—</span>}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
 
 /* ═══════════════════════════════════════════════════════════
    MAIN PAGE
@@ -789,15 +516,6 @@ export default function NetWorth() {
   const [deleteItem,  setDeleteItem]  = useState<AssetRecord | null>(null);
   const [deleting,    setDeleting]    = useState(false);
 
-  /* ── snapshot state ──────────────────────────────────── */
-  const [snapItem,    setSnapItem]    = useState<AssetRecord | null>(null);
-  const [snaps,       setSnaps]       = useState<Snapshot[]>([]);
-  const [snapsLoading, setSnapsLoading] = useState(false);
-
-  /* ── net worth history state ─────────────────────────── */
-  const [nwHistory,   setNwHistory]   = useState<NwPoint[]>([]);
-  const [nwLoading,   setNwLoading]   = useState(false);
-
   const load = async () => {
     setLoading(true);
     try {
@@ -811,58 +529,7 @@ export default function NetWorth() {
     finally { setLoading(false); }
   };
 
-  const loadNwHistory = async () => {
-    setNwLoading(true);
-    try {
-      const data = await apiFetch("/asset-balances/net-worth-history");
-      setNwHistory(data);
-    } catch { /* silent */ }
-    finally { setNwLoading(false); }
-  };
-
-  useEffect(() => {
-    load();
-    loadNwHistory();
-  }, [activeBid]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  /* ── snapshot handlers ────────────────────────────────── */
-  const openHistory = async (item: AssetRecord) => {
-    setSnapItem(item);
-    setSnapsLoading(true);
-    try {
-      const data = await apiFetch(`/asset-balances?assetId=${item.id}`);
-      setSnaps(data.map((s: any) => ({ ...s, balance: parseFloat(s.balance) })));
-    } catch { toast({ title: "שגיאה בטעינה", variant: "destructive" }); }
-    finally { setSnapsLoading(false); }
-  };
-
-  const addSnapshot = async (balance: string, date: string, notes: string) => {
-    if (!snapItem) return;
-    const created = await apiFetch("/asset-balances", {
-      method: "POST",
-      body: JSON.stringify({
-        assetId: snapItem.id,
-        balance,
-        recordedAt: date,
-        notes: notes || "",
-      }),
-    });
-    const snap = { ...created, balance: parseFloat(created.balance) };
-    setSnaps(prev => [snap, ...prev]);
-    setRecords(prev => prev.map(r =>
-      r.id === snapItem.id ? { ...r, currentAmount: parseFloat(created.balance) } : r
-    ));
-    setSnapItem(prev => prev ? { ...prev, currentAmount: parseFloat(created.balance) } : prev);
-    loadNwHistory();
-    toast({ title: "תמונת מצב נשמרה" });
-  };
-
-  const deleteSnapshot = async (id: number) => {
-    await apiFetch(`/asset-balances/${id}`, { method: "DELETE" });
-    setSnaps(prev => prev.filter(s => s.id !== id));
-    loadNwHistory();
-    toast({ title: "נמחק" });
-  };
+  useEffect(() => { load(); }, [activeBid]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* ── computed ─────────────────────────────────────────────── */
   const assets      = useMemo(() => records.filter(r => !isLiability(r.type)), [records]);
@@ -1025,7 +692,6 @@ export default function NetWorth() {
             onAdd={() => openAdd("asset")}
             onEdit={openEdit}
             onDelete={setDeleteItem}
-            onHistory={openHistory}
           />
           <Section
             title="חובות והתחייבויות" total={totalLiabilities} items={liabilities}
@@ -1033,26 +699,12 @@ export default function NetWorth() {
             onAdd={() => openAdd("liability")}
             onEdit={openEdit}
             onDelete={setDeleteItem}
-            onHistory={openHistory}
           />
         </div>
       )}
 
-      {/* ══ NET WORTH HISTORY ═══════════════════════════════════ */}
-      <NetWorthHistorySection history={nwHistory} loading={nwLoading} />
-
-      {/* ══ PROGRESS TRACKING MOCKUP (סקיצה) ═══════════════════ */}
-      <ProgressTrackingMockup />
-
-      {/* ══ SNAPSHOT DIALOG ══════════════════════════════════════ */}
-      <SnapshotDialog
-        item={snapItem}
-        snaps={snaps}
-        loading={snapsLoading}
-        onClose={() => setSnapItem(null)}
-        onAdd={addSnapshot}
-        onDelete={deleteSnapshot}
-      />
+      {/* ══ PROGRESS TRACKING ═══════════════════════════════════ */}
+      <ProgressTrackingSection assets={records} />
 
       {/* ══ DIALOG ══════════════════════════════════════════════ */}
       <EntryDialog
