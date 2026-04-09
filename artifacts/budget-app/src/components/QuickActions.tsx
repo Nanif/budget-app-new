@@ -800,6 +800,12 @@ export function QuickActions() {
                 onChange={e => setCf(p => ({ ...p, date: e.target.value }))}
                 className="rounded-xl"
               />
+              <p className="text-xs text-muted-foreground flex items-center gap-1">
+                <span>תנועה תרשם לחודש:</span>
+                <span className="font-semibold text-foreground">
+                  {new Intl.DateTimeFormat("he-IL", { month: "long", year: "numeric" }).format(new Date(currentMonth + "-01"))}
+                </span>
+              </p>
             </div>
             <div className="space-y-1.5">
               <Label className="font-semibold">תיאור (אופציונלי)</Label>
