@@ -15,6 +15,7 @@ export const expensesTable = pgTable("expenses", {
   amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
   description: text("description").notNull().default(""),
   date: date("date").notNull(),
+  notes: text("notes"),
   isRecurring: boolean("is_recurring").notNull().default(false),
   recurringRule: jsonb("recurring_rule"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

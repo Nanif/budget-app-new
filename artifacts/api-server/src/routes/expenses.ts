@@ -44,6 +44,7 @@ router.get("/", async (req, res) => {
         fundId: expensesTable.fundId,
         amount: expensesTable.amount,
         description: expensesTable.description,
+        notes: expensesTable.notes,
         date: expensesTable.date,
         isRecurring: expensesTable.isRecurring,
         createdAt: expensesTable.createdAt,
