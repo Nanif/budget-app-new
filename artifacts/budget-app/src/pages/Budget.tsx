@@ -960,9 +960,18 @@ function FundCard({ fund, spent, onEdit, onDelete, dimmed = false, fixedBudget, 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-1.5 text-center">
         <div className="bg-muted/40 rounded-xl py-2 px-1">
-          <p className="text-[10px] text-muted-foreground">תקציב</p>
-          <p className="text-xs font-bold mt-0.5">{fmt(budget, true)}</p>
-          {monthly && <p className="text-[9px] text-muted-foreground">{fmt(budget / 12, true)}/חודש</p>}
+          {monthly ? (
+            <>
+              <p className="text-[10px] text-muted-foreground">לחודש</p>
+              <p className="text-xs font-bold mt-0.5">{fmt(budget / 12, true)}</p>
+              <p className="text-[9px] text-muted-foreground mt-0.5">{fmt(budget, true)}/שנה</p>
+            </>
+          ) : (
+            <>
+              <p className="text-[10px] text-muted-foreground">תקציב</p>
+              <p className="text-xs font-bold mt-0.5">{fmt(budget, true)}</p>
+            </>
+          )}
         </div>
         <div className="bg-muted/40 rounded-xl py-2 px-1">
           <p className="text-[10px] text-muted-foreground">בוצע</p>
