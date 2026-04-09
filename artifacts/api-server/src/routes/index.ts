@@ -73,8 +73,9 @@ import noteTabsRouter      from "./noteTabs";
 import remindersRouter     from "./reminders";
 import dashboardRouter     from "./dashboard";
 import settingsRouter      from "./settings";
-import fixedItemsRouter    from "./fixedItems";
-import devRouter           from "./dev";
+import fixedItemsRouter           from "./fixedItems";
+import recurringTemplatesRouter   from "./recurringTemplates";
+import devRouter                  from "./dev";
 
 const router = Router();
 
@@ -126,6 +127,9 @@ router.use("/dashboard", dashboardRouter);
 
 // Fixed items (קבועות)
 router.use("/fixed-items", fixedItemsRouter);
+
+// Recurring templates (פעולות קבועות)
+router.use("/recurring-templates", recurringTemplatesRouter);
 
 // Settings
 router.use("/settings", settingsRouter);

@@ -14,8 +14,9 @@ import {
   Landmark, Loader2, Check, AlertTriangle, Filter,
   TrendingUp, TrendingDown, CalendarDays, BarChart3,
   ArrowUpRight, ArrowDownRight, ShieldAlert, StickyNote,
-  CircleDollarSign,
+  CircleDollarSign, RefreshCw,
 } from "lucide-react";
+import { RecurringPanel } from "@/components/RecurringPanel";
 
 
 /* ═══════════════════════════════════════════════════════════
@@ -129,6 +130,9 @@ export default function Incomes() {
 
   /* ── collapsed groups ─────────────────────────────────────── */
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+
+  /* ── recurring panel ──────────────────────────────────────── */
+  const [recurringOpen, setRecurringOpen] = useState(false);
 
   /* ── load ─────────────────────────────────────────────────── */
   const load = async () => {
@@ -270,6 +274,13 @@ export default function Incomes() {
     <div className="space-y-5" dir="rtl">
       <PageHeader title="הכנסות" description="תיעוד ומעקב הכנסות וניכויי הוצאות עבודה">
         <div className="flex gap-2">
+          <Button
+            onClick={() => setRecurringOpen(true)}
+            variant="outline"
+            className="rounded-xl gap-1.5 border-indigo-200 text-indigo-600 hover:bg-indigo-50"
+          >
+            <RefreshCw className="w-4 h-4" /> פעולות קבועות
+          </Button>
           <Button
             onClick={() => openAdd("work_deduction")}
             variant="outline"
@@ -520,6 +531,14 @@ export default function Incomes() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* ══ RECURRING PANEL ════════════════════════════════════ */}
+      <RecurringPanel
+        open={recurringOpen}
+        onClose={() => setRecurringOpen(false)}
+        type="income"
+        onApplied={load}
+      />
     </div>
   );
 }

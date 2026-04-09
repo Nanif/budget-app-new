@@ -13,8 +13,9 @@ import {
   Plus, Pencil, Trash2, Search, X, ChevronDown, ChevronRight,
   HeartHandshake, Loader2, Check, AlertTriangle, Filter,
   CalendarDays, ShieldAlert, StickyNote, CircleDollarSign,
-  Landmark, Percent, Target, Info,
+  Landmark, Percent, Target, Info, RefreshCw,
 } from "lucide-react";
+import { RecurringPanel } from "@/components/RecurringPanel";
 
 
 /* ═══════════════════════════════════════════════════════════
@@ -150,6 +151,9 @@ export default function Charity() {
 
   /* ── collapsed groups ─────────────────────────────────────── */
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+
+  /* ── recurring panel ──────────────────────────────────────── */
+  const [recurringOpen, setRecurringOpen] = useState(false);
 
   /* ── load ─────────────────────────────────────────────────── */
   const load = async () => {
@@ -292,9 +296,18 @@ export default function Charity() {
   return (
     <div className="space-y-5" dir="rtl">
       <PageHeader title="צדקה ותרומות" description="מעקב אחר תרומות ביחס להכנסה נטו">
-        <Button onClick={openAdd} className="rounded-xl gap-1.5 bg-violet-600 hover:bg-violet-700">
-          <Plus className="w-4 h-4" /> הוסף תרומה
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            onClick={() => setRecurringOpen(true)}
+            variant="outline"
+            className="rounded-xl gap-1.5 border-indigo-200 text-indigo-600 hover:bg-indigo-50"
+          >
+            <RefreshCw className="w-4 h-4" /> פעולות קבועות
+          </Button>
+          <Button onClick={openAdd} className="rounded-xl gap-1.5 bg-violet-600 hover:bg-violet-700">
+            <Plus className="w-4 h-4" /> הוסף תרומה
+          </Button>
+        </div>
       </PageHeader>
 
       {/* ══ KPI STRIP ══════════════════════════════════════════ */}
@@ -524,6 +537,14 @@ export default function Charity() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* ══ RECURRING PANEL ════════════════════════════════════ */}
+      <RecurringPanel
+        open={recurringOpen}
+        onClose={() => setRecurringOpen(false)}
+        type="tithe"
+        onApplied={load}
+      />
     </div>
   );
 }
