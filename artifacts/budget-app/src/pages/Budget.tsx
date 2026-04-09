@@ -530,27 +530,36 @@ export default function Budget() {
             </div>
 
             {/* תקציב */}
-            <div className="space-y-1.5">
-              <Label className="font-semibold">
-                {fundForm.period === "monthly"    ? "הקצאה חודשית (₪)" :
-                 fundForm.period === "non_budget" ? "יתרה התחלתית (₪)" : "הקצאה שנתית (₪)"}
-              </Label>
-              <Input type="number" dir="ltr"
-                value={
-                  fundForm.period === "monthly"    ? fundForm.monthlyAllocation :
-                  fundForm.period === "non_budget" ? fundForm.initialBalance    : fundForm.annualAllocation
-                }
-                onChange={e => {
-                  const v = e.target.value;
-                  if      (fundForm.period === "monthly")    setFundForm(p => ({ ...p, monthlyAllocation: v }));
-                  else if (fundForm.period === "non_budget") setFundForm(p => ({ ...p, initialBalance: v }));
-                  else                                       setFundForm(p => ({ ...p, annualAllocation: v }));
-                }}
-                placeholder="0" className="rounded-xl" />
-              {fundForm.period === "monthly" && fundForm.monthlyAllocation && (
-                <p className="text-xs text-muted-foreground">שנתי: {fmt((parseFloat(fundForm.monthlyAllocation) || 0) * 12)}</p>
-              )}
-            </div>
+            {fundForm.period === "monthly" && fundForm.transactionType === "none" ? (
+              <div className="rounded-xl border border-border/60 bg-muted/30 px-4 py-3">
+                <p className="text-sm font-semibold text-foreground">הקצאה חודשית (₪)</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  הסכום נקבע אוטומטית לפי סכום רשימת הקבועות — לא ניתן לעריכה ידנית
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-1.5">
+                <Label className="font-semibold">
+                  {fundForm.period === "monthly"    ? "הקצאה חודשית (₪)" :
+                   fundForm.period === "non_budget" ? "יתרה התחלתית (₪)" : "הקצאה שנתית (₪)"}
+                </Label>
+                <Input type="number" dir="ltr"
+                  value={
+                    fundForm.period === "monthly"    ? fundForm.monthlyAllocation :
+                    fundForm.period === "non_budget" ? fundForm.initialBalance    : fundForm.annualAllocation
+                  }
+                  onChange={e => {
+                    const v = e.target.value;
+                    if      (fundForm.period === "monthly")    setFundForm(p => ({ ...p, monthlyAllocation: v }));
+                    else if (fundForm.period === "non_budget") setFundForm(p => ({ ...p, initialBalance: v }));
+                    else                                       setFundForm(p => ({ ...p, annualAllocation: v }));
+                  }}
+                  placeholder="0" className="rounded-xl" />
+                {fundForm.period === "monthly" && fundForm.monthlyAllocation && (
+                  <p className="text-xs text-muted-foreground">שנתי: {fmt((parseFloat(fundForm.monthlyAllocation) || 0) * 12)}</p>
+                )}
+              </div>
+            )}
 
             {/* צבע */}
             <div className="space-y-2">
