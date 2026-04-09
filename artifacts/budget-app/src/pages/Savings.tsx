@@ -20,6 +20,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { ProgressTrackingMockup } from "@/components/ProgressTrackingMockup";
 
 
 /* ═══════════════════════════════════════════════════════════
@@ -1039,6 +1040,9 @@ export default function NetWorth() {
 
       {/* ══ NET WORTH HISTORY ═══════════════════════════════════ */}
       <NetWorthHistorySection history={nwHistory} loading={nwLoading} />
+
+      {/* ══ PROGRESS TRACKING MOCKUP (סקיצה) ═══════════════════ */}
+      <ProgressTrackingMockup />
 
       {/* ══ SNAPSHOT DIALOG ══════════════════════════════════════ */}
       <SnapshotDialog
