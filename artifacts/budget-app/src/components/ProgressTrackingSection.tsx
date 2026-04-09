@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Plus, ChevronRight, Trash2, RotateCcw, X, Calendar, TrendingUp, TrendingDown, Scale, Loader2, AlertTriangle } from "lucide-react";
+import { Plus, ChevronRight, Trash2, X, Calendar, TrendingUp, TrendingDown, Scale, Loader2, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { apiFetch } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
@@ -149,8 +149,6 @@ function AddRecordDialog({
     setDate(new Date().toISOString().split("T")[0]);
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const hasRemoved = removedDebts.length > 0 || removedSavings.length > 0;
-
   const handleSave = async () => {
     setSaving(true);
     try {
@@ -187,16 +185,6 @@ function AddRecordDialog({
         </div>
 
         <div className="px-6 py-5 space-y-6">
-          {/* Restore removed */}
-          {hasRemoved && (
-            <button
-              onClick={() => { setRemovedDebts([]); setRemovedSavings([]); }}
-              className="flex items-center gap-1.5 text-xs text-primary hover:text-primary/80 transition-colors"
-            >
-              <RotateCcw className="w-3 h-3" /> שחזר שדות שהוסרו
-            </button>
-          )}
-
           {/* Debts */}
           <div>
             <p className="text-sm font-semibold text-foreground mb-3 flex items-center gap-1.5">
@@ -494,13 +482,17 @@ export function ProgressTrackingSection({ assets }: { assets: AssetRecord[] }) {
                       {rec.netWorth >= 0 ? "+" : "−"}{fmt(rec.netWorth)}
                     </span>
 
-                    <button
-                      className="text-muted-foreground/40 hover:text-rose-500 transition-colors p-1 rounded-lg hover:bg-rose-50 justify-self-center"
-                      title="מחק"
-                      onClick={e => { e.stopPropagation(); setDeleteId(rec.id); }}
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                    {idx === 0 ? (
+                      <button
+                        className="text-muted-foreground/40 hover:text-rose-500 transition-colors p-1 rounded-lg hover:bg-rose-50 justify-self-center"
+                        title="מחק"
+                        onClick={e => { e.stopPropagation(); setDeleteId(rec.id); }}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    ) : (
+                      <span />
+                    )}
                   </div>
 
                   {/* Expanded detail */}
