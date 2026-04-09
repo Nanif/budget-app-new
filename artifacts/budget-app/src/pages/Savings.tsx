@@ -958,7 +958,7 @@ export default function NetWorth() {
   ═══════════════════════════════════════════════════════════ */
   return (
     <div className="space-y-5" dir="rtl">
-      <PageHeader title="חובות ונכסים" description="מעקב שווי נטו — נכסים מינוס התחייבויות">
+      <PageHeader title="נכסים והתחייבויות" description="מעקב שווי נטו — נכסים מינוס התחייבויות">
         <div className="flex gap-2">
           <Button onClick={() => openAdd("liability")} variant="outline"
             className="rounded-xl gap-1.5 border-rose-200 text-rose-600 hover:bg-rose-50">

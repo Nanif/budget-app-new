@@ -21,7 +21,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/expenses", label: "הוצאות", icon: Receipt, section: "מעקב פיננסי" },
   { href: "/incomes", label: "הכנסות", icon: Landmark, section: "מעקב פיננסי" },
   { href: "/charity", label: "צדקה ומעשרות", icon: HeartHandshake, section: "מעקב פיננסי" },
-  { href: "/savings", label: "חובות ונכסים", icon: Scale, section: "מעקב פיננסי" },
+  { href: "/savings", label: "נכסים והתחייבויות", icon: Scale, section: "מעקב פיננסי" },
   { href: "/settings", label: "הגדרות מערכת", icon: Settings, section: "הגדרות" },
   { href: "/dev",      label: "מסך פיתוח",    icon: Code2,    section: "הגדרות" },
 ];
