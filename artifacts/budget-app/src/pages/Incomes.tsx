@@ -423,7 +423,7 @@ export default function Incomes() {
           {/* Header */}
           <div
             className="grid text-xs font-bold text-muted-foreground uppercase tracking-wider px-4 py-3 border-b border-border/50 bg-muted/30"
-            style={{ gridTemplateColumns: "100px 1fr 80px 60px 110px 1fr 72px" }}
+            style={{ gridTemplateColumns: "100px 1fr 80px 60px 110px 1fr 72px", columnGap: "16px" }}
           >
             <span>תאריך</span>
             <span>שם</span>
@@ -477,7 +477,7 @@ export default function Incomes() {
           {/* Footer */}
           <div
             className="grid items-center px-4 py-3 border-t border-border/50 bg-muted/20 text-sm"
-            style={{ gridTemplateColumns: "100px 1fr 120px 80px 60px 110px 1fr 72px" }}
+            style={{ gridTemplateColumns: "100px 1fr 120px 80px 60px 110px 1fr 72px", columnGap: "16px" }}
           >
             <span className="text-muted-foreground font-medium">{filtered.length} רשומות</span>
             <span />
@@ -581,7 +581,7 @@ function IncomeRow({ entry, onEdit, onDelete }: {
   return (
     <div
       className="grid items-center px-4 py-3 border-b border-border/30 hover:bg-muted/20 transition-colors group text-sm"
-      style={{ gridTemplateColumns: "100px 1fr 80px 60px 110px 1fr 72px" }}
+      style={{ gridTemplateColumns: "100px 1fr 80px 60px 110px 1fr 72px", columnGap: "16px" }}
     >
       {/* תאריך */}
       <span className="text-muted-foreground text-xs tabular-nums">{fmtDate(entry.date)}</span>

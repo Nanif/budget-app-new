@@ -354,9 +354,6 @@ export default function Charity() {
         />
       </div>
 
-      {/* ══ PROGRESS BAR ═══════════════════════════════════════ */}
-      <TitheProgressBar given={totalGiven} target={titheTarget} />
-
       {/* Info banner when no income */}
       {netIncome === 0 && (
         <div className="flex items-center gap-2.5 p-3.5 rounded-xl bg-blue-50 border border-blue-200 text-blue-700 text-sm">
@@ -441,7 +438,7 @@ export default function Charity() {
           {/* Header */}
           <div
             className="grid text-xs font-bold text-muted-foreground uppercase tracking-wider px-4 py-3 border-b border-border/50 bg-muted/30"
-            style={{ gridTemplateColumns: "100px 1fr 110px 1fr 72px" }}
+            style={{ gridTemplateColumns: "100px 1fr 110px 1fr 72px", columnGap: "16px" }}
           >
             <span>תאריך</span>
             <span>תיאור / נמען</span>
@@ -488,7 +485,7 @@ export default function Charity() {
           {/* Footer */}
           <div
             className="grid items-center px-4 py-3 border-t border-border/50 bg-muted/20 text-sm"
-            style={{ gridTemplateColumns: "100px 1fr 110px 1fr 72px" }}
+            style={{ gridTemplateColumns: "100px 1fr 110px 1fr 72px", columnGap: "16px" }}
           >
             <span className="text-muted-foreground font-medium">{filtered.length} רשומות</span>
             <span />
@@ -583,7 +580,7 @@ function TitheRow({ entry, onEdit, onDelete }: {
   return (
     <div
       className="grid items-center px-4 py-3 border-b border-border/30 hover:bg-muted/20 transition-colors group text-sm"
-      style={{ gridTemplateColumns: "100px 1fr 110px 1fr 72px" }}
+      style={{ gridTemplateColumns: "100px 1fr 110px 1fr 72px", columnGap: "16px" }}
     >
       {/* תאריך */}
       <span className="text-muted-foreground text-xs tabular-nums">{fmtDate(entry.date)}</span>
