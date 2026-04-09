@@ -200,7 +200,7 @@ function AddRecordDialog({
           {/* Debts */}
           <div>
             <p className="text-sm font-semibold text-foreground mb-3 flex items-center gap-1.5">
-              <TrendingDown className="w-4 h-4 text-rose-500" /> חובות בפועל (₪)
+              <TrendingDown className="w-4 h-4 text-rose-500" /> התחייבויות בפועל (₪)
             </p>
             <div className="space-y-2.5">
               {liabilities.filter(a => !removedDebts.includes(a.id)).map(a => (
@@ -227,7 +227,7 @@ function AddRecordDialog({
                 onClick={() => setExtraDebts(e => [...e, {name:"",amount:""}])}
                 className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-primary transition-colors mt-1"
               >
-                <Plus className="w-4 h-4" /> חוב נוסף
+                <Plus className="w-4 h-4" /> התחייבות נוספת
               </button>
             </div>
           </div>
@@ -406,7 +406,7 @@ export function ProgressTrackingSection({ assets }: { assets: AssetRecord[] }) {
                 </p>
               </div>
               <div className="bg-rose-50 rounded-xl p-3 border border-rose-100">
-                <p className="text-xs text-rose-600 font-medium mb-1">חובות</p>
+                <p className="text-xs text-rose-600 font-medium mb-1">התחייבויות</p>
                 <p className="text-xl font-bold text-rose-700 tabular-nums" dir="ltr">
                   −{fmt(latest.totalDebts)}
                 </p>
@@ -439,7 +439,7 @@ export function ProgressTrackingSection({ assets }: { assets: AssetRecord[] }) {
             <div className="grid grid-cols-[24px_1fr_108px_108px_120px_32px] gap-2 px-5 py-2 bg-muted/30 border-b border-border/40 text-xs font-medium text-muted-foreground">
               <span />
               <span>תאריך</span>
-              <span className="text-center">חובות</span>
+              <span className="text-center">התחייבויות</span>
               <span className="text-center">חסכונות</span>
               <span className="text-center">שווי נקי</span>
               <span />
@@ -508,7 +508,7 @@ export function ProgressTrackingSection({ assets }: { assets: AssetRecord[] }) {
                     <div className="bg-muted/10 border-t border-border/30 px-10 py-4 grid grid-cols-2 gap-8">
                       <div>
                         <p className="text-xs font-semibold text-rose-600 mb-2.5 flex items-center gap-1.5">
-                          <TrendingDown className="w-3.5 h-3.5" /> פירוט חובות בפועל
+                          <TrendingDown className="w-3.5 h-3.5" /> פירוט התחייבויות בפועל
                         </p>
                         <div className="space-y-2">
                           {rec.items.debts.map((d, i) => (

@@ -1027,7 +1027,7 @@ function NetWorthSummaryCard({ records }: { records: NwRecord[] }) {
           <p className="text-sm font-bold tabular-nums text-emerald-600">{fmt(latest.totalSavings)}</p>
         </div>
         <div className="py-3 px-4 text-center">
-          <p className="text-[10px] text-muted-foreground mb-0.5">סך חובות</p>
+          <p className="text-[10px] text-muted-foreground mb-0.5">סך התחייבויות</p>
           <p className="text-sm font-bold tabular-nums text-rose-500">{fmt(latest.totalDebts)}</p>
         </div>
       </div>
