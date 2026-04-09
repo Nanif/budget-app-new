@@ -43,7 +43,7 @@ router.get("/summary", async (req, res) => {
 
     const recentExpenses = await db.select({
       id: expensesTable.id, amount: expensesTable.amount, description: expensesTable.description,
-      date: expensesTable.date, paymentMethod: expensesTable.paymentMethod,
+      date: expensesTable.date,
       categoryName: categoriesTable.name, categoryColor: categoriesTable.color, categoryIcon: categoriesTable.icon,
     }).from(expensesTable).leftJoin(categoriesTable, eq(expensesTable.categoryId, categoriesTable.id))
       .where(and(userFilter, yearFilter)).orderBy(desc(expensesTable.date)).limit(5);

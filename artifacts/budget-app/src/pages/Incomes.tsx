@@ -14,7 +14,7 @@ import {
   Landmark, Loader2, Check, AlertTriangle, Filter,
   TrendingUp, TrendingDown, CalendarDays, BarChart3,
   ArrowUpRight, ArrowDownRight, ShieldAlert, StickyNote,
-  CircleDollarSign, Tag,
+  CircleDollarSign,
 } from "lucide-react";
 
 
@@ -22,74 +22,57 @@ import {
    TYPES
 ═══════════════════════════════════════════════════════════ */
 type Income = {
-  id: number; amount: number; source: string; description: string;
+  id: number; amount: number; description: string;
   date: string; entryType: "income" | "work_deduction";
 };
-type GroupBy = "none" | "month" | "source" | "type";
+type GroupBy = "none" | "month" | "type";
 
 /* ═══════════════════════════════════════════════════════════
    CONSTANTS
 ═══════════════════════════════════════════════════════════ */
 const MONTH_HE = ["ינואר","פברואר","מרץ","אפריל","מאי","יוני","יולי","אוגוסט","ספטמבר","אוקטובר","נובמבר","דצמבר"];
 
-const SOURCE_CATEGORIES: { value: string; label: string }[] = [
-  { value: "משכורת",       label: "משכורת" },
-  { value: "פרילנס",       label: "פרילנס / עצמאי" },
-  { value: "עסק",          label: "עסק" },
-  { value: "שכירות",       label: "שכירות נכס" },
-  { value: "השקעות",       label: "השקעות / ריבית" },
-  { value: "מתנה",         label: "מתנה / ירושה" },
-  { value: "נסיעות",       label: "נסיעות (ניכוי)" },
-  { value: "ציוד",         label: "ציוד (ניכוי)" },
-  { value: "אחר",          label: "אחר" },
-];
-
 const GROUP_OPTIONS: { value: GroupBy; label: string }[] = [
-  { value: "none",   label: "ללא קיבוץ" },
-  { value: "month",  label: "לפי חודש" },
-  { value: "source", label: "לפי מקור" },
-  { value: "type",   label: "לפי סוג" },
+  { value: "none",  label: "ללא קיבוץ" },
+  { value: "month", label: "לפי חודש" },
+  { value: "type",  label: "לפי סוג" },
 ];
 
 /* ═══════════════════════════════════════════════════════════
    FORM
 ═══════════════════════════════════════════════════════════ */
 type IncomeForm = {
-  name: string; source: string; notes: string;
+  name: string; notes: string;
   amount: string; date: string; entryType: "income" | "work_deduction";
 };
-/* DB mapping:
-   source field  → form.name  (specific entry title)
-   description   → "source_category|notes" */
+/* DB mapping: description = "name\n\nnotes" */
 function formToPayload(f: IncomeForm) {
   return {
-    source:      f.name.trim(),
-    description: f.source + (f.notes.trim() ? "|" + f.notes.trim() : ""),
+    description: f.name.trim() + (f.notes.trim() ? "\n\n" + f.notes.trim() : ""),
     amount:      parseFloat(f.amount),
     date:        f.date,
     entryType:   f.entryType,
   };
 }
 function incomeToForm(e: Income): IncomeForm {
-  const [src, ...rest] = e.description.split("|");
+  const [name, ...rest] = e.description.split("\n\n");
   return {
-    name:      e.source,
-    source:    src || "",
-    notes:     rest.join("|"),
+    name:      name || "",
+    notes:     rest.join("\n\n"),
     amount:    String(e.amount),
     date:      e.date,
     entryType: e.entryType,
   };
 }
-function parseSource(description: string) {
-  return description.split("|")[0] || "";
+function parseIncomeName(description: string) {
+  return description.split("\n\n")[0] || "";
 }
-function parseNotes(description: string) {
-  const parts = description.split("|");
-  return parts.slice(1).join("|");
+function parseIncomeNotes(description: string) {
+  const parts = description.split("\n\n");
+  return parts.slice(1).join("\n\n");
 }
 const EMPTY_FORM: IncomeForm = {
-  name: "", source: "", notes: "",
+  name: "", notes: "",
   amount: "", date: new Date().toISOString().split("T")[0],
   entryType: "income",
 };
@@ -127,13 +110,12 @@ export default function Incomes() {
   const [loading,  setLoading]  = useState(true);
 
   /* ── filters ─────────────────────────────────────────────── */
-  const [search,       setSearch]       = useState("");
-  const [dateFrom,     setDateFrom]     = useState("");
-  const [dateTo,       setDateTo]       = useState("");
-  const [sourceFilter, setSourceFilter] = useState("all");
-  const [monthFilter,  setMonthFilter]  = useState("all");
-  const [typeFilter,   setTypeFilter]   = useState<"all" | "income" | "work_deduction">("all");
-  const [groupBy,      setGroupBy]      = useState<GroupBy>("none");
+  const [search,      setSearch]      = useState("");
+  const [dateFrom,    setDateFrom]    = useState("");
+  const [dateTo,      setDateTo]      = useState("");
+  const [monthFilter, setMonthFilter] = useState("all");
+  const [typeFilter,  setTypeFilter]  = useState<"all" | "income" | "work_deduction">("all");
+  const [groupBy,     setGroupBy]     = useState<GroupBy>("none");
 
   /* ── dialog ──────────────────────────────────────────────── */
   const [dialog,      setDialog]      = useState(false);
@@ -159,26 +141,17 @@ export default function Incomes() {
   };
   useEffect(() => { load(); }, [activeBid]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  /* ── derived unique values for filters ───────────────────── */
-  const uniqueSources = useMemo(() =>
-    Array.from(new Set(entries.map(e => parseSource(e.description)).filter(Boolean))).sort(),
-  [entries]);
-
   /* ── filtered ────────────────────────────────────────────── */
   const filtered = useMemo(() => {
     return entries.filter(e => {
-      const src = parseSource(e.description);
-      if (search && !e.source.toLowerCase().includes(search.toLowerCase()) &&
-          !src.toLowerCase().includes(search.toLowerCase()) &&
-          !e.description.toLowerCase().includes(search.toLowerCase())) return false;
+      if (search && !e.description.toLowerCase().includes(search.toLowerCase())) return false;
       if (dateFrom && e.date < dateFrom) return false;
       if (dateTo   && e.date > dateTo)   return false;
-      if (sourceFilter !== "all" && src !== sourceFilter) return false;
-      if (monthFilter  !== "all" && getMonth(e.date) !== monthFilter) return false;
-      if (typeFilter   !== "all" && e.entryType !== typeFilter) return false;
+      if (monthFilter !== "all" && getMonth(e.date) !== monthFilter) return false;
+      if (typeFilter  !== "all" && e.entryType !== typeFilter) return false;
       return true;
     });
-  }, [entries, search, dateFrom, dateTo, sourceFilter, monthFilter, typeFilter]);
+  }, [entries, search, dateFrom, dateTo, monthFilter, typeFilter]);
 
   /* ── KPIs ─────────────────────────────────────────────────── */
   const now = new Date();
@@ -205,9 +178,8 @@ export default function Incomes() {
     const map: Record<string, { key: string; label: string; color?: string; items: Income[] }> = {};
     for (const e of filtered) {
       let key = "", label = "";
-      if (groupBy === "month")  { key = monthKey(e.date); label = monthLabel(key); }
-      if (groupBy === "source") { key = parseSource(e.description) || "ללא מקור"; label = key; }
-      if (groupBy === "type")   { key = e.entryType; label = e.entryType === "income" ? "הכנסות" : "ניכויים"; }
+      if (groupBy === "month") { key = monthKey(e.date); label = monthLabel(key); }
+      if (groupBy === "type")  { key = e.entryType; label = e.entryType === "income" ? "הכנסות" : "ניכויים"; }
       if (!map[key]) map[key] = { key, label, items: [] };
       map[key].items.push(e);
     }
@@ -216,11 +188,10 @@ export default function Incomes() {
       .map(g => ({ ...g, color: undefined, total: g.items.reduce((s, e) => s + (e.entryType === "income" ? e.amount : -e.amount), 0) }));
   }, [filtered, groupBy]);
 
-  const hasFilters = search || dateFrom || dateTo || sourceFilter !== "all" ||
-    monthFilter !== "all" || typeFilter !== "all";
+  const hasFilters = search || dateFrom || dateTo || monthFilter !== "all" || typeFilter !== "all";
   const clearFilters = () => {
     setSearch(""); setDateFrom(""); setDateTo("");
-    setSourceFilter("all"); setMonthFilter("all"); setTypeFilter("all");
+    setMonthFilter("all"); setTypeFilter("all");
   };
 
   /* ── dialog helpers ──────────────────────────────────────── */
@@ -355,7 +326,7 @@ export default function Incomes() {
           <div className="relative flex-1 min-w-[160px]">
             <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
             <Input value={search} onChange={e => setSearch(e.target.value)}
-              placeholder="חיפוש שם / מקור..." className="pr-9 rounded-xl h-9 text-sm" />
+              placeholder="חיפוש שם..." className="pr-9 rounded-xl h-9 text-sm" />
           </div>
 
           {/* Date from */}
@@ -370,18 +341,6 @@ export default function Incomes() {
             <Input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
               className="rounded-xl h-9 text-sm w-[130px]" dir="ltr" />
           </div>
-
-          {/* Source filter */}
-          <Select value={sourceFilter} onValueChange={setSourceFilter}>
-            <SelectTrigger className="rounded-xl h-9 text-sm w-[140px]">
-              <Tag className="w-3.5 h-3.5 ml-1 text-muted-foreground" />
-              <SelectValue placeholder="מקור הכנסה" />
-            </SelectTrigger>
-            <SelectContent dir="rtl">
-              <SelectItem value="all">כל המקורות</SelectItem>
-              {uniqueSources.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-            </SelectContent>
-          </Select>
 
           {/* Month filter */}
           <Select value={monthFilter} onValueChange={setMonthFilter}>
@@ -435,8 +394,7 @@ export default function Incomes() {
             {search       && <FilterPill label={`חיפוש: "${search}"`}          onRemove={() => setSearch("")} />}
             {dateFrom     && <FilterPill label={`מ-${dateFrom}`}               onRemove={() => setDateFrom("")} />}
             {dateTo       && <FilterPill label={`עד-${dateTo}`}                onRemove={() => setDateTo("")} />}
-            {sourceFilter !== "all" && <FilterPill label={sourceFilter}        onRemove={() => setSourceFilter("all")} />}
-            {monthFilter  !== "all" && <FilterPill label={MONTH_HE[parseInt(monthFilter) - 1]} onRemove={() => setMonthFilter("all")} />}
+            {monthFilter !== "all" && <FilterPill label={MONTH_HE[parseInt(monthFilter) - 1]} onRemove={() => setMonthFilter("all")} />}
             {typeFilter   !== "all" && <FilterPill label={typeFilter === "income" ? "הכנסות" : "ניכויים"} onRemove={() => setTypeFilter("all")} />}
           </div>
         )}
@@ -454,11 +412,10 @@ export default function Incomes() {
           {/* Header */}
           <div
             className="grid text-xs font-bold text-muted-foreground uppercase tracking-wider px-4 py-3 border-b border-border/50 bg-muted/30"
-            style={{ gridTemplateColumns: "100px 1fr 120px 80px 60px 110px 1fr 72px" }}
+            style={{ gridTemplateColumns: "100px 1fr 80px 60px 110px 1fr 72px" }}
           >
             <span>תאריך</span>
             <span>שם</span>
-            <span>מקור</span>
             <span>חודש</span>
             <span>שנה</span>
             <span className="text-left" dir="ltr">סכום</span>
@@ -599,13 +556,13 @@ function IncomeRow({ entry, onEdit, onDelete }: {
   entry: Income; onEdit: () => void; onDelete: () => void;
 }) {
   const isIncome = entry.entryType === "income";
-  const src   = parseSource(entry.description);
-  const notes = parseNotes(entry.description);
+  const name  = parseIncomeName(entry.description);
+  const notes = parseIncomeNotes(entry.description);
   const d     = new Date(entry.date);
   return (
     <div
       className="grid items-center px-4 py-3 border-b border-border/30 hover:bg-muted/20 transition-colors group text-sm"
-      style={{ gridTemplateColumns: "100px 1fr 120px 80px 60px 110px 1fr 72px" }}
+      style={{ gridTemplateColumns: "100px 1fr 80px 60px 110px 1fr 72px" }}
     >
       {/* תאריך */}
       <span className="text-muted-foreground text-xs tabular-nums">{fmtDate(entry.date)}</span>
@@ -616,20 +573,11 @@ function IncomeRow({ entry, onEdit, onDelete }: {
           "w-1.5 h-6 rounded-full shrink-0",
           isIncome ? "bg-emerald-400" : "bg-rose-400"
         )} />
-        <span className="font-medium truncate">{entry.source}</span>
+        <span className="font-medium truncate">{name}</span>
         {!isIncome && (
           <span className="text-xs bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded-full font-medium shrink-0">ניכוי</span>
         )}
       </div>
-
-      {/* מקור */}
-      <span className="text-xs">
-        {src ? (
-          <span className="bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium">{src}</span>
-        ) : (
-          <span className="text-muted-foreground">—</span>
-        )}
-      </span>
 
       {/* חודש */}
       <span className="text-muted-foreground text-xs">{MONTH_HE[d.getMonth()]}</span>
@@ -849,31 +797,6 @@ function IncomeDialog({
               )}
             />
             <FieldError msg={errDate} />
-          </div>
-
-          {/* Source category */}
-          <div>
-            <Label className="text-sm font-semibold flex items-center gap-1 mb-1.5">
-              <Tag className="w-3.5 h-3.5 text-emerald-600" />
-              מקור הכנסה
-              <span className="text-xs font-normal text-muted-foreground mr-1">(אופציונלי)</span>
-            </Label>
-            <Select
-              value={form.source || "__none__"}
-              onValueChange={v => setField("source", v === "__none__" ? "" : v)}
-            >
-              <SelectTrigger className="rounded-2xl focus:ring-emerald-300">
-                <SelectValue placeholder="בחר מקור..." />
-              </SelectTrigger>
-              <SelectContent dir="rtl">
-                <SelectItem value="__none__">
-                  <span className="text-muted-foreground">ללא מיון</span>
-                </SelectItem>
-                {SOURCE_CATEGORIES.map(c => (
-                  <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
           </div>
 
           {/* Notes */}

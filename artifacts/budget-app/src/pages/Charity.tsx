@@ -13,7 +13,7 @@ import {
   Plus, Pencil, Trash2, Search, X, ChevronDown, ChevronRight,
   HeartHandshake, Loader2, Check, AlertTriangle, Filter,
   CalendarDays, ShieldAlert, StickyNote, CircleDollarSign,
-  Landmark, Percent, Target, Info, Receipt,
+  Landmark, Percent, Target, Info,
 } from "lucide-react";
 
 
@@ -22,7 +22,7 @@ import {
 ═══════════════════════════════════════════════════════════ */
 type TitheEntry = {
   id: number; amount: number; recipient: string; description: string;
-  date: string; isTithe: boolean; tithePercent?: number | null; receiptNumber?: string | null;
+  date: string;
 };
 type IncomeSummary = { totalIncome: number; totalDeductions: number; netIncome: number };
 type BudgetYear    = { tithePercentage: number | string };
@@ -43,12 +43,11 @@ const GROUP_OPTIONS: { value: GroupBy; label: string }[] = [
 ═══════════════════════════════════════════════════════════ */
 type EntryForm = {
   amount: string; recipient: string; description: string;
-  date: string; isTithe: boolean; receiptNumber: string;
+  date: string;
 };
 const EMPTY_FORM: EntryForm = {
   amount: "", recipient: "", description: "",
   date: new Date().toISOString().split("T")[0],
-  isTithe: true, receiptNumber: "",
 };
 
 /* ═══════════════════════════════════════════════════════════
@@ -219,7 +218,7 @@ export default function Charity() {
   /* ── dialog helpers ──────────────────────────────────────── */
   const openAdd = () => {
     setEditItem(null);
-    setForm({ ...EMPTY_FORM, isTithe: true });
+    setForm({ ...EMPTY_FORM });
     setTouched(new Set()); setSubmitTried(false);
     setDialog(true);
   };
@@ -228,7 +227,6 @@ export default function Charity() {
     setForm({
       amount: String(e.amount), recipient: e.recipient,
       description: e.description, date: e.date,
-      isTithe: e.isTithe, receiptNumber: e.receiptNumber || "",
     });
     setTouched(new Set()); setSubmitTried(false);
     setDialog(true);
@@ -251,12 +249,10 @@ export default function Charity() {
     setSaving(true);
     try {
       const payload: any = {
-        amount:        parseFloat(form.amount),
-        recipient:     form.recipient.trim(),
-        description:   form.description,
-        date:          form.date,
-        isTithe:       form.isTithe,
-        receiptNumber: form.receiptNumber.trim() || null,
+        amount:      parseFloat(form.amount),
+        recipient:   form.recipient.trim(),
+        description: form.description,
+        date:        form.date,
       };
       if (editItem) {
         const updated = await apiFetch(`/charity/${editItem.id}`, { method: "PUT", body: JSON.stringify(payload) });
@@ -577,11 +573,6 @@ function TitheRow({ entry, onEdit, onDelete }: {
           <HeartHandshake className="w-4 h-4 text-violet-600" />
         </div>
         <span className="font-medium truncate">{entry.recipient}</span>
-        {entry.receiptNumber && (
-          <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded shrink-0">
-            קבלה #{entry.receiptNumber}
-          </span>
-        )}
       </div>
 
       {/* סכום */}
@@ -742,22 +733,6 @@ function TitheDialog({
               )}
             />
             <FieldError msg={errDate} />
-          </div>
-
-          {/* Receipt number */}
-          <div>
-            <Label className="text-sm font-semibold flex items-center gap-1 mb-1.5">
-              <Receipt className="w-3.5 h-3.5 text-violet-600" />
-              מספר קבלה
-              <span className="text-xs font-normal text-muted-foreground mr-1">(אופציונלי)</span>
-            </Label>
-            <Input
-              value={form.receiptNumber}
-              onChange={e => setField("receiptNumber", e.target.value)}
-              placeholder="מספר קבלה לתיעוד..."
-              className="rounded-2xl focus-visible:ring-violet-300"
-              dir="ltr"
-            />
           </div>
 
           {/* Notes */}

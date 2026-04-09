@@ -12,7 +12,7 @@ router.get("/", async (req, res) => {
     const rows = await db.select().from(titheGivenTable)
       .where(and(eq(titheGivenTable.userId, DEFAULT_USER_ID), eq(titheGivenTable.budgetYearId, getBYID(req))))
       .orderBy(desc(titheGivenTable.date));
-    res.json(rows.map(r => ({ ...r, amount: parseFloat(r.amount), tithePercent: r.tithePercent ? parseFloat(r.tithePercent) : null })));
+    res.json(rows.map(r => ({ ...r, amount: parseFloat(r.amount) })));
   } catch (err) {
     req.log.error({ err }, "Failed to get charity entries");
     res.status(500).json({ error: "Failed to get charity entries" });

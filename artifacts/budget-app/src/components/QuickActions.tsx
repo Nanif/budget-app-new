@@ -27,20 +27,6 @@ const EXPENSE_BEHAVIORS = new Set([
 ]);
 const CASH_BEHAVIORS = new Set(["cash_monthly"]);
 
-const PAYMENT_METHODS: Record<string, string> = {
-  cash: "מזומן", credit: "אשראי", bank_transfer: "העברה בנקאית", check: "צ'ק",
-};
-const SOURCE_CATEGORIES = [
-  { value: "משכורת", label: "משכורת" },
-  { value: "פרילנס", label: "פרילנס / עצמאי" },
-  { value: "עסק",    label: "עסק" },
-  { value: "שכירות", label: "שכירות נכס" },
-  { value: "השקעות", label: "השקעות / ריבית" },
-  { value: "מתנה",   label: "מתנה / ירושה" },
-  { value: "נסיעות", label: "נסיעות (ניכוי)" },
-  { value: "ציוד",   label: "ציוד (ניכוי)" },
-  { value: "אחר",    label: "אחר" },
-];
 
 const today = () => new Date().toISOString().split("T")[0];
 
@@ -93,12 +79,12 @@ export function QuickActions() {
   ═══════════════════════════════════════════════════════ */
   type ExpenseForm = {
     name: string; notes: string; amount: string; date: string;
-    paymentMethod: string; fundId: string; categoryId: string; isRecurring: boolean;
+    fundId: string; categoryId: string; isRecurring: boolean;
     takenFromCash: boolean;
   };
   const EXPENSE_EMPTY: ExpenseForm = {
     name: "", notes: "", amount: "", date: today(),
-    paymentMethod: "credit", fundId: "", categoryId: "", isRecurring: false,
+    fundId: "", categoryId: "", isRecurring: false,
     takenFromCash: false,
   };
   const [ef, setEf] = useState<ExpenseForm>(EXPENSE_EMPTY);
@@ -134,7 +120,6 @@ export function QuickActions() {
           description:   ef.name.trim() + (ef.notes.trim() ? "\n\n" + ef.notes.trim() : ""),
           amount:        parseFloat(ef.amount),
           date:          ef.date,
-          paymentMethod: ef.paymentMethod,
           fundId:        parseInt(ef.fundId),
           categoryId:    ef.categoryId ? parseInt(ef.categoryId) : null,
           isRecurring:   ef.isRecurring,
@@ -164,11 +149,11 @@ export function QuickActions() {
      INCOME FORM
   ═══════════════════════════════════════════════════════ */
   type IncomeForm = {
-    name: string; source: string; notes: string;
+    name: string; notes: string;
     amount: string; date: string; entryType: "income" | "work_deduction";
   };
   const INCOME_EMPTY: IncomeForm = {
-    name: "", source: "", notes: "", amount: "",
+    name: "", notes: "", amount: "",
     date: today(), entryType: "income",
   };
   const [inf, setInf] = useState<IncomeForm>(INCOME_EMPTY);
@@ -197,8 +182,7 @@ export function QuickActions() {
       await apiFetch("/incomes", {
         method: "POST",
         body: JSON.stringify({
-          source:      inf.name.trim(),
-          description: inf.source + (inf.notes.trim() ? "|" + inf.notes.trim() : ""),
+          description: inf.name.trim() + (inf.notes.trim() ? "\n\n" + inf.notes.trim() : ""),
           amount:      parseFloat(inf.amount),
           date:        inf.date,
           entryType:   inf.entryType,
@@ -261,11 +245,11 @@ export function QuickActions() {
   ═══════════════════════════════════════════════════════ */
   type CharityForm = {
     amount: string; recipient: string; description: string;
-    date: string; isTithe: boolean; receiptNumber: string;
+    date: string;
   };
   const CHARITY_EMPTY: CharityForm = {
     amount: "", recipient: "", description: "",
-    date: today(), isTithe: true, receiptNumber: "",
+    date: today(),
   };
   const [chf, setChf] = useState<CharityForm>(CHARITY_EMPTY);
   const [chTouched, setChTouched] = useState<Partial<Record<keyof CharityForm, boolean>>>({});
@@ -293,12 +277,10 @@ export function QuickActions() {
       await apiFetch("/charity", {
         method: "POST",
         body: JSON.stringify({
-          recipient:     chf.recipient.trim(),
-          amount:        parseFloat(chf.amount),
-          date:          chf.date,
-          isTithe:       chf.isTithe,
-          description:   chf.description.trim(),
-          receiptNumber: chf.receiptNumber.trim() || null,
+          recipient:   chf.recipient.trim(),
+          amount:      parseFloat(chf.amount),
+          date:        chf.date,
+          description: chf.description.trim(),
         }),
       });
       toast({ title: "תרומה נרשמה ✓" });
@@ -404,35 +386,20 @@ export function QuickActions() {
               <FieldError msg={errEName} />
             </div>
 
-            {/* Date + Payment */}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label className="text-sm font-semibold flex items-center gap-1 mb-1.5">
-                  <CalendarDays className="w-3.5 h-3.5 text-teal-600" />
-                  תאריך <span className="text-rose-500">*</span>
-                </Label>
-                <Input
-                  type="date" dir="ltr"
-                  value={ef.date}
-                  onChange={e => efSet("date", e.target.value)}
-                  onBlur={() => efTouch("date")}
-                  className={cn("rounded-2xl", errEDate ? "border-rose-400 focus-visible:ring-rose-300 bg-rose-50/40" : "focus-visible:ring-teal-300")}
-                />
-                <FieldError msg={errEDate} />
-              </div>
-              <div>
-                <Label className="text-sm font-semibold mb-1.5 block">אמצעי תשלום</Label>
-                <Select value={ef.paymentMethod} onValueChange={v => efSet("paymentMethod", v)}>
-                  <SelectTrigger className="rounded-2xl focus:ring-teal-300">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent dir="rtl">
-                    {Object.entries(PAYMENT_METHODS).map(([v, l]) => (
-                      <SelectItem key={v} value={v}>{l}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+            {/* Date */}
+            <div>
+              <Label className="text-sm font-semibold flex items-center gap-1 mb-1.5">
+                <CalendarDays className="w-3.5 h-3.5 text-teal-600" />
+                תאריך <span className="text-rose-500">*</span>
+              </Label>
+              <Input
+                type="date" dir="ltr"
+                value={ef.date}
+                onChange={e => efSet("date", e.target.value)}
+                onBlur={() => efTouch("date")}
+                className={cn("rounded-2xl", errEDate ? "border-rose-400 focus-visible:ring-rose-300 bg-rose-50/40" : "focus-visible:ring-teal-300")}
+              />
+              <FieldError msg={errEDate} />
             </div>
 
             {/* Fund */}
@@ -687,31 +654,6 @@ export function QuickActions() {
               <FieldError msg={errInDate} />
             </div>
 
-            {/* Source category */}
-            <div>
-              <Label className="text-sm font-semibold flex items-center gap-1 mb-1.5">
-                <Tag className="w-3.5 h-3.5 text-emerald-600" />
-                מקור הכנסה
-                <span className="text-xs font-normal text-muted-foreground mr-1">(אופציונלי)</span>
-              </Label>
-              <Select
-                value={inf.source || "__none__"}
-                onValueChange={v => infSet("source", v === "__none__" ? "" : v)}
-              >
-                <SelectTrigger className="rounded-2xl focus:ring-emerald-300">
-                  <SelectValue placeholder="בחר מקור..." />
-                </SelectTrigger>
-                <SelectContent dir="rtl">
-                  <SelectItem value="__none__">
-                    <span className="text-muted-foreground">ללא מיון</span>
-                  </SelectItem>
-                  {SOURCE_CATEGORIES.map(c => (
-                    <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
             {/* Notes */}
             <div>
               <Label className="text-sm font-semibold flex items-center gap-1 mb-1.5">
@@ -926,22 +868,6 @@ export function QuickActions() {
                 )}
               />
               <FieldError msg={errChDate} />
-            </div>
-
-            {/* Receipt number */}
-            <div>
-              <Label className="text-sm font-semibold flex items-center gap-1 mb-1.5">
-                <Receipt className="w-3.5 h-3.5 text-violet-600" />
-                מספר קבלה
-                <span className="text-xs font-normal text-muted-foreground mr-1">(אופציונלי)</span>
-              </Label>
-              <Input
-                value={chf.receiptNumber}
-                onChange={e => chfSet("receiptNumber", e.target.value)}
-                placeholder="מספר קבלה לתיעוד..."
-                className="rounded-2xl focus-visible:ring-violet-300"
-                dir="ltr"
-              />
             </div>
 
             {/* Notes */}

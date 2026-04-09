@@ -24,7 +24,7 @@ import {
 ═══════════════════════════════════════════════════════════ */
 type Expense = {
   id: number; amount: number; description: string; date: string;
-  paymentMethod: string; fundId: number | null; categoryId: number | null;
+  fundId: number | null; categoryId: number | null;
   categoryName?: string | null; categoryColor?: string | null;
   isRecurring?: boolean;
 };
@@ -39,12 +39,6 @@ type GroupBy  = "none" | "fund" | "category" | "month";
 /* ═══════════════════════════════════════════════════════════
    CONSTANTS
 ═══════════════════════════════════════════════════════════ */
-const PAYMENT_METHODS: Record<string, string> = {
-  cash:          "מזומן",
-  credit:        "אשראי",
-  bank_transfer: "העברה בנקאית",
-  check:         "צ'ק",
-};
 const MONTH_HE = ["ינואר","פברואר","מרץ","אפריל","מאי","יוני","יולי","אוגוסט","ספטמבר","אוקטובר","נובמבר","דצמבר"];
 const GROUP_OPTIONS: { value: GroupBy; label: string }[] = [
   { value: "none",     label: "ללא קיבוץ" },
@@ -75,7 +69,7 @@ function todayStr() { return new Date().toISOString().split("T")[0]; }
 /* form splits "description" → name + notes, and adds isRecurring */
 type ExpenseForm = {
   name: string; notes: string; amount: string; date: string;
-  paymentMethod: string; fundId: string; categoryId: string; isRecurring: boolean;
+  fundId: string; categoryId: string; isRecurring: boolean;
   takenFromCash: boolean;
 };
 function formToPayload(f: ExpenseForm) {
@@ -83,7 +77,6 @@ function formToPayload(f: ExpenseForm) {
     description: f.name + (f.notes.trim() ? "\n\n" + f.notes.trim() : ""),
     amount:       parseFloat(f.amount),
     date:         f.date,
-    paymentMethod: f.paymentMethod,
     fundId:       f.fundId ? parseInt(f.fundId) : null,
     categoryId:   f.categoryId ? parseInt(f.categoryId) : null,
     isRecurring:  f.isRecurring,
@@ -94,7 +87,6 @@ function expenseToForm(e: Expense): ExpenseForm {
   return {
     name: name || "", notes: rest.join("\n\n"),
     amount: String(e.amount), date: e.date,
-    paymentMethod: e.paymentMethod,
     fundId: e.fundId ? String(e.fundId) : "",
     categoryId: e.categoryId ? String(e.categoryId) : "",
     isRecurring: e.isRecurring ?? false,
@@ -103,7 +95,7 @@ function expenseToForm(e: Expense): ExpenseForm {
 }
 const EMPTY_FORM: ExpenseForm = {
   name: "", notes: "", amount: "", date: todayStr(),
-  paymentMethod: "credit", fundId: "", categoryId: "", isRecurring: false,
+  fundId: "", categoryId: "", isRecurring: false,
   takenFromCash: false,
 };
 
@@ -453,13 +445,12 @@ export default function Expenses() {
         <div className="bg-card border border-border/60 rounded-2xl overflow-hidden shadow-sm">
           {/* Table header */}
           <div className="grid text-xs font-bold text-muted-foreground uppercase tracking-wider px-4 py-3 border-b border-border/50 bg-muted/30"
-            style={{ gridTemplateColumns: "110px 1fr 130px 130px 100px 1fr 80px" }}>
+            style={{ gridTemplateColumns: "110px 1fr 130px 130px 100px 80px" }}>
             <span>תאריך</span>
             <span>תיאור</span>
             <span>קטגוריה</span>
             <span>קופה</span>
             <span className="text-left" dir="ltr">סכום</span>
-            <span>אמצעי תשלום</span>
             <span className="text-center">פעולות</span>
           </div>
 
@@ -506,13 +497,12 @@ export default function Expenses() {
 
           {/* Table footer — total */}
           <div className="grid items-center px-4 py-3 border-t border-border/50 bg-muted/20 font-semibold text-sm"
-            style={{ gridTemplateColumns: "110px 1fr 130px 130px 100px 1fr 80px" }}>
+            style={{ gridTemplateColumns: "110px 1fr 130px 130px 100px 80px" }}>
             <span className="text-muted-foreground">{filtered.length} רשומות</span>
             <span />
             <span />
             <span className="font-bold">סה״כ</span>
             <span className="font-bold text-rose-600 tabular-nums" dir="ltr">{fmt(totalAmount)}</span>
-            <span />
             <span />
           </div>
         </div>
@@ -668,40 +658,25 @@ function ExpenseDialog({
             <FieldError msg={errName} />
           </div>
 
-          {/* Date + Payment — row */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label className="text-sm font-semibold flex items-center gap-1 mb-1.5">
-                <CalendarDays className="w-3.5 h-3.5 text-teal-600" />
-                תאריך
-                <span className="text-rose-500">*</span>
-              </Label>
-              <Input
-                type="date"
-                dir="ltr"
-                value={form.date}
-                onChange={e => setField("date", e.target.value)}
-                onBlur={() => touch("date")}
-                className={cn(
-                  "rounded-2xl",
-                  errDate ? "border-rose-400 focus-visible:ring-rose-300 bg-rose-50/40" : "focus-visible:ring-teal-300"
-                )}
-              />
-              <FieldError msg={errDate} />
-            </div>
-            <div>
-              <Label className="text-sm font-semibold mb-1.5 block">אמצעי תשלום</Label>
-              <Select value={form.paymentMethod} onValueChange={v => setField("paymentMethod", v)}>
-                <SelectTrigger className="rounded-2xl focus:ring-teal-300">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent dir="rtl">
-                  {Object.entries(PAYMENT_METHODS).map(([v, l]) => (
-                    <SelectItem key={v} value={v}>{l}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+          {/* Date */}
+          <div>
+            <Label className="text-sm font-semibold flex items-center gap-1 mb-1.5">
+              <CalendarDays className="w-3.5 h-3.5 text-teal-600" />
+              תאריך
+              <span className="text-rose-500">*</span>
+            </Label>
+            <Input
+              type="date"
+              dir="ltr"
+              value={form.date}
+              onChange={e => setField("date", e.target.value)}
+              onBlur={() => touch("date")}
+              className={cn(
+                "rounded-2xl",
+                errDate ? "border-rose-400 focus-visible:ring-rose-300 bg-rose-50/40" : "focus-visible:ring-teal-300"
+              )}
+            />
+            <FieldError msg={errDate} />
           </div>
 
           {/* Fund */}
@@ -905,7 +880,7 @@ function ExpenseRow({ expense, fundMap, catMap, onEdit, onDelete }: {
 
   return (
     <div className="grid items-center px-4 py-3 border-b border-border/30 last:border-0 hover:bg-muted/20 transition-colors group text-sm"
-      style={{ gridTemplateColumns: "110px 1fr 130px 130px 100px 1fr 80px" }}>
+      style={{ gridTemplateColumns: "110px 1fr 130px 130px 100px 80px" }}>
 
       {/* Date */}
       <span className="text-muted-foreground text-xs font-medium">{fmtDate(expense.date)}</span>
@@ -942,11 +917,6 @@ function ExpenseRow({ expense, fundMap, catMap, onEdit, onDelete }: {
 
       {/* Amount */}
       <span className="font-bold text-rose-600 tabular-nums" dir="ltr">{fmt(expense.amount)}</span>
-
-      {/* Payment method */}
-      <span className="text-muted-foreground text-xs">
-        {PAYMENT_METHODS[expense.paymentMethod] || expense.paymentMethod}
-      </span>
 
       {/* Actions */}
       <div className="flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">

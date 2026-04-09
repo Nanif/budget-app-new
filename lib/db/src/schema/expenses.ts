@@ -15,10 +15,8 @@ export const expensesTable = pgTable("expenses", {
   amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
   description: text("description").notNull().default(""),
   date: date("date").notNull(),
-  paymentMethod: text("payment_method").notNull().default("cash"),
   isRecurring: boolean("is_recurring").notNull().default(false),
   recurringRule: jsonb("recurring_rule"),
-  receiptUrl: text("receipt_url"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });

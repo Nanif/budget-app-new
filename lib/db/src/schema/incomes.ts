@@ -12,7 +12,6 @@ export const incomesTable = pgTable("incomes", {
   userId: integer("user_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
   budgetYearId: integer("budget_year_id").notNull().references(() => budgetYearsTable.id, { onDelete: "cascade" }),
   amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
-  source: text("source").notNull(),
   description: text("description").notNull().default(""),
   date: date("date").notNull(),
   entryType: text("entry_type").notNull().default("income"),
