@@ -21,7 +21,7 @@ async function buildContext(budgetYearId: number): Promise<string> {
     db.select().from(categoriesTable).where(eq(categoriesTable.userId, DEFAULT_USER_ID)),
     db.select().from(debtsTable).where(eq(debtsTable.userId, DEFAULT_USER_ID)),
     db.select().from(assetsTable).where(eq(assetsTable.userId, DEFAULT_USER_ID)),
-    db.execute(sql`SELECT DISTINCT ON (asset_id) * FROM asset_balances ORDER BY asset_id, date DESC`),
+    db.execute(sql`SELECT DISTINCT ON (asset_id) * FROM asset_balances ORDER BY asset_id, recorded_at DESC`),
   ]);
 
   const fundMap = Object.fromEntries(funds.map(f => [f.id, f.name]));
@@ -95,7 +95,7 @@ async function buildContext(budgetYearId: number): Promise<string> {
     "",
     "-- חובות --",
     ...(debts.length === 0 ? ["  אין"] : debts.map(d =>
-      `  ${d.description} ${fmt(parseFloat(d.amount))} (${d.type === "owe" ? "חייבים לנו" : "אנחנו חייבים"})`)),
+      `  ${d.name} ${fmt(parseFloat(d.totalAmount))} נותר: ${fmt(parseFloat(d.remainingAmount))} (${d.type === "i_owe" ? "אנחנו חייבים" : "חייבים לנו"})`)),
     "",
     "-- נכסים --",
     ...(assets.length === 0 ? ["  אין"] : assets.map(a => {
