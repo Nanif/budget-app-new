@@ -97,10 +97,15 @@ async function buildContext(budgetYearId: number): Promise<string> {
     ...(debts.length === 0 ? ["  אין"] : debts.map(d =>
       `  ${d.name} ${fmt(parseFloat(d.totalAmount))} נותר: ${fmt(parseFloat(d.remainingAmount))} (${d.type === "i_owe" ? "אנחנו חייבים" : "חייבים לנו"})`)),
     "",
-    "-- נכסים --",
+    "-- נכסים והתחייבויות --",
     ...(assets.length === 0 ? ["  אין"] : assets.map(a => {
       const bal = (latestBalances.rows as any[]).find((b: any) => b.asset_id === a.id);
-      return `  ${a.name} | ${a.type}${bal ? " | " + fmt(parseFloat(bal.balance)) : ""}`;
+      const amount = bal ? parseFloat(bal.balance) : parseFloat(a.currentAmount ?? "0");
+      const typeHe: Record<string, string> = {
+        savings: "חיסכון", investment: "השקעה", retirement: "פנסיה",
+        mortgage: "משכנתא", bank_loan: "הלוואה", other: "אחר",
+      };
+      return `  ${a.name} | ${typeHe[a.type] ?? a.type} | ${fmt(amount)}`;
     })),
   ];
 
