@@ -156,13 +156,13 @@ export default function Agent() {
         <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-xl p-4 mb-4 flex-shrink-0">
           <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" />
           <div className="text-sm text-amber-800">
-            <p className="font-semibold mb-1">מפתח Gemini API לא מוגדר</p>
+            <p className="font-semibold mb-1">מפתח Groq API לא מוגדר</p>
             <p>
               כדי להפעיל את הסוכן:
             </p>
             <ol className="list-decimal mr-4 mt-1 space-y-1">
-              <li>עבור אל <strong>aistudio.google.com</strong> וצור מפתח API חינמי</li>
-              <li>בלחצן "Secrets" בתפריט הפרויקט, הוסף סוד בשם <code className="bg-amber-100 px-1 rounded">GEMINI_API_KEY</code></li>
+              <li>עבור אל <strong>console.groq.com</strong> וצור מפתח API חינמי</li>
+              <li>בלחצן "Secrets" בתפריט הפרויקט, הוסף סוד בשם <code className="bg-amber-100 px-1 rounded">GROQ_API_KEY</code></li>
               <li>הפעל מחדש את השרת</li>
             </ol>
           </div>

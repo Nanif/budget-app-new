@@ -108,11 +108,11 @@ async function buildContext(budgetYearId: number): Promise<string> {
   return lines.join("\n");
 }
 
-// POST /api/agent/chat — streaming SSE
+// POST /api/agent/chat — streaming SSE via Groq
 router.post("/chat", async (req: any, res) => {
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) {
-    res.status(503).json({ error: "GEMINI_API_KEY לא מוגדר. הגדר את המפתח בהגדרות הסביבה." });
+    res.status(503).json({ error: "GROQ_API_KEY לא מוגדר." });
     return;
   }
 
@@ -130,7 +130,7 @@ router.post("/chat", async (req: any, res) => {
   const systemPrompt = `אתה סוכן פיננסי חכם של משפחת אוסטרוב. אתה עוזר לנתח ולהבין את מצב התקציב המשפחתי.
 
 חוקים חשובים:
-1. עני תמיד בעברית.
+1. ענה תמיד בעברית.
 2. כאשר מבקשים ממך לבצע פעולה (הוספה, עדכון, מחיקה) — ציין בדיוק מה אתה מתכוון לעשות ובקש אישור מפורש לפני הביצוע. תגיד: "⚠️ לפני שאבצע, בוא נוודא: [פרטי הפעולה המלאים]. האם לאשר?"
 3. אתה יכול לענות על שאלות ולנתח נתונים בחופשיות.
 4. כשאתה מבצע חישובים, הצג את התוצאות בצורה מסודרת.
@@ -143,31 +143,30 @@ ${context}`;
   res.setHeader("Connection", "keep-alive");
   res.setHeader("Access-Control-Allow-Origin", "*");
 
-  const contents = [
-    ...history.map((h: any) => ({
-      role: h.role === "assistant" ? "model" : "user",
-      parts: [{ text: h.content }],
-    })),
-    { role: "user", parts: [{ text: message }] },
+  const messages = [
+    { role: "system", content: systemPrompt },
+    ...history.map((h: any) => ({ role: h.role, content: h.content })),
+    { role: "user", content: message },
   ];
 
   try {
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse&key=${apiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          system_instruction: { parts: [{ text: systemPrompt }] },
-          contents,
-          generationConfig: { maxOutputTokens: 8192 },
-        }),
-      }
-    );
+    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: "llama-3.3-70b-versatile",
+        messages,
+        stream: true,
+        max_completion_tokens: 8192,
+      }),
+    });
 
     if (!response.ok) {
       const err = await response.text();
-      res.write(`data: ${JSON.stringify({ error: `Gemini error: ${err}` })}\n\n`);
+      res.write(`data: ${JSON.stringify({ error: `Groq error: ${err}` })}\n\n`);
       res.end();
       return;
     }
@@ -188,7 +187,7 @@ ${context}`;
         if (!json || json === "[DONE]") continue;
         try {
           const parsed = JSON.parse(json);
-          const text = parsed?.candidates?.[0]?.content?.parts?.[0]?.text;
+          const text = parsed?.choices?.[0]?.delta?.content;
           if (text) {
             res.write(`data: ${JSON.stringify({ content: text })}\n\n`);
           }
@@ -207,7 +206,7 @@ ${context}`;
 
 // GET /api/agent/status — check if key is configured
 router.get("/status", (_req, res) => {
-  res.json({ configured: !!process.env.GEMINI_API_KEY });
+  res.json({ configured: !!process.env.GROQ_API_KEY });
 });
 
 export default router;
