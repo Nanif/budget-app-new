@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { db, expensesTable, incomesTable, fundsTable, categoriesTable, debtsTable, assetsTable, assetBalancesTable, systemSettingsTable } from "@workspace/db";
-import { eq, and, desc, sql } from "drizzle-orm";
+import { db, expensesTable, incomesTable, fundsTable, categoriesTable, netWorthRecordsTable, netWorthItemsTable, systemSettingsTable } from "@workspace/db";
+import { eq, and, desc } from "drizzle-orm";
 
 const router = Router();
 const DEFAULT_USER_ID = 1;
@@ -14,14 +14,13 @@ function getBYID(req: any): number {
 function fmt(n: number) { return `₪${Math.round(n).toLocaleString("he-IL")}`; }
 
 async function buildContext(budgetYearId: number): Promise<string> {
-  const [expenses, incomes, funds, categories, debts, assets, latestBalances] = await Promise.all([
+  const [expenses, incomes, funds, categories, nwRecords, nwItems] = await Promise.all([
     db.select().from(expensesTable).where(and(eq(expensesTable.userId, DEFAULT_USER_ID), eq(expensesTable.budgetYearId, budgetYearId))).orderBy(desc(expensesTable.date)),
     db.select().from(incomesTable).where(and(eq(incomesTable.userId, DEFAULT_USER_ID), eq(incomesTable.budgetYearId, budgetYearId))).orderBy(desc(incomesTable.date)),
     db.select().from(fundsTable).where(eq(fundsTable.userId, DEFAULT_USER_ID)).orderBy(fundsTable.displayOrder),
     db.select().from(categoriesTable).where(eq(categoriesTable.userId, DEFAULT_USER_ID)),
-    db.select().from(debtsTable).where(eq(debtsTable.userId, DEFAULT_USER_ID)),
-    db.select().from(assetsTable).where(eq(assetsTable.userId, DEFAULT_USER_ID)),
-    db.execute(sql`SELECT DISTINCT ON (asset_id) * FROM asset_balances ORDER BY asset_id, recorded_at DESC`),
+    db.select().from(netWorthRecordsTable).where(eq(netWorthRecordsTable.userId, DEFAULT_USER_ID)).orderBy(desc(netWorthRecordsTable.recordedAt)),
+    db.select().from(netWorthItemsTable),
   ]);
 
   const fundMap = Object.fromEntries(funds.map(f => [f.id, f.name]));
@@ -93,20 +92,31 @@ async function buildContext(budgetYearId: number): Promise<string> {
       return `  [${e.date}] ${e.description.split("\n\n")[0]} | ${fund}${cat ? "/" + cat : ""} | ${fmt(parseFloat(e.amount))}`;
     }),
     "",
-    "-- חובות --",
-    ...(debts.length === 0 ? ["  אין"] : debts.map(d =>
-      `  ${d.name} ${fmt(parseFloat(d.totalAmount))} נותר: ${fmt(parseFloat(d.remainingAmount))} (${d.type === "i_owe" ? "אנחנו חייבים" : "חייבים לנו"})`)),
+    "-- שווי נקי (עדכון אחרון) --",
+    ...(nwRecords.length === 0 ? ["  אין רשומות"] : (() => {
+      const latest = nwRecords[0];
+      const items = nwItems.filter(i => i.recordId === latest.id);
+      const savings = items.filter(i => i.type === "saving");
+      const debts   = items.filter(i => i.type === "debt");
+      const totalSavings = savings.reduce((s, i) => s + parseFloat(i.amount), 0);
+      const totalDebts   = debts.reduce((s, i) => s + parseFloat(i.amount), 0);
+      return [
+        `  תאריך עדכון: ${latest.recordedAt}`,
+        `  סה"כ חסכונות: ${fmt(totalSavings)}`,
+        ...savings.map(i => `    - ${i.name}: ${fmt(parseFloat(i.amount))}`),
+        `  סה"כ התחייבויות: ${fmt(totalDebts)}`,
+        ...debts.map(i => `    - ${i.name}: ${fmt(parseFloat(i.amount))}`),
+        `  שווי נקי: ${fmt(totalSavings - totalDebts)}`,
+      ];
+    })()),
     "",
-    "-- נכסים והתחייבויות --",
-    ...(assets.length === 0 ? ["  אין"] : assets.map(a => {
-      const bal = (latestBalances.rows as any[]).find((b: any) => b.asset_id === a.id);
-      const amount = bal ? parseFloat(bal.balance) : parseFloat(a.currentAmount ?? "0");
-      const typeHe: Record<string, string> = {
-        savings: "חיסכון", investment: "השקעה", retirement: "פנסיה",
-        mortgage: "משכנתא", bank_loan: "הלוואה", other: "אחר",
-      };
-      return `  ${a.name} | ${typeHe[a.type] ?? a.type} | ${fmt(amount)}`;
-    })),
+    "-- היסטוריית שווי נקי --",
+    ...nwRecords.slice(0, 6).map(r => {
+      const items = nwItems.filter(i => i.recordId === r.id);
+      const s = items.filter(i => i.type === "saving").reduce((t, i) => t + parseFloat(i.amount), 0);
+      const d = items.filter(i => i.type === "debt").reduce((t, i) => t + parseFloat(i.amount), 0);
+      return `  ${r.recordedAt}: חסכונות ${fmt(s)}, התחייבויות ${fmt(d)}, נקי ${fmt(s - d)}`;
+    }),
   ];
 
   return lines.join("\n");
