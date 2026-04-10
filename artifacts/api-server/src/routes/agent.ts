@@ -56,45 +56,53 @@ async function buildContext(budgetYearId: number): Promise<string> {
     byCat[name] = (byCat[name] ?? 0) + parseFloat(e.amount);
   }
 
+  // ── expenses by month ──
+  const byMonth: Record<string, number> = {};
+  for (const e of expenses) {
+    const m = e.date.substring(0, 7);
+    byMonth[m] = (byMonth[m] ?? 0) + parseFloat(e.amount);
+  }
+
   const lines: string[] = [
     "=== תקציב משפחת אוסטרוב 2026 ===",
-    `הכנסות: ${fmt(totalIncome)} | ניכויים: ${fmt(totalDeductions)} | נטו: ${fmt(totalIncome - totalDeductions)}`,
-    `הוצאות: ${fmt(totalExpenses)} | יתרה: ${fmt(totalIncome - totalDeductions - totalExpenses)}`,
+    `סה"כ הכנסות: ${fmt(totalIncome)} | ניכויים: ${fmt(totalDeductions)} | נטו: ${fmt(totalIncome - totalDeductions)}`,
+    `סה"כ הוצאות: ${fmt(totalExpenses)} | יתרה: ${fmt(totalIncome - totalDeductions - totalExpenses)}`,
     "",
-    "-- הכנסות לפי חודש --",
-    ...Object.entries(incomeByMonth).sort().map(([m, d]) =>
-      `${m}: הכנסות ${fmt(d.income)}, ניכויים ${fmt(d.ded)}, נטו ${fmt(d.income - d.ded)}`),
-    "",
-    "-- הכנסות בפירוט --",
-    ...incomes.map(i =>
-      `[${i.date}] ${i.entryType === "income" ? "הכנסה" : "ניכוי"} | ${i.description.split("\n\n")[0]} | ${fmt(parseFloat(i.amount))}`),
+    "-- הוצאות לפי קטגוריה (סיכום שנתי) --",
+    ...(Object.entries(byCat).length === 0
+      ? ["אין נתוני קטגוריות"]
+      : Object.entries(byCat).sort((a, b) => b[1] - a[1]).map(([c, v]) => `  ${c}: ${fmt(v)}`)),
     "",
     "-- קופות (תקציב vs הוצאה) --",
     ...funds.map(f => {
       const b = budgets.find(x => x.fundId === f.id);
       const budget = b ? parseFloat(b.amount) : 0;
       const spent  = byFund[f.name] ?? 0;
-      return `${f.name}: תקציב ${fmt(budget)}, הוצא ${fmt(spent)}, יתרה ${fmt(budget - spent)}`;
+      return `  ${f.name}: תקציב ${fmt(budget)}, הוצא ${fmt(spent)}, יתרה ${fmt(budget - spent)}`;
     }),
     "",
-    "-- הוצאות לפי קטגוריה --",
-    ...Object.entries(byCat).sort((a, b) => b[1] - a[1]).map(([c, v]) => `${c}: ${fmt(v)}`),
+    "-- הכנסות לפי חודש --",
+    ...Object.entries(incomeByMonth).sort().map(([m, d]) =>
+      `  ${m}: הכנסות ${fmt(d.income)}, ניכויים ${fmt(d.ded)}, נטו ${fmt(d.income - d.ded)}`),
     "",
-    "-- הוצאות בפירוט (מקוצר) --",
-    ...expenses.map(e => {
+    "-- הוצאות לפי חודש --",
+    ...Object.entries(byMonth).sort().map(([m, v]) => `  ${m}: ${fmt(v)}`),
+    "",
+    "-- הוצאות בפירוט --",
+    ...expenses.slice(0, 80).map(e => {
       const fund = e.fundId ? (fundMap[e.fundId] ?? "?") : "-";
       const cat  = e.categoryId ? (catMap[e.categoryId] ?? "") : "";
-      return `[${e.date}] ${e.description.split("\n\n")[0]} | ${fund}${cat ? "/" + cat : ""} | ${fmt(parseFloat(e.amount))}`;
+      return `  [${e.date}] ${e.description.split("\n\n")[0]} | ${fund}${cat ? "/" + cat : ""} | ${fmt(parseFloat(e.amount))}`;
     }),
     "",
     "-- חובות --",
-    ...(debts.length === 0 ? ["אין"] : debts.map(d =>
-      `${d.description} ${fmt(parseFloat(d.amount))} (${d.type === "owe" ? "חייבים לנו" : "אנחנו חייבים"})`)),
+    ...(debts.length === 0 ? ["  אין"] : debts.map(d =>
+      `  ${d.description} ${fmt(parseFloat(d.amount))} (${d.type === "owe" ? "חייבים לנו" : "אנחנו חייבים"})`)),
     "",
     "-- נכסים --",
-    ...(assets.length === 0 ? ["אין"] : assets.map(a => {
+    ...(assets.length === 0 ? ["  אין"] : assets.map(a => {
       const bal = (latestBalances.rows as any[]).find((b: any) => b.asset_id === a.id);
-      return `${a.name} | ${a.type}${bal ? " | " + fmt(parseFloat(bal.balance)) : ""}`;
+      return `  ${a.name} | ${a.type}${bal ? " | " + fmt(parseFloat(bal.balance)) : ""}`;
     })),
   ];
 
@@ -144,17 +152,21 @@ router.post("/chat", async (req: any, res) => {
     req.log.error({ err }, "Failed to build context");
   }
 
-  const systemPrompt = `אתה סוכן פיננסי חכם של משפחת אוסטרוב. אתה עוזר לנתח ולהבין את מצב התקציב המשפחתי.
+  const systemPrompt = `אתה סוכן פיננסי חכם של משפחת אוסטרוב. כל הנתונים הדרושים לך נמצאים בהקשר למטה.
 
-חוקים חשובים:
+חוקים מחייבים:
 1. ענה תמיד בעברית.
-2. כל הנתונים הדרושים כבר נמצאים בהקשר שלמטה — אל תבקש מהמשתמש נתונים שקיימים שם. אם שאלו על ביגוד, חפש את הנתונים בקטגוריות הביגוד בהקשר. אם שאלו על הכנסות, חפש בסעיף ההכנסות. תמיד חפש בנתונים לפני שאתה עונה.
-3. שאלות מידע וניתוח — ענה מיד וישירות מתוך הנתונים שבהקשר, ללא כל בקשת אישור ומבלי לבקש מהמשתמש לספק נתונים.
-4. הוראות לביצוע פעולה (הוספת רשומה, עדכון, מחיקה) — לפני הביצוע פרט את כל פרטי הפעולה ובקש אישור מפורש. נוסח: "⚠️ לפני שאבצע, בוא נוודא: [פרטי הפעולה המלאים]. האם לאשר?"
-5. כשאתה מבצע חישובים, הצג את התוצאות בצורה מסודרת.
+2. לשאלות על נתונים — חפש תשובה בהקשר ותן אותה מיד. אסור לבקש מהמשתמש נתונים שכבר קיימים בהקשר.
+   - שאלות על ביגוד → חפש בסעיף "הוצאות לפי קטגוריה": ביגוד יוסי + ביגוד נעמי + ביגוד ילדים
+   - שאלות על הכנסות → חפש בסעיף "הכנסות לפי חודש"
+   - שאלות על קופה → חפש בסעיף "קופות"
+3. לפעולות כתיבה (הוספה/עדכון/מחיקה) — פרט את הפעולה ובקש אישור לפני ביצוע.
+4. בחישובים — הצג פירוט + סכום.
 
-הנה כל נתוני התקציב העדכניים:
-${context}`;
+נתוני התקציב:
+${context}
+
+[סוף הנתונים — ענה על השאלה לפי הנתונים שלמעלה]`;
 
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
