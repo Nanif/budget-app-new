@@ -1,7 +1,7 @@
 import { ReactNode } from "react";
 import { Sidebar } from "./Sidebar";
 import { QuickActions } from "./QuickActions";
-import { AgentChat } from "./AgentChat";
+// import { AgentChat } from "./AgentChat";
 import { motion } from "framer-motion";
 
 interface LayoutProps {
@@ -25,7 +25,7 @@ export function Layout({ children }: LayoutProps) {
         </div>
       </main>
       <QuickActions />
-      <AgentChat />
+      {/* <AgentChat /> */}
     </div>
   );
 }
