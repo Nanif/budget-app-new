@@ -17,7 +17,7 @@ async function buildContext(budgetYearId: number): Promise<string> {
   const [expenses, incomes, funds, budgets, categories, debts, assets, latestBalances] = await Promise.all([
     db.select().from(expensesTable).where(and(eq(expensesTable.userId, DEFAULT_USER_ID), eq(expensesTable.budgetYearId, budgetYearId))).orderBy(desc(expensesTable.date)),
     db.select().from(incomesTable).where(and(eq(incomesTable.userId, DEFAULT_USER_ID), eq(incomesTable.budgetYearId, budgetYearId))).orderBy(desc(incomesTable.date)),
-    db.select().from(fundsTable).where(eq(fundsTable.userId, DEFAULT_USER_ID)).orderBy(fundsTable.sortOrder),
+    db.select().from(fundsTable).where(eq(fundsTable.userId, DEFAULT_USER_ID)).orderBy(fundsTable.displayOrder),
     db.select().from(fundBudgetsTable).where(eq(fundBudgetsTable.budgetYearId, budgetYearId)),
     db.select().from(categoriesTable).where(eq(categoriesTable.userId, DEFAULT_USER_ID)),
     db.select().from(debtsTable).where(eq(debtsTable.userId, DEFAULT_USER_ID)),
