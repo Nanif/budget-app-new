@@ -77,6 +77,7 @@ import fixedItemsRouter           from "./fixedItems";
 import recurringTemplatesRouter   from "./recurringTemplates";
 import netWorthRecordsRouter      from "./netWorthRecords";
 import devRouter                  from "./dev";
+import agentRouter                from "./agent";
 
 const router = Router();
 
@@ -138,5 +139,8 @@ router.use("/settings", settingsRouter);
 
 // Dev panel (file viewer + DB viewer)
 router.use("/dev", devRouter);
+
+// AI Agent
+router.use("/agent", agentRouter);
 
 export default router;
