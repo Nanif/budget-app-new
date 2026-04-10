@@ -11,6 +11,8 @@ function getBYID(req: any): number {
   return isNaN(b) ? DEFAULT_BUDGET_YEAR_ID : b;
 }
 
+function fmt(n: number) { return `₪${Math.round(n).toLocaleString("he-IL")}`; }
+
 async function buildContext(budgetYearId: number): Promise<string> {
   const [expenses, incomes, funds, budgets, categories, debts, assets, latestBalances] = await Promise.all([
     db.select().from(expensesTable).where(and(eq(expensesTable.userId, DEFAULT_USER_ID), eq(expensesTable.budgetYearId, budgetYearId))).orderBy(desc(expensesTable.date)),
@@ -20,90 +22,81 @@ async function buildContext(budgetYearId: number): Promise<string> {
     db.select().from(categoriesTable).where(eq(categoriesTable.userId, DEFAULT_USER_ID)),
     db.select().from(debtsTable).where(eq(debtsTable.userId, DEFAULT_USER_ID)),
     db.select().from(assetsTable).where(eq(assetsTable.userId, DEFAULT_USER_ID)),
-    db.execute(sql`
-      SELECT DISTINCT ON (asset_id) *
-      FROM asset_balances
-      ORDER BY asset_id, date DESC
-    `),
+    db.execute(sql`SELECT DISTINCT ON (asset_id) * FROM asset_balances ORDER BY asset_id, date DESC`),
   ]);
 
-  const totalIncome = incomes.filter(i => i.entryType === "income").reduce((s, i) => s + parseFloat(i.amount), 0);
-  const totalDeductions = incomes.filter(i => i.entryType === "work_deduction").reduce((s, i) => s + parseFloat(i.amount), 0);
-  const totalExpenses = expenses.reduce((s, e) => s + parseFloat(e.amount), 0);
-
   const fundMap = Object.fromEntries(funds.map(f => [f.id, f.name]));
-  const catMap = Object.fromEntries(categories.map(c => [c.id, c.name]));
+  const catMap  = Object.fromEntries(categories.map(c => [c.id, c.name]));
 
-  const expensesByFund: Record<string, number> = {};
+  const totalIncome     = incomes.filter(i => i.entryType === "income").reduce((s, i) => s + parseFloat(i.amount), 0);
+  const totalDeductions = incomes.filter(i => i.entryType === "work_deduction").reduce((s, i) => s + parseFloat(i.amount), 0);
+  const totalExpenses   = expenses.reduce((s, e) => s + parseFloat(e.amount), 0);
+
+  // ── income by month ──
+  const incomeByMonth: Record<string, { income: number; ded: number }> = {};
+  for (const i of incomes) {
+    const m = i.date.substring(0, 7);
+    if (!incomeByMonth[m]) incomeByMonth[m] = { income: 0, ded: 0 };
+    if (i.entryType === "income") incomeByMonth[m].income += parseFloat(i.amount);
+    else incomeByMonth[m].ded += parseFloat(i.amount);
+  }
+
+  // ── expenses by fund ──
+  const byFund: Record<string, number> = {};
   for (const e of expenses) {
-    const name = e.fundId ? (fundMap[e.fundId] ?? "לא ידוע") : "ללא קופה";
-    expensesByFund[name] = (expensesByFund[name] ?? 0) + parseFloat(e.amount);
+    const name = e.fundId ? (fundMap[e.fundId] ?? "?") : "ללא קופה";
+    byFund[name] = (byFund[name] ?? 0) + parseFloat(e.amount);
+  }
+
+  // ── expenses by category ──
+  const byCat: Record<string, number> = {};
+  for (const e of expenses) {
+    if (!e.categoryId) continue;
+    const name = catMap[e.categoryId] ?? "?";
+    byCat[name] = (byCat[name] ?? 0) + parseFloat(e.amount);
   }
 
   const lines: string[] = [
-    "=== נתוני תקציב משפחת אוסטרוב 2026 ===",
+    "=== תקציב משפחת אוסטרוב 2026 ===",
+    `הכנסות: ${fmt(totalIncome)} | ניכויים: ${fmt(totalDeductions)} | נטו: ${fmt(totalIncome - totalDeductions)}`,
+    `הוצאות: ${fmt(totalExpenses)} | יתרה: ${fmt(totalIncome - totalDeductions - totalExpenses)}`,
     "",
-    `סה"כ הכנסות: ₪${totalIncome.toLocaleString("he-IL", { maximumFractionDigits: 0 })}`,
-    `סה"כ ניכויי הוצאות עבודה: ₪${totalDeductions.toLocaleString("he-IL", { maximumFractionDigits: 0 })}`,
-    `הכנסה נטו: ₪${(totalIncome - totalDeductions).toLocaleString("he-IL", { maximumFractionDigits: 0 })}`,
-    `סה"כ הוצאות: ₪${totalExpenses.toLocaleString("he-IL", { maximumFractionDigits: 0 })}`,
+    "-- הכנסות לפי חודש --",
+    ...Object.entries(incomeByMonth).sort().map(([m, d]) =>
+      `${m}: הכנסות ${fmt(d.income)}, ניכויים ${fmt(d.ded)}, נטו ${fmt(d.income - d.ded)}`),
     "",
-    "--- הכנסות לפי חודש ---",
+    "-- הכנסות בפירוט --",
+    ...incomes.map(i =>
+      `[${i.date}] ${i.entryType === "income" ? "הכנסה" : "ניכוי"} | ${i.description.split("\n\n")[0]} | ${fmt(parseFloat(i.amount))}`),
+    "",
+    "-- קופות (תקציב vs הוצאה) --",
+    ...funds.map(f => {
+      const b = budgets.find(x => x.fundId === f.id);
+      const budget = b ? parseFloat(b.amount) : 0;
+      const spent  = byFund[f.name] ?? 0;
+      return `${f.name}: תקציב ${fmt(budget)}, הוצא ${fmt(spent)}, יתרה ${fmt(budget - spent)}`;
+    }),
+    "",
+    "-- הוצאות לפי קטגוריה --",
+    ...Object.entries(byCat).sort((a, b) => b[1] - a[1]).map(([c, v]) => `${c}: ${fmt(v)}`),
+    "",
+    "-- הוצאות בפירוט (מקוצר) --",
+    ...expenses.map(e => {
+      const fund = e.fundId ? (fundMap[e.fundId] ?? "?") : "-";
+      const cat  = e.categoryId ? (catMap[e.categoryId] ?? "") : "";
+      return `[${e.date}] ${e.description.split("\n\n")[0]} | ${fund}${cat ? "/" + cat : ""} | ${fmt(parseFloat(e.amount))}`;
+    }),
+    "",
+    "-- חובות --",
+    ...(debts.length === 0 ? ["אין"] : debts.map(d =>
+      `${d.description} ${fmt(parseFloat(d.amount))} (${d.type === "owe" ? "חייבים לנו" : "אנחנו חייבים"})`)),
+    "",
+    "-- נכסים --",
+    ...(assets.length === 0 ? ["אין"] : assets.map(a => {
+      const bal = (latestBalances.rows as any[]).find((b: any) => b.asset_id === a.id);
+      return `${a.name} | ${a.type}${bal ? " | " + fmt(parseFloat(bal.balance)) : ""}`;
+    })),
   ];
-
-  const incomeByMonth: Record<string, { income: number; deduction: number }> = {};
-  for (const i of incomes) {
-    const month = i.date.substring(0, 7);
-    if (!incomeByMonth[month]) incomeByMonth[month] = { income: 0, deduction: 0 };
-    if (i.entryType === "income") incomeByMonth[month].income += parseFloat(i.amount);
-    else incomeByMonth[month].deduction += parseFloat(i.amount);
-  }
-  for (const [month, data] of Object.entries(incomeByMonth).sort()) {
-    lines.push(`  ${month}: הכנסות ₪${data.income.toLocaleString("he-IL", { maximumFractionDigits: 0 })}, ניכויים ₪${data.deduction.toLocaleString("he-IL", { maximumFractionDigits: 0 })}, נטו ₪${(data.income - data.deduction).toLocaleString("he-IL", { maximumFractionDigits: 0 })}`);
-  }
-
-  lines.push("", "--- הכנסות בפירוט ---");
-  for (const i of incomes) {
-    const desc = i.description.split("\n\n")[0];
-    const type = i.entryType === "income" ? "הכנסה" : "ניכוי";
-    lines.push(`  [${i.date}] ${type} | ${desc} | ₪${parseFloat(i.amount).toLocaleString("he-IL", { maximumFractionDigits: 0 })}`);
-  }
-
-  lines.push("", "--- קופות ותקציב ---");
-  for (const f of funds) {
-    const fundBudget = budgets.find(b => b.fundId === f.id);
-    const spent = expensesByFund[f.name] ?? 0;
-    const budget = fundBudget ? parseFloat(fundBudget.amount) : 0;
-    lines.push(`  ${f.name} | תקציב ₪${budget.toLocaleString("he-IL", { maximumFractionDigits: 0 })} | הוצא ₪${spent.toLocaleString("he-IL", { maximumFractionDigits: 0 })} | יתרה ₪${(budget - spent).toLocaleString("he-IL", { maximumFractionDigits: 0 })}`);
-  }
-
-  lines.push("", "--- הוצאות לפי קופה ---");
-  for (const [fundName, amount] of Object.entries(expensesByFund).sort((a, b) => b[1] - a[1])) {
-    lines.push(`  ${fundName}: ₪${amount.toLocaleString("he-IL", { maximumFractionDigits: 0 })}`);
-  }
-
-  lines.push("", "--- הוצאות בפירוט ---");
-  for (const e of expenses) {
-    const desc = e.description.split("\n\n")[0];
-    const fund = e.fundId ? (fundMap[e.fundId] ?? "לא ידוע") : "ללא קופה";
-    const cat = e.categoryId ? (catMap[e.categoryId] ?? "") : "";
-    const notes = e.description.includes("\n\n") ? ` | הערה: ${e.description.split("\n\n")[1]}` : "";
-    lines.push(`  [${e.date}] ${desc} | קופה: ${fund}${cat ? ` | קטגוריה: ${cat}` : ""} | ₪${parseFloat(e.amount).toLocaleString("he-IL", { maximumFractionDigits: 0 })}${notes}`);
-  }
-
-  lines.push("", "--- חובות ---");
-  if (debts.length === 0) lines.push("  אין חובות");
-  for (const d of debts) {
-    lines.push(`  ${d.description} | ₪${parseFloat(d.amount).toLocaleString("he-IL", { maximumFractionDigits: 0 })} | ${d.type === "owe" ? "חייבים לנו" : "אנחנו חייבים"}`);
-  }
-
-  lines.push("", "--- נכסים והתחייבויות ---");
-  if (assets.length === 0) lines.push("  אין נכסים");
-  for (const a of assets) {
-    const bal = (latestBalances.rows as any[]).find((b: any) => b.asset_id === a.id);
-    const balStr = bal ? ` | יתרה נוכחית: ₪${parseFloat(bal.balance).toLocaleString("he-IL", { maximumFractionDigits: 0 })}` : "";
-    lines.push(`  ${a.name} | ${a.type}${balStr}`);
-  }
 
   return lines.join("\n");
 }
@@ -184,7 +177,7 @@ ${context}`;
         model: "llama-3.3-70b-versatile",
         messages,
         stream: true,
-        max_completion_tokens: 8192,
+        max_completion_tokens: 2048,
       }),
     });
 
