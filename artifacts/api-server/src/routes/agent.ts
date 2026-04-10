@@ -73,9 +73,12 @@ async function buildContext(budgetYearId: number): Promise<string> {
     "",
     "-- קופות (תקציב vs הוצאה) --",
     ...funds.map(f => {
-      const budget = parseFloat(f.annualAllocation ?? "0");
-      const spent  = byFund[f.name] ?? 0;
-      return `  ${f.name}: תקציב שנתי ${fmt(budget)}, הוצא ${fmt(spent)}, יתרה ${fmt(budget - spent)}`;
+      const annual  = parseFloat(f.annualAllocation ?? "0");
+      const monthly = parseFloat(f.monthlyAllocation ?? "0");
+      const budget  = annual > 0 ? annual : monthly * 12;
+      const spent   = byFund[f.name] ?? 0;
+      const tag     = monthly > 0 && annual === 0 ? ` (חודשי: ${fmt(monthly)})` : "";
+      return `  ${f.name}: תקציב שנתי ${fmt(budget)}${tag}, הוצא ${fmt(spent)}, יתרה ${fmt(budget - spent)}`;
     }),
     "",
     "-- הכנסות לפי חודש --",
