@@ -15,7 +15,6 @@ import Expenses from "@/pages/Expenses";
 import Savings from "@/pages/Savings";
 import Settings from "@/pages/Settings";
 import Dev from "@/pages/Dev";
-import Agent from "@/pages/Agent";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -40,7 +39,6 @@ function Router() {
         <Route path="/charity" component={Charity} />
         <Route path="/savings" component={Savings} />
         <Route path="/settings" component={Settings} />
-        <Route path="/agent" component={Agent} />
         <Route path="/dev" component={Dev} />
         <Route component={NotFound} />
       </Switch>

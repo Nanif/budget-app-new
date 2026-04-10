@@ -116,6 +116,9 @@ export function AgentChat() {
   const [isStreaming, setIsStreaming] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
+  /* ── drag-to-click guard ── */
+  const dragMoved = useRef(false);
+
   const checkStatus = () => {
     apiFetch("/agent/status")
       .then((d: any) => { setConfigured(d.configured); if (!d.configured) setShowKeySetup(true); })
@@ -187,16 +190,22 @@ export function AgentChat() {
 
   return (
     <>
-      {/* Floating button */}
+      {/* Floating draggable button */}
       <motion.button
-        onClick={() => setOpen(o => !o)}
+        drag
+        dragMomentum={false}
+        dragElastic={0}
+        dragConstraints={{ left: 0, right: window.innerWidth - 56, top: 0, bottom: window.innerHeight - 56 }}
+        onDragStart={() => { dragMoved.current = true; }}
+        onDragEnd={() => { setTimeout(() => { dragMoved.current = false; }, 50); }}
+        onClick={() => { if (!dragMoved.current) setOpen(o => !o); }}
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
         className={cn(
-          "fixed bottom-6 left-6 z-50 w-13 h-13 rounded-full shadow-lg flex items-center justify-center transition-colors",
+          "fixed bottom-6 left-6 z-50 rounded-full shadow-lg flex items-center justify-center transition-colors cursor-grab active:cursor-grabbing",
           open ? "bg-muted border text-muted-foreground" : "bg-primary text-primary-foreground"
         )}
-        style={{ width: 52, height: 52 }}
+        style={{ width: 52, height: 52, touchAction: "none" }}
         title="סוכן חכם"
       >
         <AnimatePresence mode="wait">
@@ -211,13 +220,13 @@ export function AgentChat() {
       <AnimatePresence>
         {open && (
           <>
-            {/* backdrop on mobile */}
+            {/* Backdrop — closes panel on click */}
             <motion.div
               key="backdrop"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 z-40 bg-black/20 md:hidden"
+              className="fixed inset-0 z-40 bg-black/20"
               onClick={() => setOpen(false)}
             />
 
