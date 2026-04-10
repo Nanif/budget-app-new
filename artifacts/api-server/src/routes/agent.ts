@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, expensesTable, incomesTable, fundsTable, categoriesTable, netWorthRecordsTable, netWorthItemsTable, systemSettingsTable, budgetYearsTable } from "@workspace/db";
+import { db, expensesTable, incomesTable, fundsTable, categoriesTable, netWorthRecordsTable, netWorthItemsTable, systemSettingsTable, budgetYearsTable, cashEnvelopeTransactionsTable } from "@workspace/db";
 import { eq, and, desc } from "drizzle-orm";
 
 const router = Router();
@@ -14,7 +14,7 @@ function getBYID(req: any): number {
 function fmt(n: number) { return `₪${Math.round(n).toLocaleString("he-IL")}`; }
 
 async function buildContext(budgetYearId: number): Promise<string> {
-  const [expenses, incomes, funds, categories, nwRecords, nwItems, budgetYears] = await Promise.all([
+  const [expenses, incomes, funds, categories, nwRecords, nwItems, budgetYears, cashTxns] = await Promise.all([
     db.select().from(expensesTable).where(and(eq(expensesTable.userId, DEFAULT_USER_ID), eq(expensesTable.budgetYearId, budgetYearId))).orderBy(desc(expensesTable.date)),
     db.select().from(incomesTable).where(and(eq(incomesTable.userId, DEFAULT_USER_ID), eq(incomesTable.budgetYearId, budgetYearId))).orderBy(desc(incomesTable.date)),
     db.select().from(fundsTable).where(eq(fundsTable.userId, DEFAULT_USER_ID)).orderBy(fundsTable.displayOrder),
@@ -22,6 +22,7 @@ async function buildContext(budgetYearId: number): Promise<string> {
     db.select().from(netWorthRecordsTable).where(eq(netWorthRecordsTable.userId, DEFAULT_USER_ID)).orderBy(desc(netWorthRecordsTable.recordedAt)),
     db.select().from(netWorthItemsTable),
     db.select().from(budgetYearsTable).where(eq(budgetYearsTable.id, budgetYearId)),
+    db.select().from(cashEnvelopeTransactionsTable).where(and(eq(cashEnvelopeTransactionsTable.userId, DEFAULT_USER_ID), eq(cashEnvelopeTransactionsTable.budgetYearId, budgetYearId))),
   ]);
 
   const budgetYearName = budgetYears[0]?.name ?? `שנה ${budgetYearId}`;
@@ -83,6 +84,22 @@ async function buildContext(budgetYearId: number): Promise<string> {
       const tag     = monthly > 0 && annual === 0 ? ` (חודשי: ${fmt(monthly)})` : "";
       return `  ${f.name}: תקציב שנתי ${fmt(budget)}${tag}, הוצא ${fmt(spent)}, יתרה ${fmt(budget - spent)}`;
     }),
+    "",
+    "-- קופות מזומן (ניתן ונותר לתת) --",
+    ...(() => {
+      const byCash: Record<number, { deposited: number; withdrawn: number }> = {};
+      for (const t of cashTxns) {
+        if (!byCash[t.fundId]) byCash[t.fundId] = { deposited: 0, withdrawn: 0 };
+        if (t.type === "deposit")    byCash[t.fundId].deposited  += parseFloat(t.amount);
+        if (t.type === "withdrawal") byCash[t.fundId].withdrawn  += parseFloat(t.amount);
+      }
+      if (Object.keys(byCash).length === 0) return ["  אין נתוני מזומן"];
+      return Object.entries(byCash).map(([fid, d]) => {
+        const name = fundMap[Number(fid)] ?? `קופה ${fid}`;
+        const balance = d.deposited - d.withdrawn;
+        return `  ${name}: הופקד ${fmt(d.deposited)}, ניתן ${fmt(d.withdrawn)}, נותר ${fmt(balance)}`;
+      });
+    })(),
     "",
     "-- הכנסות לפי חודש --",
     ...Object.entries(incomeByMonth).sort().map(([m, d]) =>
