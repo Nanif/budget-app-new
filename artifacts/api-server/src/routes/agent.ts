@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, expensesTable, incomesTable, fundsTable, categoriesTable, netWorthRecordsTable, netWorthItemsTable, systemSettingsTable } from "@workspace/db";
+import { db, expensesTable, incomesTable, fundsTable, categoriesTable, netWorthRecordsTable, netWorthItemsTable, systemSettingsTable, budgetYearsTable } from "@workspace/db";
 import { eq, and, desc } from "drizzle-orm";
 
 const router = Router();
@@ -14,14 +14,17 @@ function getBYID(req: any): number {
 function fmt(n: number) { return `₪${Math.round(n).toLocaleString("he-IL")}`; }
 
 async function buildContext(budgetYearId: number): Promise<string> {
-  const [expenses, incomes, funds, categories, nwRecords, nwItems] = await Promise.all([
+  const [expenses, incomes, funds, categories, nwRecords, nwItems, budgetYears] = await Promise.all([
     db.select().from(expensesTable).where(and(eq(expensesTable.userId, DEFAULT_USER_ID), eq(expensesTable.budgetYearId, budgetYearId))).orderBy(desc(expensesTable.date)),
     db.select().from(incomesTable).where(and(eq(incomesTable.userId, DEFAULT_USER_ID), eq(incomesTable.budgetYearId, budgetYearId))).orderBy(desc(incomesTable.date)),
     db.select().from(fundsTable).where(eq(fundsTable.userId, DEFAULT_USER_ID)).orderBy(fundsTable.displayOrder),
     db.select().from(categoriesTable).where(eq(categoriesTable.userId, DEFAULT_USER_ID)),
     db.select().from(netWorthRecordsTable).where(eq(netWorthRecordsTable.userId, DEFAULT_USER_ID)).orderBy(desc(netWorthRecordsTable.recordedAt)),
     db.select().from(netWorthItemsTable),
+    db.select().from(budgetYearsTable).where(eq(budgetYearsTable.id, budgetYearId)),
   ]);
+
+  const budgetYearName = budgetYears[0]?.name ?? `שנה ${budgetYearId}`;
 
   const fundMap = Object.fromEntries(funds.map(f => [f.id, f.name]));
   const catMap  = Object.fromEntries(categories.map(c => [c.id, c.name]));
@@ -62,7 +65,7 @@ async function buildContext(budgetYearId: number): Promise<string> {
   }
 
   const lines: string[] = [
-    "=== תקציב משפחת אוסטרוב 2026 ===",
+    `=== ${budgetYearName} ===`,
     `סה"כ הכנסות: ${fmt(totalIncome)} | ניכויים: ${fmt(totalDeductions)} | נטו: ${fmt(totalIncome - totalDeductions)}`,
     `סה"כ הוצאות: ${fmt(totalExpenses)} | יתרה: ${fmt(totalIncome - totalDeductions - totalExpenses)}`,
     "",
