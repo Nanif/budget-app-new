@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useMotionValue } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
@@ -11,6 +11,11 @@ import {
   Bot, X, Send, User, Loader2, Trash2,
   KeyRound, Eye, EyeOff, Settings2, CheckCircle2,
 } from "lucide-react";
+
+const BTN = 52;
+const PANEL_W = 384;
+const PANEL_H = 580;
+const MARGIN = 8;
 
 type Message = {
   id: string;
@@ -104,6 +109,24 @@ function KeySetup({ onSaved }: { onSaved: () => void }) {
   );
 }
 
+/* ── compute panel position so it stays on screen ── */
+function panelPos(btnX: number, btnY: number) {
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  const ph = Math.min(PANEL_H, vh - MARGIN * 2);
+
+  /* horizontal: prefer right of button */
+  let left = btnX + BTN + MARGIN;
+  if (left + PANEL_W > vw - MARGIN) left = btnX - PANEL_W - MARGIN;
+  left = Math.max(MARGIN, Math.min(vw - PANEL_W - MARGIN, left));
+
+  /* vertical: align bottom of panel with bottom of button */
+  let top = btnY + BTN - ph;
+  top = Math.max(MARGIN, Math.min(vh - ph - MARGIN, top));
+
+  return { left, top, height: ph };
+}
+
 export function AgentChat() {
   const { activeBudgetYearId } = useBudgetYear();
   const [open, setOpen] = useState(false);
@@ -116,8 +139,18 @@ export function AgentChat() {
   const [isStreaming, setIsStreaming] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  /* ── drag-to-click guard ── */
+  /* ── position tracking ── */
+  const [pos, setPos] = useState({ x: 24, y: window.innerHeight - 80 });
+  /* live position (updated every drag tick — drives the panel) */
+  const [live, setLive] = useState({ x: 24, y: window.innerHeight - 80 });
+  const posRef = useRef(pos);
+
+  /* framer motion values — reset to 0 after each drag so CSS left/top takes over */
+  const mx = useMotionValue(0);
+  const my = useMotionValue(0);
+
   const dragMoved = useRef(false);
+  const btnRef = useRef<HTMLButtonElement>(null);
 
   const checkStatus = () => {
     apiFetch("/agent/status")
@@ -126,25 +159,45 @@ export function AgentChat() {
   };
 
   useEffect(() => { if (open && configured === null) checkStatus(); }, [open]);
-
   useEffect(() => {
     if (open) bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, open]);
+
+  /* keep posRef in sync */
+  useEffect(() => { posRef.current = pos; }, [pos]);
+
+  const handleDrag = (_: any, info: any) => {
+    const vw = window.innerWidth, vh = window.innerHeight;
+    const nx = Math.max(0, Math.min(vw - BTN, posRef.current.x + info.offset.x));
+    const ny = Math.max(0, Math.min(vh - BTN, posRef.current.y + info.offset.y));
+    setLive({ x: nx, y: ny });
+  };
+
+  const handleDragEnd = () => {
+    /* read real DOM rect — most accurate */
+    const rect = btnRef.current?.getBoundingClientRect();
+    const nx = rect ? Math.max(0, Math.min(window.innerWidth - BTN, rect.left)) : live.x;
+    const ny = rect ? Math.max(0, Math.min(window.innerHeight - BTN, rect.top)) : live.y;
+    setPos({ x: nx, y: ny });
+    setLive({ x: nx, y: ny });
+    posRef.current = { x: nx, y: ny };
+    /* reset framer transform so CSS left/top takes full control */
+    mx.set(0);
+    my.set(0);
+    setTimeout(() => { dragMoved.current = false; }, 80);
+  };
 
   const send = async () => {
     const text = input.trim();
     if (!text || isStreaming) return;
     setInput("");
-
     const userMsg: Message = { id: uid(), role: "user", content: text };
     const aId = uid();
     setMessages(prev => [...prev, userMsg, { id: aId, role: "assistant", content: "", pending: true }]);
     setIsStreaming(true);
-
     const history = messages
       .filter(m => m.id !== "welcome" && !m.pending)
       .map(m => ({ role: m.role, content: m.content }));
-
     try {
       const res = await fetch(`${API_BASE}/agent/chat?bid=${activeBudgetYearId ?? 1}`, {
         method: "POST",
@@ -152,11 +205,9 @@ export function AgentChat() {
         body: JSON.stringify({ message: text, history }),
       });
       if (!res.ok || !res.body) throw new Error(await res.text());
-
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let buf = "", full = "";
-
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
@@ -188,24 +239,37 @@ export function AgentChat() {
     { id: "welcome", role: "assistant", content: "שיחה חדשה. במה אוכל לעזור?" }
   ]);
 
+  const panel = panelPos(live.x, live.y);
+
   return (
     <>
-      {/* Floating draggable button */}
+      {/* ── Floating draggable button ── */}
       <motion.button
+        ref={btnRef}
         drag
         dragMomentum={false}
         dragElastic={0}
-        dragConstraints={{ left: 0, right: window.innerWidth - 56, top: 0, bottom: window.innerHeight - 56 }}
+        style={{
+          position: "fixed",
+          left: pos.x,
+          top: pos.y,
+          x: mx,
+          y: my,
+          width: BTN,
+          height: BTN,
+          touchAction: "none",
+          zIndex: 50,
+        }}
         onDragStart={() => { dragMoved.current = true; }}
-        onDragEnd={() => { setTimeout(() => { dragMoved.current = false; }, 50); }}
+        onDrag={handleDrag}
+        onDragEnd={handleDragEnd}
         onClick={() => { if (!dragMoved.current) setOpen(o => !o); }}
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.95 }}
+        whileHover={{ scale: 1.08 }}
+        whileTap={{ scale: 0.93 }}
         className={cn(
-          "fixed bottom-6 left-6 z-50 rounded-full shadow-lg flex items-center justify-center transition-colors cursor-grab active:cursor-grabbing",
+          "rounded-full shadow-lg flex items-center justify-center transition-colors cursor-grab active:cursor-grabbing",
           open ? "bg-muted border text-muted-foreground" : "bg-primary text-primary-foreground"
         )}
-        style={{ width: 52, height: 52, touchAction: "none" }}
         title="סוכן חכם"
       >
         <AnimatePresence mode="wait">
@@ -216,28 +280,34 @@ export function AgentChat() {
         </AnimatePresence>
       </motion.button>
 
-      {/* Panel */}
+      {/* ── Panel ── */}
       <AnimatePresence>
         {open && (
           <>
-            {/* Backdrop — closes panel on click */}
             <motion.div
               key="backdrop"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 z-40 bg-black/20"
+              className="fixed inset-0 bg-black/20"
+              style={{ zIndex: 40 }}
               onClick={() => setOpen(false)}
             />
 
             <motion.div
               key="panel"
-              initial={{ x: -320, opacity: 0 }}
-              animate={{ x: 0,    opacity: 1 }}
-              exit={{ x: -320,   opacity: 0 }}
-              transition={{ type: "spring", damping: 28, stiffness: 300 }}
-              className="fixed bottom-0 left-0 z-50 w-80 md:w-96 flex flex-col bg-background border border-border rounded-t-2xl md:rounded-2xl shadow-2xl"
-              style={{ height: "min(600px, calc(100vh - 5rem))", bottom: "4.5rem", left: "1rem" }}
+              initial={{ scale: 0.92, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.92, opacity: 0 }}
+              transition={{ type: "spring", damping: 28, stiffness: 320 }}
+              className="fixed flex flex-col bg-background border border-border rounded-2xl shadow-2xl"
+              style={{
+                left: panel.left,
+                top: panel.top,
+                width: PANEL_W,
+                height: panel.height,
+                zIndex: 50,
+              }}
               dir="rtl"
             >
               {/* Header */}
