@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, expensesTable, incomesTable, fundsTable, fundBudgetsTable, categoriesTable, debtsTable, assetsTable, assetBalancesTable, budgetYearsTable } from "@workspace/db";
+import { db, expensesTable, incomesTable, fundsTable, fundBudgetsTable, categoriesTable, debtsTable, assetsTable, assetBalancesTable, systemSettingsTable } from "@workspace/db";
 import { eq, and, desc, sql } from "drizzle-orm";
 
 const router = Router();
@@ -108,9 +108,33 @@ async function buildContext(budgetYearId: number): Promise<string> {
   return lines.join("\n");
 }
 
+async function getApiKey(): Promise<string> {
+  if (process.env.GROQ_API_KEY) return process.env.GROQ_API_KEY;
+  const rows = await db.select({ groqApiKey: systemSettingsTable.groqApiKey })
+    .from(systemSettingsTable).where(eq(systemSettingsTable.userId, DEFAULT_USER_ID));
+  return rows[0]?.groqApiKey ?? "";
+}
+
+// POST /api/agent/key — save API key to DB
+router.post("/key", async (req: any, res) => {
+  const { key } = req.body as { key: string };
+  if (!key?.trim()) { res.status(400).json({ error: "key is required" }); return; }
+  try {
+    const rows = await db.select().from(systemSettingsTable).where(eq(systemSettingsTable.userId, DEFAULT_USER_ID));
+    if (rows.length === 0) {
+      await db.insert(systemSettingsTable).values({ userId: DEFAULT_USER_ID, groqApiKey: key.trim() });
+    } else {
+      await db.update(systemSettingsTable).set({ groqApiKey: key.trim(), updatedAt: new Date() }).where(eq(systemSettingsTable.userId, DEFAULT_USER_ID));
+    }
+    res.json({ ok: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // POST /api/agent/chat — streaming SSE via Groq
 router.post("/chat", async (req: any, res) => {
-  const apiKey = process.env.GROQ_API_KEY;
+  const apiKey = await getApiKey();
   if (!apiKey) {
     res.status(503).json({ error: "GROQ_API_KEY לא מוגדר." });
     return;
@@ -205,8 +229,9 @@ ${context}`;
 });
 
 // GET /api/agent/status — check if key is configured
-router.get("/status", (_req, res) => {
-  res.json({ configured: !!process.env.GROQ_API_KEY });
+router.get("/status", async (_req, res) => {
+  const key = await getApiKey();
+  res.json({ configured: !!key });
 });
 
 export default router;

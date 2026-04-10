@@ -17,6 +17,7 @@ export const systemSettingsTable = pgTable("system_settings", {
   showDecimal: boolean("show_decimal").notNull().default(true),
   darkMode: boolean("dark_mode").notNull().default(false),
   userName: text("user_name").notNull().default(""),
+  groqApiKey: text("groq_api_key").notNull().default(""),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
