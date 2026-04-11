@@ -577,12 +577,12 @@ function IncomeRow({ entry, onEdit, onDelete }: {
       {/* שם */}
       <div className="flex items-center gap-2 min-w-0">
         <span className={cn(
-          "w-1.5 h-6 rounded-full shrink-0",
-          isIncome ? "bg-emerald-400" : "bg-rose-400"
+          "w-1 h-4 rounded-full shrink-0 opacity-50",
+          isIncome ? "bg-emerald-400" : "bg-rose-300"
         )} />
         <span className="font-medium truncate">{name}</span>
         {!isIncome && (
-          <span className="text-xs bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded-full font-medium shrink-0">ניכוי</span>
+          <span className="text-[10px] text-rose-400/80 shrink-0">ניכוי</span>
         )}
       </div>
 
