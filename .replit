@@ -30,3 +30,4 @@ channel = "stable-25_05"
 [userenv]
 
 [userenv.shared]
+SUPABASE_DATABASE_URL = "postgresql://postgres:FPy&7a42&F%%yji@db.dnicziexvhfizobxkejn.supabase.co:5432/postgres"
