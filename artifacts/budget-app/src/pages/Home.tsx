@@ -27,7 +27,7 @@ const PRIORITY_COLOR: Record<string, string> = {
   low:    "text-slate-500 bg-slate-50 border-slate-200",
 };
 
-const SECTION_STYLE = "bg-card rounded-2xl border border-border/60 flex flex-col overflow-hidden shadow-sm hover:shadow-md transition-shadow h-full";
+const SECTION_STYLE = "bg-card rounded-2xl border border-border/60 flex flex-col overflow-hidden shadow-sm hover:shadow-md transition-shadow min-h-[320px] md:h-full";
 const SECTION_HEAD  = "flex items-center justify-between px-5 pt-5 pb-3 shrink-0";
 const SECTION_TITLE = "flex items-center gap-2 font-display font-bold text-base";
 const ICON_WRAP     = (bg: string) => `w-8 h-8 rounded-xl ${bg} flex items-center justify-center shrink-0`;
@@ -120,17 +120,17 @@ export default function Home() {
     return (
       <div dir="rtl">
         <PageHeader title="לוח" description="פתקים, תזכורות וחובות" />
-        <div className="grid grid-cols-3 gap-4 h-[calc(100vh-200px)]">
-          {[1, 2, 3].map(i => <div key={i} className="bg-muted animate-pulse rounded-2xl h-full" />)}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:h-[calc(100vh-200px)]">
+          {[1, 2, 3].map(i => <div key={i} className="bg-muted animate-pulse rounded-2xl min-h-[320px] md:h-full" />)}
         </div>
       </div>
     );
   }
 
   return (
-    <div dir="rtl" className="flex flex-col h-[calc(100vh-80px)]">
+    <div dir="rtl" className="flex flex-col md:h-[calc(100vh-80px)]">
       <PageHeader title="לוח" description="פתקים, תזכורות וחובות" />
-      <div className="grid grid-cols-3 gap-4 flex-1 min-h-0">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:flex-1 md:min-h-0">
       <DebtsCard
         debts={debts}
         onAdd={addDebt}
