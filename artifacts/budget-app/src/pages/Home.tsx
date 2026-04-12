@@ -5,11 +5,10 @@ import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import { apiFetch } from "@/lib/api";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
 import {
   CreditCard, CheckSquare, StickyNote,
   Plus, Check, Loader2, Trash2,
-  TrendingUp, TrendingDown, Pin, BookOpen, Sun, GripVertical, Pencil, X,
+  TrendingUp, TrendingDown, Pin, BookOpen, Sun, GripVertical, Pencil, ChevronRight,
 } from "lucide-react";
 
 /* ── Types ─────────────────────────────────────────────────── */
@@ -565,6 +564,9 @@ function NotesCard({ notes, onAdd, onUpdate, onDelete, onReorder }: {
     try {
       await onUpdate(id, { title: editTitle, content: editContent });
       setEditId(null);
+      if (viewNote?.id === id) {
+        setViewNote(v => v ? { ...v, title: editTitle, content: editContent } : v);
+      }
     } catch { toast({ title: "שגיאה בעדכון", variant: "destructive" }); }
   };
 
@@ -585,158 +587,202 @@ function NotesCard({ notes, onAdd, onUpdate, onDelete, onReorder }: {
     finally { setSaving(false); }
   };
 
-  return (<>
+  return (
     <div className={SECTION_STYLE}>
+      {/* ── Header ── */}
       <div className={SECTION_HEAD}>
-        <div className={SECTION_TITLE}>
-          <div className={ICON_WRAP("bg-yellow-100")}>
-            <StickyNote className="w-4 h-4 text-yellow-600" />
-          </div>
-          פתקים
-        </div>
-      </div>
-
-      <div className="px-5 flex-1 pb-4 overflow-y-auto space-y-2">
-        {localNotes.length === 0 ? (
-          <div className="text-center py-8">
-            <BookOpen className="w-8 h-8 mx-auto mb-2 text-muted-foreground/20" />
-            <p className="text-sm text-muted-foreground">אין פתקים עדיין</p>
-          </div>
-        ) : (
-          localNotes.map(note => (
-            <div key={note.id}
-              draggable={editId !== note.id}
-              onDragStart={e => editId !== note.id && handleDragStart(e, note.id)}
-              onDragOver={e => handleDragOver(e, note.id)}
-              onDragLeave={handleDragLeave}
-              onDrop={e => handleDrop(e, note.id)}
-              onDragEnd={handleDragEnd}
-              className={cn(
-                "group rounded-xl p-3 border transition-all relative",
-                editId === note.id ? "cursor-default" : "cursor-grab active:cursor-grabbing",
-                draggedId === note.id ? "opacity-40 scale-95" : "",
-                dragOverId === note.id
-                  ? "border-primary/60 border-dashed ring-2 ring-primary/20"
-                  : "border-border/40 hover:border-border",
-              )}
-              style={{ background: note.color ? `${note.color}40` : "#fef9c340" }}
-              onClick={() => handleNoteClick(note)}>
-
-              {note.isPinned && editId !== note.id && (
-                <Pin className="w-3 h-3 text-muted-foreground absolute top-2.5 left-8 rotate-45" />
-              )}
-
-              {editId === note.id ? (
-                /* Edit mode */
-                <div className="space-y-1.5">
-                  <input
-                    ref={editRef}
-                    value={editTitle} onChange={e => setEditTitle(e.target.value)}
-                    placeholder="כותרת..."
-                    className="w-full text-sm font-semibold bg-transparent border-b border-primary outline-none pb-0.5"
-                    onKeyDown={e => e.key === "Escape" && setEditId(null)}
-                  />
-                  <textarea
-                    value={editContent} onChange={e => setEditContent(e.target.value)}
-                    rows={3}
-                    className="w-full text-xs bg-transparent border border-primary/30 rounded-lg px-2 py-1.5 outline-none resize-none focus:border-primary"
-                    onKeyDown={e => { if (e.key === "Escape") setEditId(null); }}
-                  />
-                  <div className="flex gap-2 justify-end">
-                    <button onClick={() => saveEdit(note.id)}
-                      className="text-xs px-2.5 py-1 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">
-                      שמור
-                    </button>
-                    <button onClick={() => setEditId(null)}
-                      className="text-xs px-2 py-1 rounded-lg hover:bg-muted text-muted-foreground transition-colors">
-                      ביטול
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                /* View mode */
-                <>
-                  {note.title && <p className="text-sm font-semibold mb-0.5 pr-1 line-clamp-1">{note.title}</p>}
-                  <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
-                    {note.content || <span className="italic">פתק ריק</span>}
-                  </p>
-                  {/* Drag handle + Delete — visible on hover */}
-                  <div className="absolute top-2 left-0 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity px-1.5">
-                    <GripVertical className="w-3.5 h-3.5 text-muted-foreground/50" />
-                  </div>
-                  <button
-                    onClick={e => { e.stopPropagation(); handleDelete(note.id); }}
-                    disabled={deletingId === note.id}
-                    className="absolute top-2 left-6 opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-rose-50 text-muted-foreground hover:text-rose-600 transition-all">
-                    {deletingId === note.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
-                  </button>
-                </>
-              )}
-            </div>
-          ))
-        )}
-      </div>
-
-      {/* Quick-add */}
-      <div className="border-t border-border/50 px-4 py-3 shrink-0">
-        {open ? (
-          <div className="space-y-2">
-            <Input value={noteTitle} onChange={e => setNoteTitle(e.target.value)}
-              placeholder="כותרת (אופציונלי)..." className="rounded-lg h-8 text-sm" autoFocus />
-            <div className="flex gap-2 items-start">
-              <textarea value={noteContent} onChange={e => setNoteContent(e.target.value)}
-                placeholder="תוכן הפתק..." rows={2}
-                className="flex-1 text-sm rounded-lg border border-input bg-background px-3 py-1.5 resize-none focus:outline-none focus:ring-1 focus:ring-ring" />
-              <div className="flex flex-col gap-1.5">
-                <button onClick={handleAdd} disabled={saving}
-                  className="p-1.5 rounded-lg bg-yellow-500 text-white hover:bg-yellow-600 transition-colors">
-                  {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
-                </button>
-                <button onClick={() => { setNoteTitle(""); setNoteContent(""); setOpen(false); }} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground transition-colors text-xs">ביטול</button>
-              </div>
-            </div>
-          </div>
-        ) : (
-          <button onClick={() => setOpen(true)}
-            className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-yellow-600 transition-colors w-full">
-            <Plus className="w-4 h-4" /> כתוב פתק חדש
-          </button>
-        )}
-      </div>
-    </div>
-
-    {/* ── View dialog ── */}
-    <Dialog open={!!viewNote} onOpenChange={o => !o && setViewNote(null)}>
-      <DialogContent
-        dir="rtl"
-        className="max-w-sm rounded-2xl p-0 overflow-hidden gap-0 [&>button]:hidden"
-        style={{ background: viewNote?.color ? `${viewNote.color}30` : "#fef9c330" }}>
-        <div className="flex items-start justify-between px-5 pt-5 pb-3 border-b border-border/30">
-          <div className="flex-1 min-w-0">
-            {viewNote?.title
-              ? <h2 className="text-base font-bold leading-tight">{viewNote.title}</h2>
-              : <h2 className="text-base font-bold text-muted-foreground italic">פתק</h2>}
-          </div>
-          <div className="flex items-center gap-1 shrink-0 mr-3">
-            <button
-              onClick={() => { const n = viewNote!; setViewNote(null); setTimeout(() => openEdit(n), 50); }}
-              className="p-1.5 rounded-lg hover:bg-black/5 text-muted-foreground hover:text-foreground transition-colors">
-              <Pencil className="w-4 h-4" />
-            </button>
+        {viewNote ? (
+          <div className="flex items-center gap-2 w-full min-w-0">
             <button
               onClick={() => setViewNote(null)}
-              className="p-1.5 rounded-lg hover:bg-black/5 text-muted-foreground hover:text-foreground transition-colors">
-              <X className="w-4 h-4" />
+              className="p-1 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors shrink-0">
+              <ChevronRight className="w-4 h-4" />
             </button>
+            <span className="text-sm font-semibold truncate">
+              {viewNote.title || "פתק"}
+            </span>
           </div>
-        </div>
-        <div className="px-5 py-4 max-h-[60vh] overflow-y-auto">
-          <p className="text-sm leading-relaxed whitespace-pre-wrap text-foreground">
-            {viewNote?.content || <span className="italic text-muted-foreground">פתק ריק</span>}
-          </p>
-        </div>
-      </DialogContent>
-    </Dialog>
-    </>
+        ) : (
+          <div className={SECTION_TITLE}>
+            <div className={ICON_WRAP("bg-yellow-100")}>
+              <StickyNote className="w-4 h-4 text-yellow-600" />
+            </div>
+            פתקים
+          </div>
+        )}
+      </div>
+
+      {viewNote ? (
+        /* ── Inline note view ── */
+        <>
+          <div
+            className="flex-1 overflow-y-auto px-5 py-4"
+            style={{ background: viewNote.color ? `${viewNote.color}20` : undefined }}>
+            {editId === viewNote.id ? (
+              <div className="space-y-2">
+                <input
+                  ref={editRef}
+                  value={editTitle} onChange={e => setEditTitle(e.target.value)}
+                  placeholder="כותרת..."
+                  className="w-full text-sm font-semibold bg-transparent border-b border-primary outline-none pb-1"
+                  onKeyDown={e => e.key === "Escape" && setEditId(null)}
+                />
+                <textarea
+                  value={editContent} onChange={e => setEditContent(e.target.value)}
+                  rows={10}
+                  className="w-full text-sm bg-transparent border border-primary/30 rounded-lg px-3 py-2 outline-none resize-none focus:border-primary leading-relaxed"
+                  onKeyDown={e => { if (e.key === "Escape") setEditId(null); }}
+                />
+              </div>
+            ) : (
+              <p className="text-sm leading-relaxed whitespace-pre-wrap text-foreground">
+                {viewNote.content || <span className="italic text-muted-foreground">פתק ריק</span>}
+              </p>
+            )}
+          </div>
+
+          <div className="border-t border-border/50 px-4 py-3 shrink-0 flex items-center gap-2">
+            {editId === viewNote.id ? (
+              <>
+                <button onClick={() => saveEdit(viewNote.id)}
+                  className="flex-1 text-sm py-1.5 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">
+                  שמור
+                </button>
+                <button onClick={() => setEditId(null)}
+                  className="text-sm px-3 py-1.5 rounded-lg hover:bg-muted text-muted-foreground transition-colors">
+                  ביטול
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  onClick={() => openEdit(viewNote)}
+                  className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors px-2 py-1.5 rounded-lg hover:bg-muted">
+                  <Pencil className="w-3.5 h-3.5" /> ערוך
+                </button>
+                <button
+                  onClick={() => { handleDelete(viewNote.id); setViewNote(null); }}
+                  disabled={deletingId === viewNote.id}
+                  className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-rose-600 transition-colors px-2 py-1.5 rounded-lg hover:bg-rose-50 mr-auto">
+                  {deletingId === viewNote.id
+                    ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    : <Trash2 className="w-3.5 h-3.5" />}
+                  מחק
+                </button>
+              </>
+            )}
+          </div>
+        </>
+      ) : (
+        /* ── Notes list ── */
+        <>
+          <div className="px-5 flex-1 pb-4 overflow-y-auto space-y-2">
+            {localNotes.length === 0 ? (
+              <div className="text-center py-8">
+                <BookOpen className="w-8 h-8 mx-auto mb-2 text-muted-foreground/20" />
+                <p className="text-sm text-muted-foreground">אין פתקים עדיין</p>
+              </div>
+            ) : (
+              localNotes.map(note => (
+                <div key={note.id}
+                  draggable={editId !== note.id}
+                  onDragStart={e => editId !== note.id && handleDragStart(e, note.id)}
+                  onDragOver={e => handleDragOver(e, note.id)}
+                  onDragLeave={handleDragLeave}
+                  onDrop={e => handleDrop(e, note.id)}
+                  onDragEnd={handleDragEnd}
+                  className={cn(
+                    "group rounded-xl p-3 border transition-all relative",
+                    editId === note.id ? "cursor-default" : "cursor-pointer",
+                    draggedId === note.id ? "opacity-40 scale-95" : "",
+                    dragOverId === note.id
+                      ? "border-primary/60 border-dashed ring-2 ring-primary/20"
+                      : "border-border/40 hover:border-border",
+                  )}
+                  style={{ background: note.color ? `${note.color}40` : "#fef9c340" }}
+                  onClick={() => handleNoteClick(note)}>
+
+                  {note.isPinned && (
+                    <Pin className="w-3 h-3 text-muted-foreground absolute top-2.5 left-8 rotate-45" />
+                  )}
+
+                  {editId === note.id ? (
+                    <div className="space-y-1.5" onClick={e => e.stopPropagation()}>
+                      <input
+                        ref={editRef}
+                        value={editTitle} onChange={e => setEditTitle(e.target.value)}
+                        placeholder="כותרת..."
+                        className="w-full text-sm font-semibold bg-transparent border-b border-primary outline-none pb-0.5"
+                        onKeyDown={e => e.key === "Escape" && setEditId(null)}
+                      />
+                      <textarea
+                        value={editContent} onChange={e => setEditContent(e.target.value)}
+                        rows={3}
+                        className="w-full text-xs bg-transparent border border-primary/30 rounded-lg px-2 py-1.5 outline-none resize-none focus:border-primary"
+                        onKeyDown={e => { if (e.key === "Escape") setEditId(null); }}
+                      />
+                      <div className="flex gap-2 justify-end">
+                        <button onClick={() => saveEdit(note.id)}
+                          className="text-xs px-2.5 py-1 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">
+                          שמור
+                        </button>
+                        <button onClick={() => setEditId(null)}
+                          className="text-xs px-2 py-1 rounded-lg hover:bg-muted text-muted-foreground transition-colors">
+                          ביטול
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      {note.title && <p className="text-sm font-semibold mb-0.5 pr-1 line-clamp-1">{note.title}</p>}
+                      <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
+                        {note.content || <span className="italic">פתק ריק</span>}
+                      </p>
+                      <div className="absolute top-2 left-0 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity px-1.5">
+                        <GripVertical className="w-3.5 h-3.5 text-muted-foreground/50" />
+                      </div>
+                      <button
+                        onClick={e => { e.stopPropagation(); handleDelete(note.id); }}
+                        disabled={deletingId === note.id}
+                        className="absolute top-2 left-6 opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-rose-50 text-muted-foreground hover:text-rose-600 transition-all">
+                        {deletingId === note.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                      </button>
+                    </>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* Quick-add */}
+          <div className="border-t border-border/50 px-4 py-3 shrink-0">
+            {open ? (
+              <div className="space-y-2">
+                <Input value={noteTitle} onChange={e => setNoteTitle(e.target.value)}
+                  placeholder="כותרת (אופציונלי)..." className="rounded-lg h-8 text-sm" autoFocus />
+                <div className="flex gap-2 items-start">
+                  <textarea value={noteContent} onChange={e => setNoteContent(e.target.value)}
+                    placeholder="תוכן הפתק..." rows={2}
+                    className="flex-1 text-sm rounded-lg border border-input bg-background px-3 py-1.5 resize-none focus:outline-none focus:ring-1 focus:ring-ring" />
+                  <div className="flex flex-col gap-1.5">
+                    <button onClick={handleAdd} disabled={saving}
+                      className="p-1.5 rounded-lg bg-yellow-500 text-white hover:bg-yellow-600 transition-colors">
+                      {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                    </button>
+                    <button onClick={() => { setNoteTitle(""); setNoteContent(""); setOpen(false); }}
+                      className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground transition-colors text-xs">ביטול</button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <button onClick={() => setOpen(true)}
+                className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-yellow-600 transition-colors w-full">
+                <Plus className="w-4 h-4" /> כתוב פתק חדש
+              </button>
+            )}
+          </div>
+        </>
+      )}
+    </div>
   );
 }
