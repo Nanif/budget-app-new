@@ -326,18 +326,18 @@ function DebtsCard({ debts, onAdd, onUpdate, onDelete }: {
                               {d.notes}
                             </p>
                           )}
-                          {!d.notes && (
-                            <p className="text-xs text-muted-foreground/30 mt-0.5 hidden group-hover:block"
-                              onDoubleClick={e => { e.stopPropagation(); startInlineEdit(d, "notes"); }}>
-                              הוסף הערה...
-                            </p>
-                          )}
                         </div>
                         <span className="font-semibold tabular-nums text-sm shrink-0 cursor-text"
                           onDoubleClick={() => startInlineEdit(d, "amt")}
                           style={{ color: d.type === "i_owe" ? "var(--color-rose-600, #e11d48)" : "var(--color-emerald-600, #059669)" }}>
                           {fmt(d.remainingAmount)}
                         </span>
+                        <button
+                          onClick={() => handleDelete(d.id)}
+                          disabled={deletingId === d.id}
+                          className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:text-rose-600 text-muted-foreground/50 transition-all shrink-0">
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
                       </div>
                     )}
                   </div>
