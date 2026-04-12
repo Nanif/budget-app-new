@@ -5,6 +5,7 @@ import { useBudgetYear } from "@/contexts/BudgetYearContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { apiFetch } from "@/lib/api";
@@ -26,7 +27,7 @@ import {
 /* ═══════════════════════════════════════════════════════════
    TYPES
 ═══════════════════════════════════════════════════════════ */
-type BudgetYear = { id: number; name: string; totalBudget: number; tithePercentage: number };
+type BudgetYear = { id: number; name: string; totalBudget: number; tithePercentage: number; notes?: string | null };
 type FixedItem = { id: number; fundId: number; name: string; monthlyAmount: number; notes: string; displayOrder: number };
 type FixedItemsData = { fund: Fund | null; items: FixedItem[]; totals: { monthly: number; annual: number } };
 type Fund = {
@@ -151,7 +152,7 @@ export default function Budget() {
 
   /* ── year edit ───────────────────────────────────────────── */
   const [yearEdit,   setYearEdit]   = useState(false);
-  const [yearForm,   setYearForm]   = useState({ name: "", tithePercentage: "" });
+  const [yearForm,   setYearForm]   = useState({ name: "", tithePercentage: "", notes: "" });
   const [yearSaving, setYearSaving] = useState(false);
 
   /* ── fund dialog ─────────────────────────────────────────── */
@@ -227,7 +228,7 @@ export default function Budget() {
   /* ── year edit helpers ───────────────────────────────────── */
   const openYearEdit = () => {
     if (!year) return;
-    setYearForm({ name: year.name, tithePercentage: String(year.tithePercentage) });
+    setYearForm({ name: year.name, tithePercentage: String(year.tithePercentage), notes: year.notes || "" });
     setYearEdit(true);
   };
   const saveYear = async () => {
@@ -238,6 +239,7 @@ export default function Budget() {
         body: JSON.stringify({
           name: yearForm.name,
           tithePercentage: parseFloat(yearForm.tithePercentage) || 0,
+          notes: yearForm.notes || "",
         }),
       });
       setYear(updated); setYearEdit(false);
@@ -346,6 +348,13 @@ export default function Budget() {
         </Button>
       </PageHeader>
 
+      {!loading && year?.notes && (
+        <div className="flex gap-2.5 items-start bg-amber-50 border border-amber-200/70 rounded-2xl px-4 py-3 text-amber-900">
+          <span className="text-amber-500 mt-0.5 shrink-0 text-base leading-none">📝</span>
+          <p className="text-sm leading-relaxed whitespace-pre-wrap">{year.notes}</p>
+        </div>
+      )}
+
       {loading ? (
         <div className="space-y-4">
           {[1, 2, 3].map(i => <div key={i} className="h-36 bg-muted animate-pulse rounded-2xl" />)}
@@ -421,6 +430,16 @@ export default function Budget() {
               <Input type="number" dir="ltr" value={yearForm.tithePercentage}
                 onChange={e => setYearForm(p => ({ ...p, tithePercentage: e.target.value }))}
                 placeholder="10" className="rounded-xl" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="font-semibold">הערה / מילות הסבר</Label>
+              <Textarea
+                value={yearForm.notes}
+                onChange={e => setYearForm(p => ({ ...p, notes: e.target.value }))}
+                placeholder="לדוגמה: שנה חריגה, שינויים בהכנסות, מטרות מיוחדות..."
+                className="rounded-xl resize-none min-h-[80px]"
+                rows={3}
+              />
             </div>
           </div>
           <DialogFooter className="gap-2">

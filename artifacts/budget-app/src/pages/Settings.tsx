@@ -5,6 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { Textarea } from "@/components/ui/textarea";
 import { Tag, Plus, Pencil, Trash2, Check, X, Loader2, CalendarRange } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { apiFetch } from "@/lib/api";
@@ -57,6 +58,7 @@ function BudgetYearsSection() {
     startDate: `${nextYear}-01-01`,
     endDate:   `${nextYear}-12-31`,
     tithePercentage: "10",
+    notes: "",
   });
 
   const handleCreate = async () => {
@@ -71,11 +73,12 @@ function BudgetYearsSection() {
         startDate: createForm.startDate,
         endDate:   createForm.endDate,
         tithePercentage: createForm.tithePercentage || "10",
+        notes: createForm.notes || "",
         isActive: false,
       });
       toast({ title: "שנת תקציב נוצרה", description: createForm.name });
       setShowCreate(false);
-      setCreateForm({ name: `שנת תקציב ${nextYear}`, startDate: `${nextYear}-01-01`, endDate: `${nextYear}-12-31`, tithePercentage: "10" });
+      setCreateForm({ name: `שנת תקציב ${nextYear}`, startDate: `${nextYear}-01-01`, endDate: `${nextYear}-12-31`, tithePercentage: "10", notes: "" });
     } catch (e: any) {
       toast({ title: "שגיאה", description: e.message, variant: "destructive" });
     } finally { setSaving(false); }
@@ -83,7 +86,7 @@ function BudgetYearsSection() {
 
   /* edit */
   const [editTarget, setEditTarget] = useState<BudgetYear | null>(null);
-  const [editForm, setEditForm] = useState({ name: "", startDate: "", endDate: "", tithePercentage: "" });
+  const [editForm, setEditForm] = useState({ name: "", startDate: "", endDate: "", tithePercentage: "", notes: "" });
 
   const openEdit = (year: BudgetYear) => {
     setEditTarget(year);
@@ -92,6 +95,7 @@ function BudgetYearsSection() {
       startDate: year.startDate?.split("T")[0] || "",
       endDate:   year.endDate?.split("T")[0] || "",
       tithePercentage: String(year.tithePercentage || "10"),
+      notes: year.notes || "",
     });
   };
 
@@ -104,6 +108,7 @@ function BudgetYearsSection() {
         startDate: editForm.startDate,
         endDate:   editForm.endDate,
         tithePercentage: editForm.tithePercentage || "10",
+        notes: editForm.notes || "",
         isActive: editTarget.isActive,
         userId: editTarget.userId,
       });
@@ -148,6 +153,16 @@ function BudgetYearsSection() {
       <div className="space-y-1.5">
         <Label>אחוז מעשר (%)</Label>
         <Input type="number" value={form.tithePercentage} onChange={e => setForm(f => ({ ...f, tithePercentage: e.target.value }))} min={0} max={100} className="rounded-xl" dir="ltr" />
+      </div>
+      <div className="space-y-1.5">
+        <Label>הערה / מילות הסבר</Label>
+        <Textarea
+          value={form.notes}
+          onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
+          placeholder="לדוגמה: שנה חריגה, התחלנו עם חסכון של 50,000₪..."
+          className="rounded-xl resize-none min-h-[80px]"
+          rows={3}
+        />
       </div>
     </div>
   );
