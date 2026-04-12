@@ -582,6 +582,7 @@ function NotesCard({ notes, onAdd, onUpdate, onDelete, onReorder }: {
   const [editTitle, setEditTitle]   = useState("");
   const [editContent, setEditContent] = useState("");
   const editRef = useRef<HTMLInputElement>(null);
+  const isSavingRef = useRef(false);
 
   /* ── drag state ── */
   const [localNotes, setLocalNotes] = useState<Note[]>([]);
@@ -648,6 +649,8 @@ function NotesCard({ notes, onAdd, onUpdate, onDelete, onReorder }: {
     setTimeout(() => editRef.current?.focus(), 50);
   };
   const saveEdit = async (id: number) => {
+    if (isSavingRef.current) return;
+    isSavingRef.current = true;
     try {
       await onUpdate(id, { title: editTitle, content: editContent });
       setEditId(null);
@@ -655,6 +658,7 @@ function NotesCard({ notes, onAdd, onUpdate, onDelete, onReorder }: {
         setViewNote(v => v ? { ...v, title: editTitle, content: editContent } : v);
       }
     } catch { toast({ title: "שגיאה בעדכון", variant: "destructive" }); }
+    finally { isSavingRef.current = false; }
   };
 
   const handleDelete = async (id: number) => {
@@ -701,7 +705,9 @@ function NotesCard({ notes, onAdd, onUpdate, onDelete, onReorder }: {
 
       {viewNote ? (
         /* ── Inline note edit/view ── */
-        <div className="flex-1 overflow-y-auto px-5 py-4">
+        <div className="flex-1 overflow-y-auto px-5 py-4"
+          onMouseDown={e => e.stopPropagation()}
+          onClick={e => e.stopPropagation()}>
           <div className="flex flex-col gap-3">
             {/* Title */}
             <input
@@ -710,6 +716,7 @@ function NotesCard({ notes, onAdd, onUpdate, onDelete, onReorder }: {
               onChange={e => setEditTitle(e.target.value)}
               placeholder="כותרת..."
               className="w-full text-sm font-bold bg-transparent border-b border-border/50 focus:border-primary outline-none pb-1 transition-colors"
+              onBlur={() => saveEdit(viewNote.id)}
             />
             {/* Content */}
             <textarea
@@ -718,20 +725,24 @@ function NotesCard({ notes, onAdd, onUpdate, onDelete, onReorder }: {
               rows={Math.max(4, (editContent.match(/\n/g) || []).length + 3)}
               placeholder="תוכן הפתק..."
               className="w-full text-sm bg-transparent outline-none resize-none leading-relaxed text-foreground placeholder:text-muted-foreground/50"
+              onBlur={() => saveEdit(viewNote.id)}
             />
             {/* Action buttons — right below the content */}
             <div className="flex items-center gap-2 pt-2 border-t border-border/30">
               <button
+                onMouseDown={e => e.preventDefault()}
                 onClick={() => saveEdit(viewNote.id)}
                 className="text-sm px-4 py-1.5 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">
                 שמור
               </button>
               <button
+                onMouseDown={e => e.preventDefault()}
                 onClick={() => { setViewNote(null); setEditId(null); }}
                 className="text-sm px-3 py-1.5 rounded-lg hover:bg-muted text-muted-foreground transition-colors">
                 ביטול
               </button>
               <button
+                onMouseDown={e => e.preventDefault()}
                 onClick={() => { handleDelete(viewNote.id); setViewNote(null); }}
                 disabled={deletingId === viewNote.id}
                 className="flex items-center gap-1 text-sm text-muted-foreground hover:text-rose-600 transition-colors px-2 py-1.5 rounded-lg hover:bg-rose-50 mr-auto">
@@ -777,26 +788,30 @@ function NotesCard({ notes, onAdd, onUpdate, onDelete, onReorder }: {
                   )}
 
                   {editId === note.id ? (
-                    <div className="space-y-1.5" onClick={e => e.stopPropagation()}>
+                    <div className="space-y-1.5"
+                      onClick={e => e.stopPropagation()}
+                      onMouseDown={e => e.stopPropagation()}>
                       <input
                         ref={editRef}
                         value={editTitle} onChange={e => setEditTitle(e.target.value)}
                         placeholder="כותרת..."
                         className="w-full text-sm font-semibold bg-transparent border-b border-primary outline-none pb-0.5"
                         onKeyDown={e => e.key === "Escape" && setEditId(null)}
+                        onBlur={() => saveEdit(note.id)}
                       />
                       <textarea
                         value={editContent} onChange={e => setEditContent(e.target.value)}
                         rows={3}
                         className="w-full text-xs bg-transparent border border-primary/30 rounded-lg px-2 py-1.5 outline-none resize-none focus:border-primary"
                         onKeyDown={e => { if (e.key === "Escape") setEditId(null); }}
+                        onBlur={() => saveEdit(note.id)}
                       />
                       <div className="flex gap-2 justify-end">
-                        <button onClick={() => saveEdit(note.id)}
+                        <button onMouseDown={e => e.preventDefault()} onClick={() => saveEdit(note.id)}
                           className="text-xs px-2.5 py-1 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">
                           שמור
                         </button>
-                        <button onClick={() => setEditId(null)}
+                        <button onMouseDown={e => e.preventDefault()} onClick={() => setEditId(null)}
                           className="text-xs px-2 py-1 rounded-lg hover:bg-muted text-muted-foreground transition-colors">
                           ביטול
                         </button>
