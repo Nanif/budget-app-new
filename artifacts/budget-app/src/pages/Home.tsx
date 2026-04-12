@@ -8,13 +8,13 @@ import { apiFetch } from "@/lib/api";
 import {
   CreditCard, CheckSquare, StickyNote,
   Plus, Check, Loader2, Trash2,
-  TrendingUp, TrendingDown, Pin, BookOpen, Sun,
+  TrendingUp, TrendingDown, Pin, BookOpen, Sun, GripVertical,
 } from "lucide-react";
 
 /* ── Types ─────────────────────────────────────────────────── */
 type Debt = { id: number; name: string; type: string; remainingAmount: number; dueDate: string | null; status: string; notes: string };
 type Task = { id: number; title: string; priority: string; status: string; dueDate: string | null };
-type Note = { id: number; title: string; content: string; color: string; isPinned: boolean; tabId: number | null };
+type Note = { id: number; title: string; content: string; color: string; isPinned: boolean; tabId: number | null; sortOrder: number };
 
 /* ── Helpers ────────────────────────────────────────────────── */
 function fmt(n: number) {
@@ -108,6 +108,13 @@ export default function Home() {
     await apiFetch(`/notes/${id}`, { method: "DELETE" });
     setNotes(prev => prev.filter(n => n.id !== id));
   };
+  const reorderNotes = async (items: { id: number; sortOrder: number }[]) => {
+    setNotes(prev => prev.map(n => {
+      const item = items.find(i => i.id === n.id);
+      return item ? { ...n, sortOrder: item.sortOrder } : n;
+    }));
+    await apiFetch("/notes/reorder", { method: "PATCH", body: JSON.stringify(items) });
+  };
 
   if (loading) {
     return (
@@ -142,6 +149,7 @@ export default function Home() {
         onAdd={addNote}
         onUpdate={updateNote}
         onDelete={deleteNote}
+        onReorder={reorderNotes}
       />
       </div>
     </div>
@@ -470,11 +478,12 @@ function RemindersCard({ tasks, onAdd, onToggle, onUpdate, onDelete }: {
 /* ─────────────────────────────────────────────────────────────
    CARD 3: פתקים
 ───────────────────────────────────────────────────────────── */
-function NotesCard({ notes, onAdd, onUpdate, onDelete }: {
+function NotesCard({ notes, onAdd, onUpdate, onDelete, onReorder }: {
   notes: Note[];
   onAdd: (title: string, content: string) => Promise<void>;
   onUpdate: (id: number, data: Partial<Note>) => Promise<void>;
   onDelete: (id: number) => Promise<void>;
+  onReorder: (items: { id: number; sortOrder: number }[]) => Promise<void>;
 }) {
   const { toast } = useToast();
   const [open, setOpen]           = useState(false);
@@ -488,10 +497,50 @@ function NotesCard({ notes, onAdd, onUpdate, onDelete }: {
   const [editContent, setEditContent] = useState("");
   const editRef = useRef<HTMLInputElement>(null);
 
-  const sorted = [...notes].sort((a, b) => {
-    if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1;
-    return 0;
-  });
+  /* ── drag state ── */
+  const [localNotes, setLocalNotes] = useState<Note[]>([]);
+  const [draggedId, setDraggedId]   = useState<number | null>(null);
+  const [dragOverId, setDragOverId] = useState<number | null>(null);
+
+  useEffect(() => {
+    setLocalNotes([...notes].sort((a, b) => {
+      if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1;
+      return (a.sortOrder ?? 0) - (b.sortOrder ?? 0);
+    }));
+  }, [notes]);
+
+  const handleDragStart = (e: React.DragEvent, id: number) => {
+    setDraggedId(id);
+    e.dataTransfer.effectAllowed = "move";
+  };
+  const handleDragOver = (e: React.DragEvent, id: number) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    if (id !== draggedId) setDragOverId(id);
+  };
+  const handleDragLeave = (e: React.DragEvent) => {
+    if (!(e.currentTarget as HTMLElement).contains(e.relatedTarget as Node)) {
+      setDragOverId(null);
+    }
+  };
+  const handleDrop = (e: React.DragEvent, targetId: number) => {
+    e.preventDefault();
+    if (!draggedId || draggedId === targetId) { setDraggedId(null); setDragOverId(null); return; }
+    const from = localNotes.findIndex(n => n.id === draggedId);
+    const to   = localNotes.findIndex(n => n.id === targetId);
+    if (from < 0 || to < 0) return;
+    const reordered = [...localNotes];
+    const [moved] = reordered.splice(from, 1);
+    reordered.splice(to, 0, moved);
+    const withOrder = reordered.map((n, i) => ({ ...n, sortOrder: i }));
+    setLocalNotes(withOrder);
+    setDraggedId(null);
+    setDragOverId(null);
+    onReorder(withOrder.map(n => ({ id: n.id, sortOrder: n.sortOrder }))).catch(() =>
+      toast({ title: "שגיאה בשמירת סדר", variant: "destructive" })
+    );
+  };
+  const handleDragEnd = () => { setDraggedId(null); setDragOverId(null); };
 
   const openEdit = (n: Note) => {
     setEditId(n.id); setEditTitle(n.title || ""); setEditContent(n.content || "");
@@ -533,20 +582,33 @@ function NotesCard({ notes, onAdd, onUpdate, onDelete }: {
       </div>
 
       <div className="px-5 flex-1 pb-4 overflow-y-auto space-y-2">
-        {sorted.length === 0 ? (
+        {localNotes.length === 0 ? (
           <div className="text-center py-8">
             <BookOpen className="w-8 h-8 mx-auto mb-2 text-muted-foreground/20" />
             <p className="text-sm text-muted-foreground">אין פתקים עדיין</p>
           </div>
         ) : (
-          sorted.map(note => (
+          localNotes.map(note => (
             <div key={note.id}
-              className="group rounded-xl p-3 border border-border/40 hover:border-border transition-colors relative cursor-default"
+              draggable={editId !== note.id}
+              onDragStart={e => editId !== note.id && handleDragStart(e, note.id)}
+              onDragOver={e => handleDragOver(e, note.id)}
+              onDragLeave={handleDragLeave}
+              onDrop={e => handleDrop(e, note.id)}
+              onDragEnd={handleDragEnd}
+              className={cn(
+                "group rounded-xl p-3 border transition-all relative",
+                editId === note.id ? "cursor-default" : "cursor-grab active:cursor-grabbing",
+                draggedId === note.id ? "opacity-40 scale-95" : "",
+                dragOverId === note.id
+                  ? "border-primary/60 border-dashed ring-2 ring-primary/20"
+                  : "border-border/40 hover:border-border",
+              )}
               style={{ background: note.color ? `${note.color}40` : "#fef9c340" }}
               onDoubleClick={() => editId !== note.id && openEdit(note)}>
 
               {note.isPinned && editId !== note.id && (
-                <Pin className="w-3 h-3 text-muted-foreground absolute top-2.5 left-2.5 rotate-45" />
+                <Pin className="w-3 h-3 text-muted-foreground absolute top-2.5 left-8 rotate-45" />
               )}
 
               {editId === note.id ? (
@@ -583,10 +645,14 @@ function NotesCard({ notes, onAdd, onUpdate, onDelete }: {
                   <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
                     {note.content || <span className="italic">פתק ריק</span>}
                   </p>
-                  {/* Delete — visible on hover */}
+                  {/* Drag handle + Delete — visible on hover */}
+                  <div className="absolute top-2 left-0 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity px-1.5">
+                    <GripVertical className="w-3.5 h-3.5 text-muted-foreground/50" />
+                  </div>
                   <button
-                    onClick={() => handleDelete(note.id)} disabled={deletingId === note.id}
-                    className="absolute top-2 left-2 opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-rose-50 text-muted-foreground hover:text-rose-600 transition-all">
+                    onClick={e => { e.stopPropagation(); handleDelete(note.id); }}
+                    disabled={deletingId === note.id}
+                    className="absolute top-2 left-6 opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-rose-50 text-muted-foreground hover:text-rose-600 transition-all">
                     {deletingId === note.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
                   </button>
                 </>

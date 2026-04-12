@@ -25,7 +25,7 @@ router.get("/", async (req, res) => {
       .from(notesTable)
       .leftJoin(noteTabsTable, eq(notesTable.tabId, noteTabsTable.id))
       .where(eq(notesTable.userId, DEFAULT_USER_ID))
-      .orderBy(desc(notesTable.isPinned), desc(notesTable.updatedAt));
+      .orderBy(desc(notesTable.isPinned), notesTable.sortOrder, desc(notesTable.updatedAt));
     res.json(rows);
   } catch (err) {
     req.log.error({ err }, "Failed to get notes");
@@ -43,6 +43,23 @@ router.post("/", async (req, res) => {
   } catch (err) {
     req.log.error({ err }, "Failed to create note");
     res.status(500).json({ error: "Failed to create note" });
+  }
+});
+
+router.patch("/reorder", async (req, res) => {
+  try {
+    const items: { id: number; sortOrder: number }[] = req.body;
+    if (!Array.isArray(items)) { res.status(400).json({ error: "Expected array" }); return; }
+    await Promise.all(
+      items.map(({ id, sortOrder }) =>
+        db.update(notesTable).set({ sortOrder })
+          .where(and(eq(notesTable.id, id), eq(notesTable.userId, DEFAULT_USER_ID)))
+      )
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    req.log.error({ err }, "Failed to reorder notes");
+    res.status(500).json({ error: "Failed to reorder notes" });
   }
 });
 
