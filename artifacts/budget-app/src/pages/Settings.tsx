@@ -7,10 +7,6 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { Tag, Plus, Pencil, Trash2, Check, X, Loader2, CalendarRange } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { apiFetch } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { useBudgetYear, BudgetYear } from "@/contexts/BudgetYearContext";
@@ -249,28 +245,31 @@ function BudgetYearsSection() {
       </Dialog>
 
       {/* Delete confirm */}
-      <AlertDialog open={!!deleteTarget} onOpenChange={v => !v && setDeleteTarget(null)}>
-        <AlertDialogContent dir="rtl">
-          <AlertDialogHeader>
-            <AlertDialogTitle>מחיקת שנת תקציב</AlertDialogTitle>
-            <AlertDialogDescription>
-              האם למחוק את "{deleteTarget?.name}"?<br />
-              הנתונים המשויכים לשנה זו (הכנסות, הוצאות, מעשרות) לא יימחקו.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>ביטול</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+      <Dialog open={!!deleteTarget} onOpenChange={v => !v && setDeleteTarget(null)}>
+        <DialogContent dir="rtl" className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>מחיקת שנת תקציב</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            האם למחוק את &quot;{deleteTarget?.name}&quot;?<br />
+            הנתונים המשויכים לשנה זו (הכנסות, הוצאות, מעשרות) לא יימחקו.
+          </p>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setDeleteTarget(null)} disabled={deleting}>
+              ביטול
+            </Button>
+            <Button
+              variant="destructive"
               onClick={handleDelete}
               disabled={deleting}
+              tabIndex={-1}
             >
               {deleting && <Loader2 className="w-4 h-4 ml-2 animate-spin" />}
               מחק
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
