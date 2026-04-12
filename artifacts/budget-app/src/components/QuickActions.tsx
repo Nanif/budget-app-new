@@ -294,9 +294,11 @@ export function QuickActions() {
   ═══════════════════════════════════════════════════════ */
   return (
     <>
-      {/* ── Side bar — fixed left ─────────────────────────── */}
+      {/* ── Bottom bar on mobile, left sidebar on md+ ─────── */}
       <div
-        className="fixed left-0 top-1/2 -translate-y-1/2 z-40 flex flex-col gap-1 p-1.5 bg-card/95 backdrop-blur-sm border border-border/60 rounded-r-2xl shadow-lg max-h-[90vh] overflow-y-auto"
+        className="fixed z-40 bg-card/95 backdrop-blur-sm border border-border/60 shadow-lg
+          bottom-0 left-0 right-0 flex flex-row justify-around items-center gap-1 p-1.5 border-t rounded-none
+          md:bottom-auto md:right-auto md:left-0 md:top-1/2 md:-translate-y-1/2 md:flex-col md:rounded-r-2xl md:rounded-l-none md:border md:border-t md:w-auto"
         dir="rtl"
       >
         {ACTIONS.map(action => {
@@ -306,17 +308,17 @@ export function QuickActions() {
               key={action.id}
               onClick={() => setActiveDialog(action.id)}
               className={cn(
-                "flex flex-col items-center gap-0.5 w-12 py-2 rounded-xl transition-all active:scale-95 group",
+                "flex flex-col items-center gap-0.5 flex-1 md:flex-none md:w-12 py-2 px-1 rounded-xl transition-all active:scale-95 group",
                 action.hoverBg
               )}
             >
               <div className={cn(
-                "w-8 h-8 rounded-xl flex items-center justify-center text-white shadow-sm transition-transform group-hover:scale-110",
+                "w-9 h-9 rounded-xl flex items-center justify-center text-white shadow-sm transition-transform group-hover:scale-110",
                 action.color
               )}>
-                <Icon className="w-4 h-4" />
+                <Icon className="w-4.5 h-4.5" />
               </div>
-              <span className={cn("text-[9px] font-semibold leading-tight transition-colors text-center", action.iconText)}>
+              <span className={cn("text-[10px] font-semibold leading-tight transition-colors text-center", action.iconText)}>
                 {action.label}
               </span>
             </button>
