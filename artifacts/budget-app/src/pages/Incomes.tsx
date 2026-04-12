@@ -411,12 +411,10 @@ export default function Incomes() {
           {/* Header */}
           <div
             className="grid text-xs font-bold text-muted-foreground uppercase tracking-wider px-4 py-3 border-b border-border/50 bg-muted/30"
-            style={{ gridTemplateColumns: "100px 1fr 80px 60px 110px 1fr 72px", columnGap: "16px" }}
+            style={{ gridTemplateColumns: "100px 1fr 110px 1fr 72px", columnGap: "16px" }}
           >
             <span>תאריך</span>
             <span>שם</span>
-            <span>חודש</span>
-            <span>שנה</span>
             <span className="text-left" dir="ltr">סכום</span>
             <span>הערה</span>
             <span className="text-center">פעולות</span>
@@ -465,13 +463,10 @@ export default function Incomes() {
           {/* Footer */}
           <div
             className="grid items-center px-4 py-3 border-t border-border/50 bg-muted/20 text-sm"
-            style={{ gridTemplateColumns: "100px 1fr 120px 80px 60px 110px 1fr 72px", columnGap: "16px" }}
+            style={{ gridTemplateColumns: "100px 1fr 110px 1fr 72px", columnGap: "16px" }}
           >
             <span className="text-muted-foreground font-medium">{filtered.length} רשומות</span>
             <span />
-            <span />
-            <span />
-            <span className="font-bold text-xs text-muted-foreground">סה״כ</span>
             <div dir="ltr">
               <div className="text-emerald-600 font-bold tabular-nums">+{fmt(filteredIncomeTotal)}</div>
               {filteredDeductTotal > 0 && (
@@ -569,7 +564,7 @@ function IncomeRow({ entry, onEdit, onDelete }: {
   return (
     <div
       className="grid items-center px-4 py-3 border-b border-border/30 hover:bg-muted/20 transition-colors group text-sm"
-      style={{ gridTemplateColumns: "100px 1fr 80px 60px 110px 1fr 72px", columnGap: "16px" }}
+      style={{ gridTemplateColumns: "100px 1fr 110px 1fr 72px", columnGap: "16px" }}
     >
       {/* תאריך */}
       <span className="text-muted-foreground text-xs tabular-nums">{fmtDate(entry.date)}</span>
@@ -585,12 +580,6 @@ function IncomeRow({ entry, onEdit, onDelete }: {
           <span className="text-[10px] text-rose-400/80 shrink-0">ניכוי</span>
         )}
       </div>
-
-      {/* חודש */}
-      <span className="text-muted-foreground text-xs">{MONTH_HE[d.getMonth()]}</span>
-
-      {/* שנה */}
-      <span className="text-muted-foreground text-xs tabular-nums">{d.getFullYear()}</span>
 
       {/* סכום */}
       <span
