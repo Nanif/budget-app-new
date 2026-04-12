@@ -17,6 +17,43 @@ type Category = {
   id: number; name: string; color: string; type: string; isSystem: boolean; isActive: boolean;
 };
 
+type YearForm = { name: string; startDate: string; endDate: string; tithePercentage: string; notes: string };
+
+function YearFormFields({ form, setForm }: { form: YearForm; setForm: React.Dispatch<React.SetStateAction<YearForm>> }) {
+  return (
+    <div className="space-y-4 py-2">
+      <div className="space-y-1.5">
+        <Label>שם השנה</Label>
+        <Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="לדוגמה: שנת תקציב 2027" className="rounded-xl" />
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-1.5">
+          <Label>תאריך התחלה</Label>
+          <Input type="date" value={form.startDate} onChange={e => setForm(f => ({ ...f, startDate: e.target.value }))} className="rounded-xl" />
+        </div>
+        <div className="space-y-1.5">
+          <Label>תאריך סיום</Label>
+          <Input type="date" value={form.endDate} onChange={e => setForm(f => ({ ...f, endDate: e.target.value }))} className="rounded-xl" />
+        </div>
+      </div>
+      <div className="space-y-1.5">
+        <Label>אחוז מעשר (%)</Label>
+        <Input type="number" value={form.tithePercentage} onChange={e => setForm(f => ({ ...f, tithePercentage: e.target.value }))} min={0} max={100} className="rounded-xl" dir="ltr" />
+      </div>
+      <div className="space-y-1.5">
+        <Label>הערה / מילות הסבר</Label>
+        <Textarea
+          value={form.notes}
+          onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
+          placeholder="לדוגמה: שנה חריגה, התחלנו עם חסכון של 50,000₪..."
+          className="rounded-xl resize-none min-h-[80px]"
+          rows={3}
+        />
+      </div>
+    </div>
+  );
+}
+
 const COLOR_SWATCHES = [
   "#ef4444","#f97316","#f59e0b","#eab308","#84cc16","#22c55e",
   "#10b981","#14b8a6","#06b6d4","#0ea5e9","#3b82f6","#6366f1",
@@ -133,39 +170,6 @@ function BudgetYearsSection() {
       toast({ title: "שגיאה במחיקה", description: e.message, variant: "destructive" });
     } finally { setDeleting(false); }
   };
-
-  const YearFormFields = ({ form, setForm }: { form: typeof createForm; setForm: React.Dispatch<React.SetStateAction<typeof createForm>> }) => (
-    <div className="space-y-4 py-2">
-      <div className="space-y-1.5">
-        <Label>שם השנה</Label>
-        <Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="לדוגמה: שנת תקציב 2027" className="rounded-xl" />
-      </div>
-      <div className="grid grid-cols-2 gap-3">
-        <div className="space-y-1.5">
-          <Label>תאריך התחלה</Label>
-          <Input type="date" value={form.startDate} onChange={e => setForm(f => ({ ...f, startDate: e.target.value }))} className="rounded-xl" />
-        </div>
-        <div className="space-y-1.5">
-          <Label>תאריך סיום</Label>
-          <Input type="date" value={form.endDate} onChange={e => setForm(f => ({ ...f, endDate: e.target.value }))} className="rounded-xl" />
-        </div>
-      </div>
-      <div className="space-y-1.5">
-        <Label>אחוז מעשר (%)</Label>
-        <Input type="number" value={form.tithePercentage} onChange={e => setForm(f => ({ ...f, tithePercentage: e.target.value }))} min={0} max={100} className="rounded-xl" dir="ltr" />
-      </div>
-      <div className="space-y-1.5">
-        <Label>הערה / מילות הסבר</Label>
-        <Textarea
-          value={form.notes}
-          onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
-          placeholder="לדוגמה: שנה חריגה, התחלנו עם חסכון של 50,000₪..."
-          className="rounded-xl resize-none min-h-[80px]"
-          rows={3}
-        />
-      </div>
-    </div>
-  );
 
   return (
     <>
