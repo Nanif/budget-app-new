@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import { useBudgetYear } from "@/contexts/BudgetYearContext";
+import { AllYearsToggle } from "@/components/AllYearsToggle";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -25,8 +26,9 @@ import { RecurringPanel } from "@/components/RecurringPanel";
 type Income = {
   id: number; amount: number; description: string;
   date: string; entryType: "income" | "work_deduction";
+  yearName?: string;
 };
-type GroupBy = "none" | "month" | "type";
+type GroupBy = "none" | "month" | "type" | "year";
 
 /* ═══════════════════════════════════════════════════════════
    CONSTANTS
@@ -37,6 +39,7 @@ const GROUP_OPTIONS: { value: GroupBy; label: string }[] = [
   { value: "none",  label: "ללא קיבוץ" },
   { value: "month", label: "לפי חודש" },
   { value: "type",  label: "לפי סוג" },
+  { value: "year",  label: "לפי שנה" },
 ];
 
 /* ═══════════════════════════════════════════════════════════
@@ -103,11 +106,15 @@ function getMonth(d: string) { return String(new Date(d).getMonth() + 1); }
 ═══════════════════════════════════════════════════════════ */
 export default function Incomes() {
   const { toast } = useToast();
-  const { activeBid } = useBudgetYear();
+  const { activeBid, years } = useBudgetYear();
 
   /* ── data ────────────────────────────────────────────────── */
   const [entries,  setEntries]  = useState<Income[]>([]);
   const [loading,  setLoading]  = useState(true);
+
+  /* ── all-years mode ───────────────────────────────────────── */
+  const [allYearsMode,    setAllYearsMode]    = useState(false);
+  const [selectedYearIds, setSelectedYearIds] = useState<number[]>([]);
 
   /* ── filters ─────────────────────────────────────────────── */
   const [search,      setSearch]      = useState("");
@@ -134,15 +141,48 @@ export default function Incomes() {
   const [recurringOpen, setRecurringOpen] = useState(false);
 
   /* ── load ─────────────────────────────────────────────────── */
-  const load = async () => {
+  const load = async (opts?: { allYears?: boolean; yearIds?: number[] }) => {
+    const isAll = opts?.allYears ?? allYearsMode;
+    const ids   = opts?.yearIds  ?? selectedYearIds;
     setLoading(true);
     try {
-      const data = await apiFetch("/incomes");
-      setEntries(data.map((e: any) => ({ ...e, amount: parseFloat(e.amount) })));
+      if (isAll && ids.length > 0) {
+        const yearMap = Object.fromEntries(years.map(y => [y.id, y.name]));
+        const results = await Promise.all(ids.map(bid => apiFetch(`/incomes?bid=${bid}`)));
+        const merged  = results.flatMap((data, i) =>
+          data.map((e: any) => ({
+            ...e, amount: parseFloat(e.amount),
+            yearName: yearMap[ids[i]] ?? String(ids[i]),
+          }))
+        );
+        merged.sort((a: Income, b: Income) => (a.date < b.date ? 1 : -1));
+        setEntries(merged);
+      } else {
+        const data = await apiFetch("/incomes");
+        setEntries(data.map((e: any) => ({ ...e, amount: parseFloat(e.amount) })));
+      }
     } catch { toast({ title: "שגיאה בטעינה", variant: "destructive" }); }
     finally { setLoading(false); }
   };
   useEffect(() => { load(); }, [activeBid]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleToggleAllYears = () => {
+    if (!allYearsMode) {
+      const ids = years.map(y => y.id);
+      setAllYearsMode(true);
+      setSelectedYearIds(ids);
+      load({ allYears: true, yearIds: ids });
+    } else {
+      setAllYearsMode(false);
+      setSelectedYearIds([]);
+      load({ allYears: false });
+    }
+  };
+  const handleSelectYearIds = (ids: number[]) => {
+    setSelectedYearIds(ids);
+    if (ids.length > 0) load({ allYears: true, yearIds: ids });
+    else setEntries([]);
+  };
 
   /* ── filtered ────────────────────────────────────────────── */
   const filtered = useMemo(() => {
@@ -180,6 +220,7 @@ export default function Incomes() {
       let key = "", label = "";
       if (groupBy === "month") { key = monthKey(e.date); label = monthLabel(key); }
       if (groupBy === "type")  { key = e.entryType; label = e.entryType === "income" ? "הכנסות" : "ניכויים"; }
+      if (groupBy === "year")  { key = e.yearName ?? ""; label = e.yearName ?? "ללא שנה"; }
       if (!map[key]) map[key] = { key, label, items: [] };
       map[key].items.push(e);
     }
@@ -269,24 +310,33 @@ export default function Incomes() {
   return (
     <div className="space-y-5" dir="rtl">
       <PageHeader title="הכנסות" description="תיעוד ומעקב הכנסות וניכויי הוצאות עבודה">
-        <div className="flex gap-2">
-          <Button
-            onClick={() => setRecurringOpen(true)}
-            variant="outline"
-            className="rounded-xl gap-1.5 border-indigo-200 text-indigo-600 hover:bg-indigo-50"
-          >
-            <RefreshCw className="w-4 h-4" /> פעולות קבועות
-          </Button>
-          <Button
-            onClick={() => openAdd("work_deduction")}
-            variant="outline"
-            className="rounded-xl gap-1.5 border-rose-200 text-rose-600 hover:bg-rose-50"
-          >
-            <ArrowDownRight className="w-4 h-4" /> ניכוי עבודה
-          </Button>
-          <Button onClick={() => openAdd("income")} className="rounded-xl gap-1.5">
-            <Plus className="w-4 h-4" /> הכנסה חדשה
-          </Button>
+        <div className="flex gap-2 flex-wrap items-center">
+          <AllYearsToggle
+            years={years}
+            active={allYearsMode}
+            selectedIds={selectedYearIds}
+            onToggle={handleToggleAllYears}
+            onSelectIds={handleSelectYearIds}
+          />
+          {!allYearsMode && <>
+            <Button
+              onClick={() => setRecurringOpen(true)}
+              variant="outline"
+              className="rounded-xl gap-1.5 border-indigo-200 text-indigo-600 hover:bg-indigo-50"
+            >
+              <RefreshCw className="w-4 h-4" /> פעולות קבועות
+            </Button>
+            <Button
+              onClick={() => openAdd("work_deduction")}
+              variant="outline"
+              className="rounded-xl gap-1.5 border-rose-200 text-rose-600 hover:bg-rose-50"
+            >
+              <ArrowDownRight className="w-4 h-4" /> ניכוי עבודה
+            </Button>
+            <Button onClick={() => openAdd("income")} className="rounded-xl gap-1.5">
+              <Plus className="w-4 h-4" /> הכנסה חדשה
+            </Button>
+          </>}
         </div>
       </PageHeader>
 
@@ -411,20 +461,20 @@ export default function Incomes() {
           {/* Header */}
           <div
             className="grid text-xs font-bold text-muted-foreground uppercase tracking-wider px-4 py-3 border-b border-border/50 bg-muted/30"
-            style={{ gridTemplateColumns: "100px 1fr 110px 1fr 72px", columnGap: "16px" }}
+            style={{ gridTemplateColumns: allYearsMode ? "100px 1fr 110px 1fr 120px" : "100px 1fr 110px 1fr 72px", columnGap: "16px" }}
           >
             <span>תאריך</span>
             <span>שם</span>
             <span className="text-left" dir="ltr">סכום</span>
             <span>הערה</span>
-            <span className="text-center">פעולות</span>
+            {allYearsMode ? <span>שנה</span> : <span className="text-center">פעולות</span>}
           </div>
 
           {/* Rows */}
           <div>
             {groupBy === "none" ? (
               grouped[0]?.items.map(e => (
-                <IncomeRow key={e.id} entry={e}
+                <IncomeRow key={e.id} entry={e} allYearsMode={allYearsMode}
                   onEdit={() => openEdit(e)} onDelete={() => setDeleteId(e.id)} />
               ))
             ) : (
@@ -452,7 +502,7 @@ export default function Incomes() {
                     </span>
                   </button>
                   {!collapsed.has(g.key) && g.items.map(e => (
-                    <IncomeRow key={e.id} entry={e}
+                    <IncomeRow key={e.id} entry={e} allYearsMode={allYearsMode}
                       onEdit={() => openEdit(e)} onDelete={() => setDeleteId(e.id)} />
                   ))}
                 </div>
@@ -463,7 +513,7 @@ export default function Incomes() {
           {/* Footer */}
           <div
             className="grid items-center px-4 py-3 border-t border-border/50 bg-muted/20 text-sm"
-            style={{ gridTemplateColumns: "100px 1fr 110px 1fr 72px", columnGap: "16px" }}
+            style={{ gridTemplateColumns: allYearsMode ? "100px 1fr 110px 1fr 120px" : "100px 1fr 110px 1fr 72px", columnGap: "16px" }}
           >
             <span className="text-muted-foreground font-medium">{filtered.length} רשומות</span>
             <span />
@@ -554,17 +604,16 @@ function FilterPill({ label, onRemove }: { label: string; onRemove: () => void }
   );
 }
 
-function IncomeRow({ entry, onEdit, onDelete }: {
-  entry: Income; onEdit: () => void; onDelete: () => void;
+function IncomeRow({ entry, onEdit, onDelete, allYearsMode }: {
+  entry: Income; onEdit: () => void; onDelete: () => void; allYearsMode?: boolean;
 }) {
   const isIncome = entry.entryType === "income";
   const name  = parseIncomeName(entry.description);
   const notes = parseIncomeNotes(entry.description);
-  const d     = new Date(entry.date);
   return (
     <div
       className="grid items-center px-4 py-3 border-b border-border/30 hover:bg-muted/20 transition-colors group text-sm"
-      style={{ gridTemplateColumns: "100px 1fr 110px 1fr 72px", columnGap: "16px" }}
+      style={{ gridTemplateColumns: allYearsMode ? "100px 1fr 110px 1fr 120px" : "100px 1fr 110px 1fr 72px", columnGap: "16px" }}
     >
       {/* תאריך */}
       <span className="text-muted-foreground text-xs tabular-nums">{fmtDate(entry.date)}</span>
@@ -594,17 +643,23 @@ function IncomeRow({ entry, onEdit, onDelete }: {
         {notes || "—"}
       </span>
 
-      {/* פעולות */}
-      <div className="flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-        <button onClick={onEdit}
-          className="p-1.5 rounded-lg hover:bg-blue-50 text-muted-foreground hover:text-blue-600 transition-colors">
-          <Pencil className="w-3.5 h-3.5" />
-        </button>
-        <button onClick={onDelete}
-          className="p-1.5 rounded-lg hover:bg-rose-50 text-muted-foreground hover:text-rose-600 transition-colors">
-          <Trash2 className="w-3.5 h-3.5" />
-        </button>
-      </div>
+      {/* שנה / פעולות */}
+      {allYearsMode ? (
+        <span className="text-xs text-muted-foreground truncate bg-muted/60 px-2 py-1 rounded-lg">
+          {entry.yearName ?? "—"}
+        </span>
+      ) : (
+        <div className="flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          <button onClick={onEdit}
+            className="p-1.5 rounded-lg hover:bg-blue-50 text-muted-foreground hover:text-blue-600 transition-colors">
+            <Pencil className="w-3.5 h-3.5" />
+          </button>
+          <button onClick={onDelete}
+            className="p-1.5 rounded-lg hover:bg-rose-50 text-muted-foreground hover:text-rose-600 transition-colors">
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
     </div>
   );
 }

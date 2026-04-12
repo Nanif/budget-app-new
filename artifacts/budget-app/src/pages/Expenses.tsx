@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import { useBudgetYear } from "@/contexts/BudgetYearContext";
+import { AllYearsToggle } from "@/components/AllYearsToggle";
 import { useCashFund } from "@/hooks/useCashFund";
 import { useCashCurrentMonth } from "@/hooks/useCashCurrentMonth";
 import { Button } from "@/components/ui/button";
@@ -26,7 +27,7 @@ type Expense = {
   id: number; amount: number; description: string; notes?: string | null; date: string;
   fundId: number | null; categoryId: number | null;
   categoryName?: string | null; categoryColor?: string | null;
-  isRecurring?: boolean;
+  isRecurring?: boolean; yearName?: string;
 };
 type Fund     = {
   id: number; name: string; colorClass: string; fundBehavior: string;
@@ -37,7 +38,7 @@ const EXPENSE_BEHAVIORS = new Set([
   "expense_monthly", "annual_categorized", "annual_large", "annual", "expense_non_budget",
 ]);
 type Category = { id: number; name: string; color: string; icon: string; fundId: number | null };
-type GroupBy  = "none" | "fund" | "category" | "month";
+type GroupBy  = "none" | "fund" | "category" | "month" | "year";
 
 /* ═══════════════════════════════════════════════════════════
    CONSTANTS
@@ -48,6 +49,7 @@ const GROUP_OPTIONS: { value: GroupBy; label: string }[] = [
   { value: "month",    label: "לפי חודש" },
   { value: "fund",     label: "לפי קופה" },
   { value: "category", label: "לפי קטגוריה" },
+  { value: "year",     label: "לפי שנה" },
 ];
 
 /* ═══════════════════════════════════════════════════════════
@@ -107,7 +109,7 @@ const EMPTY_FORM: ExpenseForm = {
 ═══════════════════════════════════════════════════════════ */
 export default function Expenses() {
   const { toast } = useToast();
-  const { activeBid } = useBudgetYear();
+  const { activeBid, years } = useBudgetYear();
   const { cashFundId } = useCashFund();
   const { currentMonth } = useCashCurrentMonth(activeBid);
 
@@ -116,6 +118,10 @@ export default function Expenses() {
   const [funds,      setFunds]      = useState<Fund[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading,    setLoading]    = useState(true);
+
+  /* ── all-years mode ───────────────────────────────────────── */
+  const [allYearsMode,    setAllYearsMode]    = useState(false);
+  const [selectedYearIds, setSelectedYearIds] = useState<number[]>([]);
 
   /* ── filters ─────────────────────────────────────────────── */
   const [search,    setSearch]    = useState("");
@@ -145,21 +151,54 @@ export default function Expenses() {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
 
   /* ── load ────────────────────────────────────────────────── */
-  const load = async () => {
+  const load = async (opts?: { allYears?: boolean; yearIds?: number[] }) => {
+    const isAll = opts?.allYears ?? allYearsMode;
+    const ids   = opts?.yearIds  ?? selectedYearIds;
     setLoading(true);
     try {
-      const [exp, fnd, cats] = await Promise.all([
-        apiFetch("/expenses"),
-        apiFetch(`/funds/summary?bid=${activeBid}`),
-        apiFetch("/categories"),
-      ]);
-      setExpenses(exp.map((e: any) => ({ ...e, amount: parseFloat(e.amount) })));
-      setFunds(fnd);
-      setCategories(cats);
+      if (isAll && ids.length > 0) {
+        const yearMap = Object.fromEntries(years.map(y => [y.id, y.name]));
+        const results = await Promise.all(ids.map(bid => apiFetch(`/expenses?bid=${bid}`)));
+        const merged  = results.flatMap((data, i) =>
+          data.map((e: any) => ({
+            ...e, amount: parseFloat(e.amount),
+            yearName: yearMap[ids[i]] ?? String(ids[i]),
+          }))
+        );
+        merged.sort((a: Expense, b: Expense) => (a.date < b.date ? 1 : -1));
+        setExpenses(merged);
+      } else {
+        const [exp, fnd, cats] = await Promise.all([
+          apiFetch("/expenses"),
+          apiFetch(`/funds/summary?bid=${activeBid}`),
+          apiFetch("/categories"),
+        ]);
+        setExpenses(exp.map((e: any) => ({ ...e, amount: parseFloat(e.amount) })));
+        setFunds(fnd);
+        setCategories(cats);
+      }
     } catch { toast({ title: "שגיאה בטעינה", variant: "destructive" }); }
     finally { setLoading(false); }
   };
   useEffect(() => { load(); }, [activeBid]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleToggleAllYears = () => {
+    if (!allYearsMode) {
+      const ids = years.map(y => y.id);
+      setAllYearsMode(true);
+      setSelectedYearIds(ids);
+      load({ allYears: true, yearIds: ids });
+    } else {
+      setAllYearsMode(false);
+      setSelectedYearIds([]);
+      load({ allYears: false });
+    }
+  };
+  const handleSelectYearIds = (ids: number[]) => {
+    setSelectedYearIds(ids);
+    if (ids.length > 0) load({ allYears: true, yearIds: ids });
+    else setExpenses([]);
+  };
 
   /* ── lookup maps ─────────────────────────────────────────── */
   const fundMap = useMemo(() => Object.fromEntries(funds.map(f => [f.id, f])), [funds]);
@@ -194,6 +233,8 @@ export default function Expenses() {
       } else if (groupBy === "category") {
         const c = e.categoryId ? catMap[e.categoryId] : null;
         key = String(e.categoryId ?? 0); label = c?.name ?? "ללא קטגוריה"; color = c?.color;
+      } else if (groupBy === "year") {
+        key = e.yearName ?? ""; label = e.yearName ?? "ללא שנה";
       } else {
         key = monthKey(e.date); label = monthLabel(key);
       }
@@ -316,9 +357,20 @@ export default function Expenses() {
   return (
     <div className="space-y-5" dir="rtl">
       <PageHeader title="הוצאות" description="מעקב ורישום הוצאות לפי קופה וקטגוריה">
-        <Button onClick={openAdd} className="rounded-xl gap-1.5">
-          <Plus className="w-4 h-4" /> הוסף הוצאה
-        </Button>
+        <div className="flex gap-2 flex-wrap items-center">
+          <AllYearsToggle
+            years={years}
+            active={allYearsMode}
+            selectedIds={selectedYearIds}
+            onToggle={handleToggleAllYears}
+            onSelectIds={handleSelectYearIds}
+          />
+          {!allYearsMode && (
+            <Button onClick={openAdd} className="rounded-xl gap-1.5">
+              <Plus className="w-4 h-4" /> הוסף הוצאה
+            </Button>
+          )}
+        </div>
       </PageHeader>
 
       {/* ══ FUND CARDS ═════════════════════════════════════════ */}
@@ -467,13 +519,13 @@ export default function Expenses() {
         <div className="bg-card border border-border/60 rounded-2xl overflow-hidden shadow-sm">
           {/* Table header */}
           <div className="grid text-xs font-bold text-muted-foreground uppercase tracking-wider px-4 py-3 border-b border-border/50 bg-muted/30"
-            style={{ gridTemplateColumns: "110px 1fr 130px 130px 100px 80px" }}>
+            style={{ gridTemplateColumns: allYearsMode ? "110px 1fr 130px 130px 100px 120px" : "110px 1fr 130px 130px 100px 80px" }}>
             <span>תאריך</span>
             <span>תיאור</span>
             <span>קטגוריה</span>
             <span>קופה</span>
             <span className="text-left" dir="ltr">סכום</span>
-            <span className="text-center">פעולות</span>
+            {allYearsMode ? <span>שנה</span> : <span className="text-center">פעולות</span>}
           </div>
 
           {/* Grouped sections or flat list */}
@@ -481,6 +533,7 @@ export default function Expenses() {
             {groupBy === "none" ? (
               grouped[0]?.items.map(e => (
                 <ExpenseRow key={e.id} expense={e} fundMap={fundMap} catMap={catMap}
+                  allYearsMode={allYearsMode}
                   onEdit={() => openEdit(e)} onDelete={() => setDeleteId(e.id)} />
               ))
             ) : (
@@ -510,6 +563,7 @@ export default function Expenses() {
                   {/* Group rows */}
                   {!collapsed.has(g.key) && g.items.map(e => (
                     <ExpenseRow key={e.id} expense={e} fundMap={fundMap} catMap={catMap}
+                      allYearsMode={allYearsMode}
                       onEdit={() => openEdit(e)} onDelete={() => setDeleteId(e.id)} />
                   ))}
                 </div>
@@ -519,7 +573,7 @@ export default function Expenses() {
 
           {/* Table footer — total */}
           <div className="grid items-center px-4 py-3 border-t border-border/50 bg-muted/20 font-semibold text-sm"
-            style={{ gridTemplateColumns: "110px 1fr 130px 130px 100px 80px" }}>
+            style={{ gridTemplateColumns: allYearsMode ? "110px 1fr 130px 130px 100px 120px" : "110px 1fr 130px 130px 100px 80px" }}>
             <span className="text-muted-foreground">{filtered.length} רשומות</span>
             <span />
             <span />
@@ -850,12 +904,13 @@ function FilterPill({ label, onRemove }: { label: string; onRemove: () => void }
   );
 }
 
-function ExpenseRow({ expense, fundMap, catMap, onEdit, onDelete }: {
+function ExpenseRow({ expense, fundMap, catMap, onEdit, onDelete, allYearsMode }: {
   expense: Expense;
   fundMap: Record<number, Fund>;
   catMap:  Record<number, Category>;
   onEdit:  () => void;
   onDelete: () => void;
+  allYearsMode?: boolean;
 }) {
   const fund = expense.fundId ? fundMap[expense.fundId] : null;
   const cat  = expense.categoryId ? catMap[expense.categoryId] : null;
@@ -864,7 +919,7 @@ function ExpenseRow({ expense, fundMap, catMap, onEdit, onDelete }: {
 
   return (
     <div className="grid items-center px-4 py-3 border-b border-border/30 last:border-0 hover:bg-muted/20 transition-colors group text-sm"
-      style={{ gridTemplateColumns: "110px 1fr 130px 130px 100px 80px" }}>
+      style={{ gridTemplateColumns: allYearsMode ? "110px 1fr 130px 130px 100px 120px" : "110px 1fr 130px 130px 100px 80px" }}>
 
       {/* Date */}
       <span className="text-muted-foreground text-xs font-medium">{fmtDate(expense.date)}</span>
@@ -907,17 +962,23 @@ function ExpenseRow({ expense, fundMap, catMap, onEdit, onDelete }: {
       {/* Amount */}
       <span className="font-bold text-rose-600 tabular-nums" dir="ltr">{fmt(expense.amount)}</span>
 
-      {/* Actions */}
-      <div className="flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-        <button onClick={onEdit}
-          className="p-1.5 rounded-lg hover:bg-blue-50 text-muted-foreground hover:text-blue-600 transition-colors">
-          <Pencil className="w-3.5 h-3.5" />
-        </button>
-        <button onClick={onDelete}
-          className="p-1.5 rounded-lg hover:bg-rose-50 text-muted-foreground hover:text-rose-600 transition-colors">
-          <Trash2 className="w-3.5 h-3.5" />
-        </button>
-      </div>
+      {/* שנה / פעולות */}
+      {allYearsMode ? (
+        <span className="text-xs text-muted-foreground truncate bg-muted/60 px-2 py-1 rounded-lg">
+          {expense.yearName ?? "—"}
+        </span>
+      ) : (
+        <div className="flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          <button onClick={onEdit}
+            className="p-1.5 rounded-lg hover:bg-blue-50 text-muted-foreground hover:text-blue-600 transition-colors">
+            <Pencil className="w-3.5 h-3.5" />
+          </button>
+          <button onClick={onDelete}
+            className="p-1.5 rounded-lg hover:bg-rose-50 text-muted-foreground hover:text-rose-600 transition-colors">
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
     </div>
   );
 }
