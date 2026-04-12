@@ -166,11 +166,12 @@ function DebtsCard({ debts, onAdd, onUpdate, onDelete }: {
   onDelete: (id: number) => Promise<void>;
 }) {
   const { toast } = useToast();
-  const [open, setOpen]     = useState(false);
-  const [name, setName]     = useState("");
-  const [amount, setAmount] = useState("");
-  const [type, setType]     = useState<"i_owe" | "owed_to_me">("i_owe");
-  const [saving, setSaving] = useState(false);
+  const [open, setOpen]         = useState(false);
+  const [name, setName]         = useState("");
+  const [amount, setAmount]     = useState("");
+  const [newNotes, setNewNotes] = useState("");
+  const [type, setType]         = useState<"i_owe" | "owed_to_me">("i_owe");
+  const [saving, setSaving]     = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
 
   const [viewDebt, setViewDebt]   = useState<Debt | null>(null);
@@ -212,8 +213,8 @@ function DebtsCard({ debts, onAdd, onUpdate, onDelete }: {
     setSaving(true);
     try {
       const amt = parseFloat(amount);
-      await onAdd({ name: name.trim(), type, totalAmount: amt, remainingAmount: amt, interestRate: 0, status: "active", notes: "" });
-      setName(""); setAmount(""); setOpen(false);
+      await onAdd({ name: name.trim(), type, totalAmount: amt, remainingAmount: amt, interestRate: 0, status: "active", notes: newNotes.trim() });
+      setName(""); setAmount(""); setNewNotes(""); setOpen(false);
     } catch { toast({ title: "שגיאה", variant: "destructive" }); }
     finally { setSaving(false); }
   };
@@ -355,12 +356,18 @@ function DebtsCard({ debts, onAdd, onUpdate, onDelete }: {
                     placeholder="שם..." className="rounded-lg h-8 text-sm flex-1" autoFocus />
                   <Input value={amount} onChange={e => setAmount(e.target.value)}
                     type="number" placeholder="₪" dir="ltr" className="rounded-lg h-8 text-sm w-20" />
+                </div>
+                <textarea
+                  value={newNotes} onChange={e => setNewNotes(e.target.value)}
+                  placeholder="הערה (אופציונלי)..." rows={2}
+                  className="w-full text-sm rounded-lg border border-input bg-background px-3 py-1.5 resize-none focus:outline-none focus:ring-1 focus:ring-ring" />
+                <div className="flex gap-2">
                   <button onClick={handleAdd} disabled={saving}
-                    className="p-1.5 rounded-lg bg-rose-600 text-white hover:bg-rose-700 transition-colors">
-                    {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                    className="flex-1 py-1.5 rounded-lg bg-rose-600 text-white hover:bg-rose-700 transition-colors text-sm">
+                    {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin inline" /> : "הוסף"}
                   </button>
-                  <button onClick={() => { setName(""); setAmount(""); setOpen(false); }}
-                    className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground transition-colors text-xs">ביטול</button>
+                  <button onClick={() => { setName(""); setAmount(""); setNewNotes(""); setOpen(false); }}
+                    className="px-3 py-1.5 rounded-lg hover:bg-muted text-muted-foreground transition-colors text-sm">ביטול</button>
                 </div>
               </div>
             ) : (
