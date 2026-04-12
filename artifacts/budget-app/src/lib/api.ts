@@ -1,4 +1,16 @@
-let _activeBid = 1;
+const STORAGE_KEY = "budget_year_bid";
+
+function readStoredBid(): number {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    const parsed = stored ? parseInt(stored) : NaN;
+    return isNaN(parsed) ? 1 : parsed;
+  } catch {
+    return 1;
+  }
+}
+
+let _activeBid: number = readStoredBid();
 
 export function setActiveBid(bid: number) {
   _activeBid = bid;
