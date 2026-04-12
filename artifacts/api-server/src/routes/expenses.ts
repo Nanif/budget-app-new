@@ -51,9 +51,12 @@ router.get("/", async (req, res) => {
         updatedAt: expensesTable.updatedAt,
         categoryName: categoriesTable.name,
         categoryColor: categoriesTable.color,
+        fundName: fundsTable.name,
+        fundColor: fundsTable.colorClass,
       })
       .from(expensesTable)
       .leftJoin(categoriesTable, eq(expensesTable.categoryId, categoriesTable.id))
+      .leftJoin(fundsTable, eq(expensesTable.fundId, fundsTable.id))
       .where(and(...conditions))
       .orderBy(desc(expensesTable.date));
 

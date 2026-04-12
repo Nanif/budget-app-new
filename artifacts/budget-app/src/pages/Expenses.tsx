@@ -27,6 +27,7 @@ type Expense = {
   id: number; amount: number; description: string; notes?: string | null; date: string;
   fundId: number | null; categoryId: number | null;
   categoryName?: string | null; categoryColor?: string | null;
+  fundName?: string | null; fundColor?: string | null;
   isRecurring?: boolean; yearName?: string;
 };
 type Fund     = {
@@ -228,7 +229,7 @@ export default function Expenses() {
     for (const e of filtered) {
       let key = "", label = "", color: string | undefined;
       if (groupBy === "fund") {
-        const f = e.fundId ? fundMap[e.fundId] : null;
+        const f = e.fundId ? (fundMap[e.fundId] ?? (e.fundName ? { name: e.fundName, colorClass: e.fundColor ?? "#94a3b8" } : null)) : null;
         key = String(e.fundId ?? 0); label = f?.name ?? "ללא קופה"; color = f?.colorClass;
       } else if (groupBy === "category") {
         const c = e.categoryId ? catMap[e.categoryId] : null;
@@ -912,7 +913,8 @@ function ExpenseRow({ expense, fundMap, catMap, onEdit, onDelete, allYearsMode }
   onDelete: () => void;
   allYearsMode?: boolean;
 }) {
-  const fund = expense.fundId ? fundMap[expense.fundId] : null;
+  const fundFromMap = expense.fundId ? fundMap[expense.fundId] : null;
+  const fund = fundFromMap ?? (expense.fundName ? { name: expense.fundName, colorClass: expense.fundColor ?? "#94a3b8" } : null);
   const cat  = expense.categoryId ? catMap[expense.categoryId] : null;
   const catName  = expense.categoryName || cat?.name;
   const catColor = expense.categoryColor || cat?.color;
