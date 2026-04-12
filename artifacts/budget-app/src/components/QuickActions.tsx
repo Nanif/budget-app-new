@@ -296,7 +296,7 @@ export function QuickActions() {
     <>
       {/* ── Side bar — fixed left ─────────────────────────── */}
       <div
-        className="fixed left-0 top-1/2 -translate-y-1/2 z-40 flex flex-col gap-1.5 p-2 bg-card/95 backdrop-blur-sm border border-border/60 rounded-r-2xl shadow-lg"
+        className="fixed left-0 top-1/2 -translate-y-1/2 z-40 flex flex-col gap-1 p-1.5 bg-card/95 backdrop-blur-sm border border-border/60 rounded-r-2xl shadow-lg max-h-[90vh] overflow-y-auto"
         dir="rtl"
       >
         {ACTIONS.map(action => {
@@ -306,17 +306,17 @@ export function QuickActions() {
               key={action.id}
               onClick={() => setActiveDialog(action.id)}
               className={cn(
-                "flex flex-col items-center gap-1 w-14 py-2.5 rounded-xl transition-all active:scale-95 group",
+                "flex flex-col items-center gap-0.5 w-12 py-2 rounded-xl transition-all active:scale-95 group",
                 action.hoverBg
               )}
             >
               <div className={cn(
-                "w-9 h-9 rounded-xl flex items-center justify-center text-white shadow-sm transition-transform group-hover:scale-110",
+                "w-8 h-8 rounded-xl flex items-center justify-center text-white shadow-sm transition-transform group-hover:scale-110",
                 action.color
               )}>
-                <Icon className="w-4.5 h-4.5" />
+                <Icon className="w-4 h-4" />
               </div>
-              <span className={cn("text-[10px] font-semibold leading-tight transition-colors", action.iconText)}>
+              <span className={cn("text-[9px] font-semibold leading-tight transition-colors text-center", action.iconText)}>
                 {action.label}
               </span>
             </button>
