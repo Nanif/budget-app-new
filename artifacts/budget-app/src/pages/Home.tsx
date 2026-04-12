@@ -5,10 +5,11 @@ import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import { apiFetch } from "@/lib/api";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import {
   CreditCard, CheckSquare, StickyNote,
   Plus, Check, Loader2, Trash2,
-  TrendingUp, TrendingDown, Pin, BookOpen, Sun, GripVertical,
+  TrendingUp, TrendingDown, Pin, BookOpen, Sun, GripVertical, Pencil, X,
 } from "lucide-react";
 
 /* ── Types ─────────────────────────────────────────────────── */
@@ -502,6 +503,10 @@ function NotesCard({ notes, onAdd, onUpdate, onDelete, onReorder }: {
   const [draggedId, setDraggedId]   = useState<number | null>(null);
   const [dragOverId, setDragOverId] = useState<number | null>(null);
 
+  /* ── view state ── */
+  const [viewNote, setViewNote] = useState<Note | null>(null);
+  const didDragRef = useRef(false);
+
   useEffect(() => {
     setLocalNotes([...notes].sort((a, b) => {
       if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1;
@@ -510,6 +515,7 @@ function NotesCard({ notes, onAdd, onUpdate, onDelete, onReorder }: {
   }, [notes]);
 
   const handleDragStart = (e: React.DragEvent, id: number) => {
+    didDragRef.current = true;
     setDraggedId(id);
     e.dataTransfer.effectAllowed = "move";
   };
@@ -540,7 +546,16 @@ function NotesCard({ notes, onAdd, onUpdate, onDelete, onReorder }: {
       toast({ title: "שגיאה בשמירת סדר", variant: "destructive" })
     );
   };
-  const handleDragEnd = () => { setDraggedId(null); setDragOverId(null); };
+  const handleDragEnd = () => {
+    setDraggedId(null);
+    setDragOverId(null);
+    setTimeout(() => { didDragRef.current = false; }, 100);
+  };
+
+  const handleNoteClick = (note: Note) => {
+    if (didDragRef.current || editId === note.id) return;
+    setViewNote(note);
+  };
 
   const openEdit = (n: Note) => {
     setEditId(n.id); setEditTitle(n.title || ""); setEditContent(n.content || "");
@@ -570,7 +585,7 @@ function NotesCard({ notes, onAdd, onUpdate, onDelete, onReorder }: {
     finally { setSaving(false); }
   };
 
-  return (
+  return (<>
     <div className={SECTION_STYLE}>
       <div className={SECTION_HEAD}>
         <div className={SECTION_TITLE}>
@@ -605,7 +620,7 @@ function NotesCard({ notes, onAdd, onUpdate, onDelete, onReorder }: {
                   : "border-border/40 hover:border-border",
               )}
               style={{ background: note.color ? `${note.color}40` : "#fef9c340" }}
-              onDoubleClick={() => editId !== note.id && openEdit(note)}>
+              onClick={() => handleNoteClick(note)}>
 
               {note.isPinned && editId !== note.id && (
                 <Pin className="w-3 h-3 text-muted-foreground absolute top-2.5 left-8 rotate-45" />
@@ -689,5 +704,39 @@ function NotesCard({ notes, onAdd, onUpdate, onDelete, onReorder }: {
         )}
       </div>
     </div>
+
+    {/* ── View dialog ── */}
+    <Dialog open={!!viewNote} onOpenChange={o => !o && setViewNote(null)}>
+      <DialogContent
+        dir="rtl"
+        className="max-w-sm rounded-2xl p-0 overflow-hidden gap-0 [&>button]:hidden"
+        style={{ background: viewNote?.color ? `${viewNote.color}30` : "#fef9c330" }}>
+        <div className="flex items-start justify-between px-5 pt-5 pb-3 border-b border-border/30">
+          <div className="flex-1 min-w-0">
+            {viewNote?.title
+              ? <h2 className="text-base font-bold leading-tight">{viewNote.title}</h2>
+              : <h2 className="text-base font-bold text-muted-foreground italic">פתק</h2>}
+          </div>
+          <div className="flex items-center gap-1 shrink-0 mr-3">
+            <button
+              onClick={() => { const n = viewNote!; setViewNote(null); setTimeout(() => openEdit(n), 50); }}
+              className="p-1.5 rounded-lg hover:bg-black/5 text-muted-foreground hover:text-foreground transition-colors">
+              <Pencil className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setViewNote(null)}
+              className="p-1.5 rounded-lg hover:bg-black/5 text-muted-foreground hover:text-foreground transition-colors">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+        <div className="px-5 py-4 max-h-[60vh] overflow-y-auto">
+          <p className="text-sm leading-relaxed whitespace-pre-wrap text-foreground">
+            {viewNote?.content || <span className="italic text-muted-foreground">פתק ריק</span>}
+          </p>
+        </div>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }
