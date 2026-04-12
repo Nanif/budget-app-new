@@ -7,7 +7,7 @@ import { budgetYearsTable } from "./budgetYears";
 export const titheGivenTable = pgTable("tithe_given", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
-  budgetYearId: integer("budget_year_id").notNull().references(() => budgetYearsTable.id, { onDelete: "cascade" }),
+  budgetYearId: integer("budget_year_id").references(() => budgetYearsTable.id, { onDelete: "set null" }),
   amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
   recipient: text("recipient").notNull(),
   description: text("description").notNull().default(""),

@@ -8,7 +8,7 @@ import { fundsTable } from "./funds";
 export const cashEnvelopeTransactionsTable = pgTable("cash_envelope_transactions", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
-  budgetYearId: integer("budget_year_id").notNull().references(() => budgetYearsTable.id, { onDelete: "cascade" }),
+  budgetYearId: integer("budget_year_id").references(() => budgetYearsTable.id, { onDelete: "set null" }),
   fundId: integer("fund_id").references(() => fundsTable.id, { onDelete: "set null" }),
   type: text("type").notNull(),
   amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
