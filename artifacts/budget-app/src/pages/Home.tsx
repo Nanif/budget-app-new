@@ -181,6 +181,15 @@ function DebtsCard({ debts, onAdd, onUpdate, onDelete }: {
   const [editType, setEditType]   = useState<"i_owe" | "owed_to_me">("i_owe");
   const editRef = useRef<HTMLInputElement>(null);
 
+  // inline (double-click) editing
+  const [inlineId, setInlineId]       = useState<number | null>(null);
+  const [inlineName, setInlineName]   = useState("");
+  const [inlineAmt, setInlineAmt]     = useState("");
+  const [inlineSaving, setInlineSaving] = useState(false);
+  const inlineNameRef = useRef<HTMLInputElement>(null);
+  const inlineAmtRef  = useRef<HTMLInputElement>(null);
+  const clickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const activeDebts = debts.filter(d => d.status === "active");
 
   const openDebt = (d: Debt) => {
@@ -192,6 +201,44 @@ function DebtsCard({ debts, onAdd, onUpdate, onDelete }: {
     setTimeout(() => editRef.current?.focus(), 50);
   };
   const closeDebt = () => setViewDebt(null);
+
+  const startInlineEdit = (d: Debt, focus: "name" | "amt") => {
+    setInlineId(d.id);
+    setInlineName(d.name);
+    setInlineAmt(String(d.remainingAmount));
+    setTimeout(() => {
+      if (focus === "name") inlineNameRef.current?.focus();
+      else inlineAmtRef.current?.focus();
+    }, 20);
+  };
+
+  const cancelInlineEdit = () => setInlineId(null);
+
+  const saveInlineEdit = async (d: Debt) => {
+    if (!inlineName.trim()) return cancelInlineEdit();
+    setInlineSaving(true);
+    try {
+      await onUpdate(d.id, {
+        name: inlineName.trim(),
+        remainingAmount: parseFloat(inlineAmt) || 0,
+      });
+    } catch { toast({ title: "שגיאה בעדכון", variant: "destructive" }); }
+    finally { setInlineSaving(false); setInlineId(null); }
+  };
+
+  const handleRowClick = (d: Debt) => {
+    if (inlineId === d.id) return;
+    if (clickTimerRef.current) return;
+    clickTimerRef.current = setTimeout(() => {
+      clickTimerRef.current = null;
+      openDebt(d);
+    }, 230);
+  };
+
+  const handleRowDblClick = (d: Debt, focus: "name" | "amt") => {
+    if (clickTimerRef.current) { clearTimeout(clickTimerRef.current); clickTimerRef.current = null; }
+    startInlineEdit(d, focus);
+  };
 
   const saveDebt = async () => {
     if (!viewDebt || !editName.trim()) return;
@@ -318,22 +365,77 @@ function DebtsCard({ debts, onAdd, onUpdate, onDelete }: {
               <p className="text-sm text-muted-foreground text-center py-6">אין חובות פעילים</p>
             ) : (
               <div className="space-y-0.5">
-                {activeDebts.map(d => (
-                  <div key={d.id}
-                    onClick={() => openDebt(d)}
-                    className="group flex items-center gap-2 py-2.5 border-b border-border/30 last:border-0 cursor-pointer hover:bg-muted/30 rounded-lg px-1 -mx-1 transition-colors">
-                    <span className={cn("w-2 h-2 rounded-full shrink-0", d.type === "i_owe" ? "bg-rose-400" : "bg-emerald-400")} />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm truncate">{d.name}</p>
-                      {d.notes && (
-                        <p className="text-xs text-muted-foreground truncate mt-0.5">{d.notes}</p>
+                {activeDebts.map(d => {
+                  const isInline = inlineId === d.id;
+                  return (
+                    <div key={d.id}
+                      onClick={() => handleRowClick(d)}
+                      onDoubleClick={() => handleRowDblClick(d, "name")}
+                      className={cn(
+                        "group flex items-center gap-2 py-2.5 border-b border-border/30 last:border-0 rounded-lg px-1 -mx-1 transition-colors select-none",
+                        isInline ? "bg-muted/40" : "cursor-pointer hover:bg-muted/30"
+                      )}>
+                      <span className={cn("w-2 h-2 rounded-full shrink-0", d.type === "i_owe" ? "bg-rose-400" : "bg-emerald-400")} />
+
+                      {isInline ? (
+                        /* ── inline edit inputs ── */
+                        <>
+                          <input
+                            ref={inlineNameRef}
+                            value={inlineName}
+                            onChange={e => setInlineName(e.target.value)}
+                            onClick={e => e.stopPropagation()}
+                            onDoubleClick={e => e.stopPropagation()}
+                            onKeyDown={e => {
+                              if (e.key === "Enter") saveInlineEdit(d);
+                              if (e.key === "Escape") cancelInlineEdit();
+                            }}
+                            onBlur={() => setTimeout(() => {
+                              if (document.activeElement !== inlineAmtRef.current) saveInlineEdit(d);
+                            }, 0)}
+                            className="flex-1 min-w-0 text-sm bg-transparent border-b border-primary outline-none"
+                          />
+                          <input
+                            ref={inlineAmtRef}
+                            value={inlineAmt}
+                            onChange={e => setInlineAmt(e.target.value)}
+                            onClick={e => e.stopPropagation()}
+                            onDoubleClick={e => e.stopPropagation()}
+                            type="number" dir="ltr"
+                            onKeyDown={e => {
+                              if (e.key === "Enter") saveInlineEdit(d);
+                              if (e.key === "Escape") cancelInlineEdit();
+                            }}
+                            onBlur={() => setTimeout(() => {
+                              if (document.activeElement !== inlineNameRef.current) saveInlineEdit(d);
+                            }, 0)}
+                            className={cn(
+                              "w-16 text-sm tabular-nums font-semibold bg-transparent border-b border-primary outline-none text-left shrink-0",
+                              d.type === "i_owe" ? "text-rose-600" : "text-emerald-600"
+                            )}
+                          />
+                          {inlineSaving && <Loader2 className="w-3 h-3 animate-spin text-muted-foreground shrink-0" />}
+                        </>
+                      ) : (
+                        /* ── normal display ── */
+                        <>
+                          <div className="flex-1 min-w-0"
+                            onDoubleClick={e => { e.stopPropagation(); handleRowDblClick(d, "name"); }}>
+                            <p className="text-sm truncate">{d.name}</p>
+                            {d.notes && (
+                              <p className="text-xs text-muted-foreground truncate mt-0.5">{d.notes}</p>
+                            )}
+                          </div>
+                          <span
+                            onDoubleClick={e => { e.stopPropagation(); handleRowDblClick(d, "amt"); }}
+                            className={cn("font-semibold tabular-nums text-sm shrink-0", d.type === "i_owe" ? "text-rose-600" : "text-emerald-600")}>
+                            {fmt(d.remainingAmount)}
+                          </span>
+                        </>
                       )}
                     </div>
-                    <span className={cn("font-semibold tabular-nums text-sm shrink-0", d.type === "i_owe" ? "text-rose-600" : "text-emerald-600")}>
-                      {fmt(d.remainingAmount)}
-                    </span>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
