@@ -255,7 +255,7 @@ function BudgetYearsSection() {
             <AlertDialogTitle>מחיקת שנת תקציב</AlertDialogTitle>
             <AlertDialogDescription>
               האם למחוק את "{deleteTarget?.name}"?<br />
-              פעולה זו תמחק את כל הנתונים המשויכים לשנה זו ולא ניתן לשחזרם.
+              הנתונים המשויכים לשנה זו (הכנסות, הוצאות, מעשרות) לא יימחקו.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
