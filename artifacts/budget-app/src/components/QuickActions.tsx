@@ -327,7 +327,7 @@ export function QuickActions() {
       {/* ══════════════════════════════════════════════════════
           EXPENSE DIALOG — exact same as Expenses page
       ══════════════════════════════════════════════════════ */}
-      <Dialog open={activeDialog === "expense"} onOpenChange={v => !v && close()}>
+      <Dialog open={activeDialog === "expense"} onOpenChange={v => { if (!v) { setETouched({}); close(); } }}>
         <DialogContent
           className="max-w-lg rounded-3xl p-0 overflow-hidden shadow-2xl border border-border/60"
           dir="rtl"
@@ -360,7 +360,6 @@ export function QuickActions() {
                   type="number" dir="ltr" min="0" step="0.01"
                   value={ef.amount}
                   onChange={e => efSet("amount", e.target.value)}
-                  onBlur={() => efTouch("amount")}
                   placeholder="0.00"
                   className={cn(
                     "pr-9 text-2xl font-bold h-14 rounded-2xl tabular-nums text-left",
@@ -525,7 +524,7 @@ export function QuickActions() {
       {/* ══════════════════════════════════════════════════════
           INCOME DIALOG — exact same as Incomes page
       ══════════════════════════════════════════════════════ */}
-      <Dialog open={activeDialog === "income"} onOpenChange={v => !v && close()}>
+      <Dialog open={activeDialog === "income"} onOpenChange={v => { if (!v) { setInTouched({}); close(); } }}>
         <DialogContent
           className="max-w-lg rounded-3xl p-0 overflow-hidden shadow-2xl border border-border/60"
           dir="rtl"
@@ -592,7 +591,6 @@ export function QuickActions() {
                   type="number" dir="ltr" min="0" step="0.01"
                   value={inf.amount}
                   onChange={e => infSet("amount", e.target.value)}
-                  onBlur={() => infTouch("amount")}
                   placeholder="0.00"
                   className={cn(
                     "pr-9 text-2xl font-bold h-14 rounded-2xl tabular-nums text-left",
@@ -673,7 +671,7 @@ export function QuickActions() {
       {/* ══════════════════════════════════════════════════════
           CASH DIALOG — exact same as CashWallet page
       ══════════════════════════════════════════════════════ */}
-      <Dialog open={activeDialog === "cash"} onOpenChange={v => !v && close()}>
+      <Dialog open={activeDialog === "cash"} onOpenChange={v => { if (!v) close(); }}>
         <DialogContent className="max-w-sm rounded-2xl" dir="rtl">
           <div className="flex items-center gap-2 pt-2 pb-1">
             {cf.type === "deposit"
@@ -770,7 +768,7 @@ export function QuickActions() {
       {/* ══════════════════════════════════════════════════════
           CHARITY DIALOG — exact same as Charity page
       ══════════════════════════════════════════════════════ */}
-      <Dialog open={activeDialog === "charity"} onOpenChange={v => !v && close()}>
+      <Dialog open={activeDialog === "charity"} onOpenChange={v => { if (!v) { setChTouched({}); close(); } }}>
         <DialogContent
           className="max-w-lg rounded-3xl p-0 overflow-hidden shadow-2xl border border-border/60"
           dir="rtl"
@@ -802,7 +800,6 @@ export function QuickActions() {
                   type="number" dir="ltr" min="0" step="0.01"
                   value={chf.amount}
                   onChange={e => chfSet("amount", e.target.value)}
-                  onBlur={() => chfTouch("amount")}
                   placeholder="0.00"
                   className={cn(
                     "pr-9 text-2xl font-bold h-14 rounded-2xl tabular-nums text-left",
