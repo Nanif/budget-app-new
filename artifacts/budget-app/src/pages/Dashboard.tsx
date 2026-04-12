@@ -23,7 +23,7 @@ import {
 type MonthlyEntry  = { month: string; entryType: string; total: number };
 type IncomeSummary = { totalIncome: number; totalDeductions: number; netIncome: number; monthly: MonthlyEntry[] };
 type BudgetYear    = { tithePercentage: number; totalBudget: number; startDate: string; endDate: string };
-type Tithe         = { id: number; amount: number; recipient: string; isTithe: boolean; date: string };
+type Tithe         = { id: number; amount: number; recipient: string; date: string };
 type WalletTotals  = { deposits: number; withdrawals: number; net: number };
 type WalletTx      = { id: number; type: "deposit" | "withdrawal"; amount: number; date: string; description: string };
 type RecentTx      = { id: number; label: string; amount: number; date: string; sign: "+" | "-" };
@@ -117,7 +117,7 @@ export default function DashboardPage() {
   }, [funds, currentMonth, cashFundId, activeBid]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const titheTarget = income.netIncome * (budgetYear.tithePercentage / 100);
-  const titheGiven  = tithes.filter(t => t.isTithe).reduce((s, t) => s + t.amount, 0);
+  const titheGiven  = tithes.reduce((s, t) => s + t.amount, 0);
   const titheLeft   = titheTarget - titheGiven;
   const tithePct    = titheTarget > 0 ? Math.min(100, (titheGiven / titheTarget) * 100) : 0;
 
@@ -444,23 +444,20 @@ function TitheCard({ income, budgetYear, tithes, titheTarget, titheGiven, titheL
       <div className="rounded-3xl overflow-hidden border border-border/50 shadow-sm bg-card flex flex-col">
         {/* Soft gradient header */}
         <div className="bg-gradient-to-l from-violet-50 to-purple-100 dark:from-violet-950/40 dark:to-purple-900/30 px-5 pt-5 pb-4 relative overflow-hidden border-b border-violet-100 dark:border-violet-800/30">
-          <div className="flex items-start justify-between">
+          <div className="flex items-center gap-2 mb-3">
+            <div className="w-7 h-7 rounded-xl bg-violet-100 dark:bg-violet-800/40 flex items-center justify-center">
+              <HeartHandshake className="w-4 h-4 text-violet-600 dark:text-violet-400" />
+            </div>
+            <span className="font-semibold text-sm text-violet-900 dark:text-violet-100">מעשרות</span>
+          </div>
+          <div className="flex items-end justify-between">
             <div>
-              <div className="flex items-center gap-2 mb-3">
-                <div className="w-7 h-7 rounded-xl bg-violet-100 dark:bg-violet-800/40 flex items-center justify-center">
-                  <HeartHandshake className="w-4 h-4 text-violet-600 dark:text-violet-400" />
-                </div>
-                <span className="font-semibold text-sm text-violet-900 dark:text-violet-100">מעשרות</span>
-              </div>
-              <p className="text-violet-900 dark:text-violet-100 text-2xl font-bold tabular-nums tracking-tight">{fmt(titheGiven)}</p>
+              <p className="text-violet-900 dark:text-violet-100 text-3xl font-bold tabular-nums tracking-tight">{fmt(titheGiven)}</p>
               <p className="text-violet-500 dark:text-violet-400 text-xs mt-0.5">נתרם מתוך {fmt(titheTarget)}</p>
             </div>
-            <div className="text-left">
-              <p className={cn("text-2xl font-bold tabular-nums", over ? "text-emerald-600" : "text-rose-500")}>
-                {fmt(Math.abs(titheLeft))}
-              </p>
-              <p className="text-violet-500 dark:text-violet-400 text-xs mt-0.5 text-left">{over ? "עודף ✓" : "נותר לתת"}</p>
-            </div>
+            <p className={cn("text-sm font-semibold pb-0.5", over ? "text-emerald-600" : "text-violet-500 dark:text-violet-400")}>
+              {over ? "✓ עודף" : `נותר: ${fmt(titheLeft)}`}
+            </p>
           </div>
           {/* Progress bar */}
           <div className="mt-4">
@@ -478,11 +475,10 @@ function TitheCard({ income, budgetYear, tithes, titheTarget, titheGiven, titheL
         </div>
 
         {/* Stats row */}
-        <div className="grid grid-cols-3 divide-x divide-x-reverse divide-border/40 border-b border-border/40">
+        <div className="grid grid-cols-2 divide-x divide-x-reverse divide-border/40 border-b border-border/40">
           {[
             { label: "הכנסה נטו", value: fmt(income.netIncome), cls: "text-foreground" },
             { label: `יעד ${budgetYear.tithePercentage}%`, value: fmt(titheTarget), cls: "text-violet-600" },
-            { label: over ? "עודף" : "נותר", value: fmt(Math.abs(titheLeft)), cls: over ? "text-emerald-600" : "text-rose-500" },
           ].map(s => (
             <div key={s.label} className="py-3 px-2 text-center">
               <p className="text-[10px] text-muted-foreground mb-0.5">{s.label}</p>
@@ -657,24 +653,23 @@ function WalletMonthCard({ fundName, currentMonth, monthlyTarget, totals, transa
       <div className="rounded-3xl overflow-hidden border border-border/50 shadow-sm bg-card flex flex-col">
         {/* Soft gradient header */}
         <div className="bg-gradient-to-l from-amber-50 to-orange-100 dark:from-amber-950/40 dark:to-orange-900/30 px-5 pt-5 pb-4 relative overflow-hidden border-b border-amber-100 dark:border-amber-800/30">
-          <div className="flex items-start justify-between">
-            <div>
-              <div className="flex items-center gap-2 mb-3">
-                <div className="w-7 h-7 rounded-xl bg-amber-100 dark:bg-amber-800/40 flex items-center justify-center">
-                  <Wallet className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-                </div>
-                <span className="font-semibold text-sm text-amber-900 dark:text-amber-100">{fundName}</span>
-              </div>
-              <p className="text-amber-900 dark:text-amber-100 text-2xl font-bold tabular-nums tracking-tight">{fmt(net)}</p>
-              <p className="text-amber-500 dark:text-amber-400 text-xs mt-0.5">ניתן החודש</p>
+          <div className="flex items-center gap-2 mb-3">
+            <div className="w-7 h-7 rounded-xl bg-amber-100 dark:bg-amber-800/40 flex items-center justify-center">
+              <Wallet className="w-4 h-4 text-amber-600 dark:text-amber-400" />
             </div>
-            <div className="text-left">
-              <p className={cn("text-2xl font-bold tabular-nums", over ? "text-emerald-600" : "text-amber-700 dark:text-amber-300")}>
-                {fmt(remaining)}
-              </p>
-              <p className="text-amber-500 dark:text-amber-400 text-xs mt-0.5 text-left">{over ? "כוסה ✓" : "נותר לתת"}</p>
+            <span className="font-semibold text-sm text-amber-900 dark:text-amber-100">{fundName}</span>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <p className="text-amber-500 dark:text-amber-400 text-[11px] mb-0.5">ניתן החודש</p>
+              <p className="text-amber-900 dark:text-amber-100 text-2xl font-bold tabular-nums tracking-tight">{fmt(net)}</p>
+            </div>
+            <div>
+              <p className="text-amber-500 dark:text-amber-400 text-[11px] mb-0.5">{over ? "כוסה ✓" : "נותר לתת"}</p>
+              <p className={cn("text-2xl font-bold tabular-nums", over ? "text-emerald-600" : "text-amber-700 dark:text-amber-300")}>{fmt(remaining)}</p>
             </div>
           </div>
+          <p className="text-amber-500 dark:text-amber-400 text-[11px] mt-2">תקציב חודשי: {fmt(monthlyTarget)}</p>
           {/* Progress bar */}
           <div className="mt-4 relative">
             <div className="flex justify-between text-amber-500 dark:text-amber-400 text-[11px] mb-1.5">
@@ -689,27 +684,6 @@ function WalletMonthCard({ fundName, currentMonth, monthlyTarget, totals, transa
                 style={{ width: `${Math.max(0, pct)}%` }}
               />
             </div>
-          </div>
-        </div>
-
-        {/* Stats row */}
-        <div className="grid grid-cols-3 divide-x divide-x-reverse divide-border/40 border-b border-border/40">
-          <div className="py-3 px-2 text-center">
-            <Wallet className="w-3 h-3 mx-auto mb-0.5 text-muted-foreground" />
-            <p className="text-[10px] text-muted-foreground mb-0.5">תקציב</p>
-            <p className="text-sm font-bold tabular-nums">{fmt(monthlyTarget)}</p>
-          </div>
-          <div className="py-3 px-2 text-center">
-            <ArrowDownLeft className="w-3 h-3 mx-auto mb-0.5 text-emerald-500" />
-            <p className="text-[10px] text-muted-foreground mb-0.5">ניתן</p>
-            <p className="text-sm font-bold tabular-nums text-emerald-600">{fmt(net)}</p>
-          </div>
-          <div className="py-3 px-2 text-center">
-            <ArrowUpRight className="w-3 h-3 mx-auto mb-0.5 text-muted-foreground" />
-            <p className="text-[10px] text-muted-foreground mb-0.5">{over ? "כוסה ✓" : "נותר לתת"}</p>
-            <p className={cn("text-sm font-bold tabular-nums",
-              over ? "text-emerald-600" : remaining > 0 ? "text-amber-600" : "text-muted-foreground"
-            )}>{fmt(remaining)}</p>
           </div>
         </div>
 
