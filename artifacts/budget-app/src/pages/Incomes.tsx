@@ -341,7 +341,7 @@ export default function Incomes() {
       </PageHeader>
 
       {/* ══ KPI STRIP ══════════════════════════════════════════ */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      {!allYearsMode && <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <KpiCard
           icon={<Landmark className="w-4 h-4" />}
           label='סה"כ הכנסות נטו'
@@ -366,7 +366,7 @@ export default function Incomes() {
           iconBg="bg-blue-100 text-blue-600"
           valueColor="text-blue-600"
         />
-      </div>
+      </div>}
 
       {/* ══ FILTER BAR ═════════════════════════════════════════ */}
       <div className="bg-card border border-border/60 rounded-2xl p-4 space-y-3">

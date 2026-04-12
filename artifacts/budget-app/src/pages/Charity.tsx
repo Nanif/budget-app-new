@@ -360,7 +360,7 @@ export default function Charity() {
       </PageHeader>
 
       {/* ══ KPI STRIP ══════════════════════════════════════════ */}
-      <div className="grid grid-cols-2 xl:grid-cols-5 gap-3">
+      {!allYearsMode && <div className="grid grid-cols-2 xl:grid-cols-5 gap-3">
         <KpiCard
           icon={<Landmark className="w-4 h-4" />}
           label="הכנסה נטו (רלוונטית)"
@@ -401,10 +401,10 @@ export default function Charity() {
           iconBg={remaining > 0 ? "bg-rose-100 text-rose-600" : "bg-emerald-100 text-emerald-600"}
           valueColor={remaining > 0 ? "text-rose-600" : "text-emerald-600"}
         />
-      </div>
+      </div>}
 
       {/* Info banner when no income */}
-      {netIncome === 0 && (
+      {!allYearsMode && netIncome === 0 && (
         <div className="flex items-center gap-2.5 p-3.5 rounded-xl bg-blue-50 border border-blue-200 text-blue-700 text-sm">
           <Info className="w-4 h-4 shrink-0" />
           <span>כדי לחשב יעד מעשרות, הוסף הכנסות בעמוד ההכנסות תחילה.</span>

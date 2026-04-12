@@ -375,7 +375,7 @@ export default function Expenses() {
       </PageHeader>
 
       {/* ══ FUND CARDS ═════════════════════════════════════════ */}
-      {!loading && expenseFunds.length > 0 && (
+      {!allYearsMode && !loading && expenseFunds.length > 0 && (
         <div className="flex gap-3 flex-wrap">
           {expenseFunds.map(fund => {
             const pct  = fund.budgetAmount > 0
