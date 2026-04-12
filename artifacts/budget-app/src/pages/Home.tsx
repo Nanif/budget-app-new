@@ -595,7 +595,7 @@ function NotesCard({ notes, onAdd, onUpdate, onDelete, onReorder }: {
         {viewNote ? (
           <div className="flex items-center gap-2 w-full min-w-0">
             <button
-              onClick={() => setViewNote(null)}
+              onClick={() => { setViewNote(null); setEditId(null); }}
               className="p-1 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors shrink-0">
               <ChevronRight className="w-4 h-4" />
             </button>
