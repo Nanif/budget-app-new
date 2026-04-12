@@ -410,6 +410,7 @@ function RemindersCard({ tasks, onAdd, onToggle, onUpdate, onDelete }: {
   const [editId, setEditId]           = useState<number | null>(null);
   const [editTitle, setEditTitle]     = useState("");
   const editRef = useRef<HTMLInputElement>(null);
+  const isSavingRef = useRef(false);
 
   const sorted = [...tasks].sort((a, b) => {
     if (a.status !== b.status) return a.status === "done" ? 1 : -1;
@@ -423,11 +424,13 @@ function RemindersCard({ tasks, onAdd, onToggle, onUpdate, onDelete }: {
     setTimeout(() => editRef.current?.focus(), 50);
   };
   const saveEdit = async (id: number) => {
-    if (!editTitle.trim()) return;
+    if (!editTitle.trim() || isSavingRef.current) return;
+    isSavingRef.current = true;
     try {
       await onUpdate(id, { title: editTitle.trim() });
       setEditId(null);
     } catch { toast({ title: "שגיאה בעדכון", variant: "destructive" }); }
+    finally { isSavingRef.current = false; }
   };
 
   const handleDelete = async (id: number) => {
@@ -480,17 +483,20 @@ function RemindersCard({ tasks, onAdd, onToggle, onUpdate, onDelete }: {
 
               {editId === task.id ? (
                 /* Edit row */
-                <div className="flex-1 flex items-center gap-1.5 mt-0.5">
+                <div className="flex-1 flex items-center gap-1.5 mt-0.5"
+                  onMouseDown={e => e.stopPropagation()}
+                  onClick={e => e.stopPropagation()}>
                   <input
                     ref={editRef}
                     value={editTitle} onChange={e => setEditTitle(e.target.value)}
                     className="flex-1 text-sm border-b border-primary bg-transparent outline-none px-0.5"
                     onKeyDown={e => { if (e.key === "Enter") saveEdit(task.id); if (e.key === "Escape") setEditId(null); }}
+                    onBlur={() => { if (editTitle.trim()) saveEdit(task.id); }}
                   />
-                  <button onClick={() => saveEdit(task.id)} className="p-1 rounded hover:bg-muted">
+                  <button onMouseDown={e => e.preventDefault()} onClick={() => saveEdit(task.id)} className="p-1 rounded hover:bg-muted">
                     <Check className="w-3.5 h-3.5 text-primary" />
                   </button>
-                  <button onClick={() => setEditId(null)} className="text-xs text-muted-foreground hover:text-foreground px-1">ביטול</button>
+                  <button onMouseDown={e => e.preventDefault()} onClick={() => setEditId(null)} className="text-xs text-muted-foreground hover:text-foreground px-1">ביטול</button>
                 </div>
               ) : (
                 /* View row */
