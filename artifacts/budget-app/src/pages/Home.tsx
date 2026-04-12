@@ -554,6 +554,7 @@ function NotesCard({ notes, onAdd, onUpdate, onDelete, onReorder }: {
   const handleNoteClick = (note: Note) => {
     if (didDragRef.current || editId === note.id) return;
     setViewNote(note);
+    openEdit(note);
   };
 
   const openEdit = (n: Note) => {
@@ -613,66 +614,49 @@ function NotesCard({ notes, onAdd, onUpdate, onDelete, onReorder }: {
       </div>
 
       {viewNote ? (
-        /* ── Inline note view ── */
-        <>
-          <div
-            className="flex-1 overflow-y-auto px-5 py-4"
-            style={{ background: viewNote.color ? `${viewNote.color}20` : undefined }}>
-            {editId === viewNote.id ? (
-              <div className="space-y-2">
-                <input
-                  ref={editRef}
-                  value={editTitle} onChange={e => setEditTitle(e.target.value)}
-                  placeholder="כותרת..."
-                  className="w-full text-sm font-semibold bg-transparent border-b border-primary outline-none pb-1"
-                  onKeyDown={e => e.key === "Escape" && setEditId(null)}
-                />
-                <textarea
-                  value={editContent} onChange={e => setEditContent(e.target.value)}
-                  rows={10}
-                  className="w-full text-sm bg-transparent border border-primary/30 rounded-lg px-3 py-2 outline-none resize-none focus:border-primary leading-relaxed"
-                  onKeyDown={e => { if (e.key === "Escape") setEditId(null); }}
-                />
-              </div>
-            ) : (
-              <p className="text-sm leading-relaxed whitespace-pre-wrap text-foreground">
-                {viewNote.content || <span className="italic text-muted-foreground">פתק ריק</span>}
-              </p>
-            )}
+        /* ── Inline note edit/view ── */
+        <div className="flex-1 overflow-y-auto px-5 py-4">
+          <div className="flex flex-col gap-3">
+            {/* Title */}
+            <input
+              ref={editRef}
+              value={editTitle}
+              onChange={e => setEditTitle(e.target.value)}
+              placeholder="כותרת..."
+              className="w-full text-sm font-bold bg-transparent border-b border-border/50 focus:border-primary outline-none pb-1 transition-colors"
+            />
+            {/* Content */}
+            <textarea
+              value={editContent}
+              onChange={e => setEditContent(e.target.value)}
+              rows={Math.max(4, (editContent.match(/\n/g) || []).length + 3)}
+              placeholder="תוכן הפתק..."
+              className="w-full text-sm bg-transparent outline-none resize-none leading-relaxed text-foreground placeholder:text-muted-foreground/50"
+            />
+            {/* Action buttons — right below the content */}
+            <div className="flex items-center gap-2 pt-2 border-t border-border/30">
+              <button
+                onClick={() => saveEdit(viewNote.id)}
+                className="text-sm px-4 py-1.5 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">
+                שמור
+              </button>
+              <button
+                onClick={() => { setViewNote(null); setEditId(null); }}
+                className="text-sm px-3 py-1.5 rounded-lg hover:bg-muted text-muted-foreground transition-colors">
+                ביטול
+              </button>
+              <button
+                onClick={() => { handleDelete(viewNote.id); setViewNote(null); }}
+                disabled={deletingId === viewNote.id}
+                className="flex items-center gap-1 text-sm text-muted-foreground hover:text-rose-600 transition-colors px-2 py-1.5 rounded-lg hover:bg-rose-50 mr-auto">
+                {deletingId === viewNote.id
+                  ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  : <Trash2 className="w-3.5 h-3.5" />}
+                מחק
+              </button>
+            </div>
           </div>
-
-          <div className="border-t border-border/50 px-4 py-3 shrink-0 flex items-center gap-2">
-            {editId === viewNote.id ? (
-              <>
-                <button onClick={() => saveEdit(viewNote.id)}
-                  className="flex-1 text-sm py-1.5 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">
-                  שמור
-                </button>
-                <button onClick={() => setEditId(null)}
-                  className="text-sm px-3 py-1.5 rounded-lg hover:bg-muted text-muted-foreground transition-colors">
-                  ביטול
-                </button>
-              </>
-            ) : (
-              <>
-                <button
-                  onClick={() => openEdit(viewNote)}
-                  className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors px-2 py-1.5 rounded-lg hover:bg-muted">
-                  <Pencil className="w-3.5 h-3.5" /> ערוך
-                </button>
-                <button
-                  onClick={() => { handleDelete(viewNote.id); setViewNote(null); }}
-                  disabled={deletingId === viewNote.id}
-                  className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-rose-600 transition-colors px-2 py-1.5 rounded-lg hover:bg-rose-50 mr-auto">
-                  {deletingId === viewNote.id
-                    ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    : <Trash2 className="w-3.5 h-3.5" />}
-                  מחק
-                </button>
-              </>
-            )}
-          </div>
-        </>
+        </div>
       ) : (
         /* ── Notes list ── */
         <>
