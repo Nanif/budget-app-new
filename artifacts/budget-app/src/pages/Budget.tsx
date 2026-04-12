@@ -1,5 +1,4 @@
 import { useState, useEffect, useMemo } from "react";
-import { Link } from "wouter";
 import { PageHeader } from "@/components/PageHeader";
 import { useBudgetYear } from "@/contexts/BudgetYearContext";
 import { Button } from "@/components/ui/button";
@@ -11,7 +10,7 @@ import { cn } from "@/lib/utils";
 import { apiFetch } from "@/lib/api";
 import {
   Pencil, Check, X, Loader2, Plus, Wallet, Settings2,
-  TrendingUp, TrendingDown, AlertTriangle, ArrowLeft,
+  TrendingUp, TrendingDown, AlertTriangle,
   Minus, CalendarDays, CircleDollarSign, Trash2, BarChart3,
   ListChecks,
 } from "lucide-react";
@@ -929,13 +928,6 @@ function FundCard({ fund, spent, onEdit, onDelete, dimmed = false, fixedBudget, 
   const statusLabel = status === "over" ? "חריגה" : status === "warn" ? "קרוב לגבול" : "תקין";
   const statusBg    = status === "over" ? "bg-rose-100 text-rose-700" : status === "warn" ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700";
 
-  /* route to detail page */
-  const detailPath = fund.fundBehavior === "cash_monthly"        ? `/cash`
-    : fund.fundBehavior === "annual_categorized"  ? `/annual`
-    : fund.fundBehavior === "annual_large"         ? `/large`
-    : fund.fundBehavior === "non_budget"           ? `/external`
-    : null;
-
   return (
     <div className={cn(
       "bg-card rounded-2xl border border-border/60 p-4 flex flex-col gap-3 hover:shadow-md transition-all group",
@@ -973,13 +965,6 @@ function FundCard({ fund, spent, onEdit, onDelete, dimmed = false, fixedBudget, 
             className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors">
             <Pencil className="w-3.5 h-3.5" />
           </button>
-          {detailPath && (
-            <Link href={detailPath}>
-              <span className="p-1.5 rounded-lg hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors block">
-                <ArrowLeft className="w-3.5 h-3.5" />
-              </span>
-            </Link>
-          )}
         </div>
       </div>
 
