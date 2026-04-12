@@ -174,45 +174,36 @@ function DebtsCard({ debts, onAdd, onUpdate, onDelete }: {
   const [saving, setSaving]     = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
 
-  const [viewDebt, setViewDebt]   = useState<Debt | null>(null);
-  const [editName, setEditName]   = useState("");
-  const [editAmt, setEditAmt]     = useState("");
-  const [editNotes, setEditNotes] = useState("");
-  const [editType, setEditType]   = useState<"i_owe" | "owed_to_me">("i_owe");
-  const editRef = useRef<HTMLInputElement>(null);
-
-  // inline (double-click) editing
-  const [inlineId, setInlineId]       = useState<number | null>(null);
-  const [inlineName, setInlineName]   = useState("");
-  const [inlineAmt, setInlineAmt]     = useState("");
+  // inline double-click editing
+  const [inlineId, setInlineId]         = useState<number | null>(null);
+  const [inlineName, setInlineName]     = useState("");
+  const [inlineAmt, setInlineAmt]       = useState("");
+  const [inlineNotes, setInlineNotes]   = useState("");
   const [inlineSaving, setInlineSaving] = useState(false);
-  const inlineNameRef = useRef<HTMLInputElement>(null);
-  const inlineAmtRef  = useRef<HTMLInputElement>(null);
-  const clickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const inlineNameRef  = useRef<HTMLInputElement>(null);
+  const inlineAmtRef   = useRef<HTMLInputElement>(null);
+  const inlineNotesRef = useRef<HTMLTextAreaElement>(null);
 
   const activeDebts = debts.filter(d => d.status === "active");
 
-  const openDebt = (d: Debt) => {
-    setViewDebt(d);
-    setEditName(d.name);
-    setEditAmt(String(d.remainingAmount));
-    setEditNotes(d.notes || "");
-    setEditType(d.type as "i_owe" | "owed_to_me");
-    setTimeout(() => editRef.current?.focus(), 50);
-  };
-  const closeDebt = () => setViewDebt(null);
-
-  const startInlineEdit = (d: Debt, focus: "name" | "amt") => {
+  const startInlineEdit = (d: Debt, focus: "name" | "amt" | "notes") => {
     setInlineId(d.id);
     setInlineName(d.name);
     setInlineAmt(String(d.remainingAmount));
+    setInlineNotes(d.notes || "");
     setTimeout(() => {
-      if (focus === "name") inlineNameRef.current?.focus();
-      else inlineAmtRef.current?.focus();
+      if (focus === "name")  inlineNameRef.current?.focus();
+      else if (focus === "amt")   inlineAmtRef.current?.focus();
+      else inlineNotesRef.current?.focus();
     }, 20);
   };
 
   const cancelInlineEdit = () => setInlineId(null);
+
+  const isInlineField = () => {
+    const a = document.activeElement;
+    return a === inlineNameRef.current || a === inlineAmtRef.current || a === inlineNotesRef.current;
+  };
 
   const saveInlineEdit = async (d: Debt) => {
     if (!inlineName.trim()) return cancelInlineEdit();
@@ -221,36 +212,10 @@ function DebtsCard({ debts, onAdd, onUpdate, onDelete }: {
       await onUpdate(d.id, {
         name: inlineName.trim(),
         remainingAmount: parseFloat(inlineAmt) || 0,
+        notes: inlineNotes,
       });
     } catch { toast({ title: "שגיאה בעדכון", variant: "destructive" }); }
     finally { setInlineSaving(false); setInlineId(null); }
-  };
-
-  const handleRowClick = (d: Debt) => {
-    if (inlineId === d.id) return;
-    if (clickTimerRef.current) return;
-    clickTimerRef.current = setTimeout(() => {
-      clickTimerRef.current = null;
-      openDebt(d);
-    }, 230);
-  };
-
-  const handleRowDblClick = (d: Debt, focus: "name" | "amt") => {
-    if (clickTimerRef.current) { clearTimeout(clickTimerRef.current); clickTimerRef.current = null; }
-    startInlineEdit(d, focus);
-  };
-
-  const saveDebt = async () => {
-    if (!viewDebt || !editName.trim()) return;
-    try {
-      await onUpdate(viewDebt.id, {
-        name: editName.trim(),
-        remainingAmount: parseFloat(editAmt) || 0,
-        notes: editNotes,
-        type: editType,
-      });
-      setViewDebt(v => v ? { ...v, name: editName.trim(), remainingAmount: parseFloat(editAmt) || 0, notes: editNotes, type: editType } : v);
-    } catch { toast({ title: "שגיאה בעדכון", variant: "destructive" }); }
   };
 
   const handleAdd = async () => {
@@ -277,168 +242,110 @@ function DebtsCard({ debts, onAdd, onUpdate, onDelete }: {
     <div className={SECTION_STYLE}>
       {/* ── Header ── */}
       <div className={SECTION_HEAD}>
-        {viewDebt ? (
-          <div className="flex items-center gap-2 w-full min-w-0">
-            <button onClick={closeDebt}
-              className="p-1 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors shrink-0">
-              <ChevronRight className="w-4 h-4" />
-            </button>
-            <span className={cn("w-2 h-2 rounded-full shrink-0", editType === "i_owe" ? "bg-rose-400" : "bg-emerald-400")} />
-            <span className="text-sm font-semibold truncate">{viewDebt.name}</span>
+        <div className={SECTION_TITLE}>
+          <div className={ICON_WRAP("bg-rose-100")}>
+            <CreditCard className="w-4 h-4 text-rose-600" />
           </div>
-        ) : (
-          <div className={SECTION_TITLE}>
-            <div className={ICON_WRAP("bg-rose-100")}>
-              <CreditCard className="w-4 h-4 text-rose-600" />
-            </div>
-            חובות
-          </div>
-        )}
+          חובות
+        </div>
       </div>
 
-      {viewDebt ? (
-        /* ── Inline debt edit ── */
-        <div className="flex-1 overflow-y-auto px-5 py-4">
-          <div className="flex flex-col gap-3">
-            {/* Type toggle */}
-            <div className="flex gap-1.5">
-              {[{ v: "i_owe", l: "אני חייב" }, { v: "owed_to_me", l: "חייבים לי" }].map(t => (
-                <button key={t.v} onClick={() => setEditType(t.v as any)}
-                  className={cn("flex-1 text-xs py-1.5 rounded-lg border font-medium transition-colors",
-                    editType === t.v ? "bg-foreground text-background border-foreground" : "border-border text-muted-foreground")}>
-                  {t.l}
-                </button>
-              ))}
-            </div>
-            {/* Name */}
-            <input
-              ref={editRef}
-              value={editName} onChange={e => setEditName(e.target.value)}
-              placeholder="שם..."
-              className="w-full text-sm font-semibold bg-transparent border-b border-border/50 focus:border-primary outline-none pb-1 transition-colors"
-            />
-            {/* Amount */}
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-muted-foreground shrink-0">סכום</span>
-              <input
-                value={editAmt} onChange={e => setEditAmt(e.target.value)}
-                type="number" dir="ltr"
-                className="flex-1 text-sm bg-transparent border-b border-border/50 focus:border-primary outline-none pb-1 text-left transition-colors"
-              />
-              <span className="text-xs text-muted-foreground">₪</span>
-            </div>
-            {/* Notes */}
-            <div className="flex flex-col gap-1">
-              <span className="text-xs text-muted-foreground">הערות</span>
-              <textarea
-                value={editNotes} onChange={e => setEditNotes(e.target.value)}
-                rows={Math.max(3, (editNotes.match(/\n/g) || []).length + 3)}
-                placeholder="הוסף הערה..."
-                className="w-full text-sm bg-transparent outline-none resize-none leading-relaxed text-foreground placeholder:text-muted-foreground/50 border-b border-border/30 focus:border-primary transition-colors pb-1"
-              />
-            </div>
-            {/* Buttons */}
-            <div className="flex items-center gap-2 pt-2 border-t border-border/30">
-              <button onClick={saveDebt}
-                className="text-sm px-4 py-1.5 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">
-                שמור
-              </button>
-              <button onClick={closeDebt}
-                className="text-sm px-3 py-1.5 rounded-lg hover:bg-muted text-muted-foreground transition-colors">
-                ביטול
-              </button>
-              <button
-                onClick={() => { handleDelete(viewDebt.id); closeDebt(); }}
-                disabled={deletingId === viewDebt.id}
-                className="flex items-center gap-1 text-sm text-muted-foreground hover:text-rose-600 transition-colors px-2 py-1.5 rounded-lg hover:bg-rose-50 mr-auto">
-                {deletingId === viewDebt.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
-                מחק
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : (
-        /* ── Debts list ── */
-        <>
-          <div className="px-5 pb-4 flex-1 overflow-y-auto">
-            {activeDebts.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-6">אין חובות פעילים</p>
-            ) : (
-              <div className="space-y-0.5">
-                {activeDebts.map(d => {
-                  const isInline = inlineId === d.id;
-                  return (
-                    <div key={d.id}
-                      onClick={() => handleRowClick(d)}
-                      onDoubleClick={() => handleRowDblClick(d, "name")}
-                      className={cn(
-                        "group flex items-center gap-2 py-2.5 border-b border-border/30 last:border-0 rounded-lg px-1 -mx-1 transition-colors select-none",
-                        isInline ? "bg-muted/40" : "cursor-pointer hover:bg-muted/30"
-                      )}>
-                      <span className={cn("w-2 h-2 rounded-full shrink-0", d.type === "i_owe" ? "bg-rose-400" : "bg-emerald-400")} />
+      {/* ── Debts list ── */}
+      <>
+        <div className="px-5 pb-4 flex-1 overflow-y-auto">
+          {activeDebts.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-6">אין חובות פעילים</p>
+          ) : (
+            <div className="space-y-0.5">
+              {activeDebts.map(d => {
+                const isInline = inlineId === d.id;
+                const blurSave = () => setTimeout(() => { if (!isInlineField()) saveInlineEdit(d); }, 0);
+                const blurCancel = () => setTimeout(() => { if (!isInlineField()) cancelInlineEdit(); }, 0);
+                return (
+                  <div key={d.id}
+                    className={cn(
+                      "group border-b border-border/30 last:border-0 rounded-lg px-1 -mx-1 transition-colors",
+                      isInline ? "bg-muted/40 py-2" : "py-2.5 hover:bg-muted/30"
+                    )}>
 
-                      {isInline ? (
-                        /* ── inline edit inputs ── */
-                        <>
+                    {isInline ? (
+                      /* ── inline edit ── */
+                      <div className="flex flex-col gap-1.5">
+                        <div className="flex items-center gap-2">
+                          <span className={cn("w-2 h-2 rounded-full shrink-0", d.type === "i_owe" ? "bg-rose-400" : "bg-emerald-400")} />
                           <input
                             ref={inlineNameRef}
                             value={inlineName}
                             onChange={e => setInlineName(e.target.value)}
-                            onClick={e => e.stopPropagation()}
-                            onDoubleClick={e => e.stopPropagation()}
-                            onKeyDown={e => {
-                              if (e.key === "Enter") saveInlineEdit(d);
-                              if (e.key === "Escape") cancelInlineEdit();
-                            }}
-                            onBlur={() => setTimeout(() => {
-                              if (document.activeElement !== inlineAmtRef.current) saveInlineEdit(d);
-                            }, 0)}
-                            className="flex-1 min-w-0 text-sm bg-transparent border-b border-primary outline-none"
+                            onKeyDown={e => { if (e.key === "Enter") saveInlineEdit(d); if (e.key === "Escape") cancelInlineEdit(); }}
+                            onBlur={blurSave}
+                            className="flex-1 min-w-0 text-sm font-medium bg-transparent border-b border-primary outline-none"
                           />
                           <input
                             ref={inlineAmtRef}
                             value={inlineAmt}
                             onChange={e => setInlineAmt(e.target.value)}
-                            onClick={e => e.stopPropagation()}
-                            onDoubleClick={e => e.stopPropagation()}
                             type="number" dir="ltr"
-                            onKeyDown={e => {
-                              if (e.key === "Enter") saveInlineEdit(d);
-                              if (e.key === "Escape") cancelInlineEdit();
-                            }}
-                            onBlur={() => setTimeout(() => {
-                              if (document.activeElement !== inlineNameRef.current) saveInlineEdit(d);
-                            }, 0)}
+                            onKeyDown={e => { if (e.key === "Enter") saveInlineEdit(d); if (e.key === "Escape") cancelInlineEdit(); }}
+                            onBlur={blurSave}
                             className={cn(
                               "w-16 text-sm tabular-nums font-semibold bg-transparent border-b border-primary outline-none text-left shrink-0",
                               d.type === "i_owe" ? "text-rose-600" : "text-emerald-600"
                             )}
                           />
-                          {inlineSaving && <Loader2 className="w-3 h-3 animate-spin text-muted-foreground shrink-0" />}
-                        </>
-                      ) : (
-                        /* ── normal display ── */
-                        <>
-                          <div className="flex-1 min-w-0"
-                            onDoubleClick={e => { e.stopPropagation(); handleRowDblClick(d, "name"); }}>
-                            <p className="text-sm truncate">{d.name}</p>
-                            {d.notes && (
-                              <p className="text-xs text-muted-foreground truncate mt-0.5">{d.notes}</p>
-                            )}
-                          </div>
-                          <span
-                            onDoubleClick={e => { e.stopPropagation(); handleRowDblClick(d, "amt"); }}
-                            className={cn("font-semibold tabular-nums text-sm shrink-0", d.type === "i_owe" ? "text-rose-600" : "text-emerald-600")}>
-                            {fmt(d.remainingAmount)}
-                          </span>
-                        </>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
+                          {inlineSaving
+                            ? <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground shrink-0" />
+                            : <button onClick={() => { handleDelete(d.id); cancelInlineEdit(); }}
+                                disabled={deletingId === d.id}
+                                className="p-0.5 rounded hover:text-rose-600 text-muted-foreground/50 transition-colors shrink-0">
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                          }
+                        </div>
+                        <textarea
+                          ref={inlineNotesRef}
+                          value={inlineNotes}
+                          onChange={e => setInlineNotes(e.target.value)}
+                          placeholder="הערה..."
+                          rows={Math.max(1, (inlineNotes.match(/\n/g) || []).length + 1)}
+                          onKeyDown={e => { if (e.key === "Escape") cancelInlineEdit(); }}
+                          onBlur={blurSave}
+                          className="w-full text-xs text-muted-foreground bg-transparent border-b border-border/40 focus:border-primary outline-none resize-none leading-relaxed placeholder:text-muted-foreground/40 pr-4"
+                        />
+                      </div>
+                    ) : (
+                      /* ── normal display ── */
+                      <div className="flex items-center gap-2">
+                        <span className={cn("w-2 h-2 rounded-full shrink-0", d.type === "i_owe" ? "bg-rose-400" : "bg-emerald-400")} />
+                        <div className="flex-1 min-w-0 cursor-text"
+                          onDoubleClick={() => startInlineEdit(d, "name")}>
+                          <p className="text-sm truncate">{d.name}</p>
+                          {d.notes && (
+                            <p className="text-xs text-muted-foreground truncate mt-0.5"
+                              onDoubleClick={e => { e.stopPropagation(); startInlineEdit(d, "notes"); }}>
+                              {d.notes}
+                            </p>
+                          )}
+                          {!d.notes && (
+                            <p className="text-xs text-muted-foreground/30 mt-0.5 hidden group-hover:block"
+                              onDoubleClick={e => { e.stopPropagation(); startInlineEdit(d, "notes"); }}>
+                              הוסף הערה...
+                            </p>
+                          )}
+                        </div>
+                        <span className="font-semibold tabular-nums text-sm shrink-0 cursor-text"
+                          onDoubleClick={() => startInlineEdit(d, "amt")}
+                          style={{ color: d.type === "i_owe" ? "var(--color-rose-600, #e11d48)" : "var(--color-emerald-600, #059669)" }}>
+                          {fmt(d.remainingAmount)}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
 
           {/* Quick-add */}
           <div className="border-t border-border/50 px-4 py-3 shrink-0">
@@ -480,7 +387,6 @@ function DebtsCard({ debts, onAdd, onUpdate, onDelete }: {
             )}
           </div>
         </>
-      )}
     </div>
   );
 }
