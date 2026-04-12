@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { apiFetch } from "@/lib/api";
 import {
   CreditCard, CheckSquare, StickyNote,
-  Plus, Check, Circle, Loader2, Trash2,
+  Plus, Check, Loader2, Trash2,
   TrendingUp, TrendingDown, Pin, BookOpen, Sun,
 } from "lucide-react";
 
@@ -317,7 +317,6 @@ function RemindersCard({ tasks, onAdd, onToggle, onUpdate, onDelete }: {
   const [open, setOpen]         = useState(false);
   const [title, setTitle]       = useState("");
   const [saving, setSaving]     = useState(false);
-  const [togglingId, setTogglingId]   = useState<number | null>(null);
   const [deletingId, setDeletingId]   = useState<number | null>(null);
   const [highlightingId, setHighlightingId] = useState<number | null>(null);
   const [editId, setEditId]           = useState<number | null>(null);
@@ -341,13 +340,6 @@ function RemindersCard({ tasks, onAdd, onToggle, onUpdate, onDelete }: {
       await onUpdate(id, { title: editTitle.trim() });
       setEditId(null);
     } catch { toast({ title: "שגיאה בעדכון", variant: "destructive" }); }
-  };
-
-  const handleToggle = async (id: number) => {
-    setTogglingId(id);
-    try { await onToggle(id); }
-    catch { toast({ title: "שגיאה", variant: "destructive" }); }
-    finally { setTogglingId(null); }
   };
 
   const handleDelete = async (id: number) => {
@@ -391,8 +383,11 @@ function RemindersCard({ tasks, onAdd, onToggle, onUpdate, onDelete }: {
         ) : (
           sorted.map(task => (
             <div key={task.id}
-              className={cn("group flex items-start gap-2 py-2 border-b border-border/30 last:border-0",
-                task.status === "done" && "opacity-50")}
+              className={cn(
+                "group flex items-start gap-2 py-2 border-b border-border/30 last:border-0 rounded-lg px-1 transition-colors",
+                task.status === "done" && "opacity-40",
+                task.priority === "high" && task.status !== "done" && "bg-amber-50/70 border-amber-100"
+              )}
               onDoubleClick={() => editId !== task.id && openEdit(task)}>
 
               {editId === task.id ? (
@@ -412,39 +407,33 @@ function RemindersCard({ tasks, onAdd, onToggle, onUpdate, onDelete }: {
               ) : (
                 /* View row */
                 <>
+                  {/* Highlight accent bar */}
+                  {task.priority === "high" && task.status !== "done" && (
+                    <div className="w-1 self-stretch rounded-full bg-amber-400 shrink-0" />
+                  )}
                   <p className={cn(
                     "flex-1 text-sm leading-snug",
-                    task.status === "done" && "line-through",
-                    task.priority === "high" && task.status !== "done" && "font-semibold text-amber-700"
-                  )}>{task.priority === "high" && task.status !== "done" && "★ "}{task.title}</p>
+                    task.status === "done" && "line-through text-muted-foreground",
+                    task.priority === "high" && task.status !== "done" && "font-bold text-amber-900"
+                  )}>{task.priority === "high" && task.status !== "done" && "⭐ "}{task.title}</p>
 
                   {/* Actions — visible on hover */}
                   <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
                     {/* הבלט */}
                     <button onClick={() => handleHighlight(task)} disabled={highlightingId === task.id}
                       title={task.priority === "high" ? "הסר הבלטה" : "הבלט משימה"}
-                      className={cn("p-1 rounded transition-colors",
+                      className={cn("p-1.5 rounded-lg transition-colors",
                         task.priority === "high"
-                          ? "text-amber-500 hover:bg-amber-50"
-                          : "text-muted-foreground hover:bg-amber-50 hover:text-amber-500")}>
+                          ? "bg-amber-200 text-amber-700 hover:bg-amber-300"
+                          : "text-muted-foreground hover:bg-amber-100 hover:text-amber-600")}>
                       {highlightingId === task.id
-                        ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        : <Sun className="w-3.5 h-3.5" />}
-                    </button>
-                    {/* הזרח / toggle */}
-                    <button onClick={() => handleToggle(task.id)} disabled={togglingId === task.id}
-                      title={task.status === "done" ? "בטל סימון" : "סמן כבוצע"}
-                      className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors">
-                      {togglingId === task.id
-                        ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        : task.status === "done"
-                          ? <Circle className="w-3.5 h-3.5" />
-                          : <Check className="w-3.5 h-3.5" />}
+                        ? <Loader2 className="w-4 h-4 animate-spin" />
+                        : <Sun className="w-4 h-4" />}
                     </button>
                     {/* מחיקה */}
                     <button onClick={() => handleDelete(task.id)} disabled={deletingId === task.id}
-                      className="p-1 rounded hover:bg-rose-50 text-muted-foreground hover:text-rose-600 transition-colors">
-                      {deletingId === task.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                      className="p-1.5 rounded-lg hover:bg-rose-50 text-muted-foreground hover:text-rose-600 transition-colors">
+                      {deletingId === task.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
                     </button>
                   </div>
                 </>
