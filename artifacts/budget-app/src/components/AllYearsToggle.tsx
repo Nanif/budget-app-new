@@ -36,7 +36,7 @@ export function AllYearsToggle({ years, active, selectedIds, onToggle, onSelectI
         )}
       >
         <CalendarRange className="w-3.5 h-3.5" />
-        כל השנים
+        {active ? "תקציב נוכחי" : "כל השנים"}
         {active && !allSelected && (
           <span className="bg-primary/15 text-primary text-[10px] px-1.5 py-0.5 rounded-full font-bold">
             {selectedIds.length}
