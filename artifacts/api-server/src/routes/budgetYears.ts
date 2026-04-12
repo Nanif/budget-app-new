@@ -1,6 +1,23 @@
 import { Router } from "express";
-import { db, budgetYearsTable, systemSettingsTable, insertBudgetYearSchema } from "@workspace/db";
-import { eq, and } from "drizzle-orm";
+import { db, budgetYearsTable, systemSettingsTable, insertBudgetYearSchema, fundsTable } from "@workspace/db";
+import { eq, and, sql } from "drizzle-orm";
+
+const DEFAULT_YEAR_FUNDS = [
+  { name: "קופת שוטף",          fundBehavior: "cash_monthly",       colorClass: "#f59e0b", monthlyAllocation: "0", annualAllocation: "0", initialBalance: "0", includeInBudget: true,  displayOrder: 0, isDefault: true },
+  { name: "קופת קבועות",        fundBehavior: "fixed_monthly",      colorClass: "#3b82f6", monthlyAllocation: "0", annualAllocation: "0", initialBalance: "0", includeInBudget: true,  displayOrder: 1, isDefault: true },
+  { name: "קופת משכנתא וחובות", fundBehavior: "fixed_monthly",      colorClass: "#8b5cf6", monthlyAllocation: "0", annualAllocation: "0", initialBalance: "0", includeInBudget: true,  displayOrder: 2, isDefault: true },
+  { name: "קופת מעגל שנה",      fundBehavior: "annual_categorized", colorClass: "#10b981", monthlyAllocation: "0", annualAllocation: "0", initialBalance: "0", includeInBudget: true,  displayOrder: 3, isDefault: true },
+];
+
+async function seedDefaultFunds(userId: number, byid: number) {
+  const existing = await db.select({ n: sql<string>`COUNT(*)` }).from(fundsTable)
+    .where(and(eq(fundsTable.userId, userId), eq(fundsTable.budgetYearId, byid)));
+  if (parseInt(existing[0].n) === 0) {
+    await db.insert(fundsTable).values(
+      DEFAULT_YEAR_FUNDS.map(f => ({ ...f, userId, budgetYearId: byid, isActive: true, description: "" }))
+    );
+  }
+}
 
 const router = Router();
 const DEFAULT_USER_ID = 1;
@@ -23,6 +40,7 @@ router.post("/", async (req, res) => {
     const parsed = insertBudgetYearSchema.safeParse(body);
     if (!parsed.success) { res.status(400).json({ error: "Invalid input", details: parsed.error.issues }); return; }
     const [created] = await db.insert(budgetYearsTable).values(parsed.data).returning();
+    await seedDefaultFunds(DEFAULT_USER_ID, created.id);
     res.status(201).json(created);
   } catch (err) {
     req.log.error({ err }, "Failed to create budget year");

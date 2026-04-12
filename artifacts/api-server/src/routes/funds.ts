@@ -105,24 +105,10 @@ router.get("/summary", async (req, res) => {
   }
 });
 
-/* ── default funds seeded per budget year ────────────────────── */
-const DEFAULT_YEAR_FUNDS = [
-  { name: "קופת שוטף",          fundBehavior: "cash_monthly",       colorClass: "#f59e0b", monthlyAllocation: "0", annualAllocation: "0", initialBalance: "0", includeInBudget: true,  displayOrder: 0, isDefault: true },
-  { name: "קופת קבועות",        fundBehavior: "fixed_monthly",      colorClass: "#3b82f6", monthlyAllocation: "0", annualAllocation: "0", initialBalance: "0", includeInBudget: true,  displayOrder: 1, isDefault: true },
-  { name: "קופת משכנתא וחובות", fundBehavior: "fixed_monthly",      colorClass: "#8b5cf6", monthlyAllocation: "0", annualAllocation: "0", initialBalance: "0", includeInBudget: true,  displayOrder: 2, isDefault: true },
-  { name: "קופת מעגל שנה",      fundBehavior: "annual_categorized", colorClass: "#10b981", monthlyAllocation: "0", annualAllocation: "0", initialBalance: "0", includeInBudget: true,  displayOrder: 3, isDefault: true },
-];
-
 /* ── global (cross-year) default funds — created once per user ── */
 const DEFAULT_GLOBAL_FUNDS = [
   { name: "עודפים", fundBehavior: "expense_non_budget", colorClass: "#06b6d4", monthlyAllocation: "0", annualAllocation: "0", initialBalance: "0", includeInBudget: false, displayOrder: 99, isDefault: true },
 ];
-
-async function seedDefaultFunds(byid: number) {
-  await db.insert(fundsTable).values(
-    DEFAULT_YEAR_FUNDS.map(f => ({ ...f, userId: DEFAULT_USER_ID, budgetYearId: byid, isActive: true, description: "" }))
-  );
-}
 
 async function seedGlobalFunds() {
   const existing = await db.select({ name: fundsTable.name }).from(fundsTable)
@@ -140,11 +126,6 @@ router.get("/", async (req, res) => {
     const byid = getBYID(req);
     const includeInactive = req.query.all === "true";
     const activeClause = includeInactive ? [] : [eq(fundsTable.isActive, true)];
-
-    /* Seed per-year funds if this year has none */
-    const yearCount = await db.select({ n: sql<string>`COUNT(*)` }).from(fundsTable)
-      .where(and(eq(fundsTable.userId, DEFAULT_USER_ID), eq(fundsTable.budgetYearId, byid)));
-    if (parseInt(yearCount[0].n) === 0) await seedDefaultFunds(byid);
 
     /* Seed global funds once if they don't exist */
     await seedGlobalFunds();
