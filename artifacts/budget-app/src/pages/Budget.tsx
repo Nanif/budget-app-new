@@ -162,6 +162,7 @@ export default function Budget() {
     colorClass: "#6366f1",
     monthlyAllocation: "", annualAllocation: "", initialBalance: "",
     description: "",
+    withCategories: true,
   });
   const [fundSaving, setFundSaving] = useState(false);
 
@@ -262,7 +263,7 @@ export default function Budget() {
   /* ── fund dialog helpers ─────────────────────────────────── */
   const openCreateFund = () => {
     setEditFund(null);
-    setFundForm({ name: "", period: "monthly", transactionType: "none", colorClass: "#6366f1", monthlyAllocation: "", annualAllocation: "", initialBalance: "", description: "" });
+    setFundForm({ name: "", period: "monthly", transactionType: "none", colorClass: "#6366f1", monthlyAllocation: "", annualAllocation: "", initialBalance: "", description: "", withCategories: true });
     setFundDialog(true);
   };
   const openEditFund = (f: Fund) => {
@@ -276,6 +277,7 @@ export default function Budget() {
       annualAllocation:  f.annualAllocation  > 0 ? String(f.annualAllocation)  : "",
       initialBalance:    f.initialBalance    > 0 ? String(f.initialBalance)    : "",
       description: "",
+      withCategories: f.fundBehavior !== "annual_large",
     });
     setFundDialog(true);
   };
@@ -283,7 +285,9 @@ export default function Budget() {
     if (!fundForm.name.trim()) { toast({ title: "שם הקופה נדרש", variant: "destructive" }); return; }
     setFundSaving(true);
     try {
-      const behavior = BEHAVIOR_MAP[fundForm.period][fundForm.transactionType];
+      const behavior = (fundForm.period === "annual" && fundForm.transactionType === "expenses")
+        ? (fundForm.withCategories ? "annual_categorized" : "annual_large")
+        : BEHAVIOR_MAP[fundForm.period][fundForm.transactionType];
       const monthly  = isMonthlyFund(behavior);
       const nonBudg  = isNonBudgetFund(behavior);
       const payload = {
@@ -551,6 +555,37 @@ export default function Budget() {
                 ))}
               </div>
             </div>
+
+            {/* קטגוריות — רק לקופה שנתית עם הוצאות */}
+            {fundForm.period === "annual" && fundForm.transactionType === "expenses" && (
+              <div className="space-y-2">
+                <label className="font-semibold text-sm">שיוך קטגוריות</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button type="button"
+                    disabled={!!editFund?.isDefault}
+                    onClick={() => setFundForm(p => ({ ...p, withCategories: true }))}
+                    className={cn(
+                      "px-3 py-3 rounded-xl border-2 transition-all text-center",
+                      fundForm.withCategories ? "border-primary bg-primary/5" : "border-border hover:border-primary/30",
+                      editFund?.isDefault && "opacity-60 cursor-not-allowed"
+                    )}>
+                    <p className="font-semibold text-sm">עם קטגוריות</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5 leading-tight">כל הוצאה משויכת לקטגוריה</p>
+                  </button>
+                  <button type="button"
+                    disabled={!!editFund?.isDefault}
+                    onClick={() => setFundForm(p => ({ ...p, withCategories: false }))}
+                    className={cn(
+                      "px-3 py-3 rounded-xl border-2 transition-all text-center",
+                      !fundForm.withCategories ? "border-primary bg-primary/5" : "border-border hover:border-primary/30",
+                      editFund?.isDefault && "opacity-60 cursor-not-allowed"
+                    )}>
+                    <p className="font-semibold text-sm">ללא קטגוריות</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5 leading-tight">הוצאות גדולות וחד-פעמיות</p>
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* תקציב */}
             {fundForm.period === "monthly" && fundForm.transactionType === "none" ? (
