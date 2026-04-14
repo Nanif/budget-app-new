@@ -22,10 +22,8 @@ if %errorlevel% neq 0 (
     call npm install -g pnpm
 )
 
-if not exist "node_modules" (
-    echo Running pnpm install...
-    call pnpm install
-)
+echo Running pnpm install...
+call pnpm install
 
 if not exist "artifacts\api-server\dist\index.mjs" (
     echo Building API server...
