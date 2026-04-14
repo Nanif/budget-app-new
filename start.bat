@@ -10,8 +10,9 @@ if not exist "config.bat" (
 
 call config.bat
 
-if "%SUPABASE_DATABASE_URL%"=="" (
-    echo ERROR: SUPABASE_DATABASE_URL is not set in config.bat
+if "%SUPABASE_DATABASE_URL%"=="" if "%DB_HOST%"=="" (
+    echo ERROR: No DB connection found in config.bat
+    echo Please set either SUPABASE_DATABASE_URL or DB_HOST in config.bat
     pause
     exit /b 1
 )
