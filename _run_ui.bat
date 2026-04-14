@@ -1,7 +1,7 @@
 @echo off
 chcp 65001 > nul
-title Budget App UI
-echo Frontend starting on http://localhost:3000 ...
+title Frontend - Budget App
 cd /d "%~dp0"
-pnpm --filter budget-app exec vite --config vite.config.local.ts
+echo Frontend starting on http://localhost:3000 ...
+pnpm --filter budget-app exec vite --config artifacts/budget-app/vite.config.local.ts
 pause

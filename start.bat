@@ -32,11 +32,11 @@ if not exist "artifacts\api-server\dist\index.mjs" (
     call pnpm --filter api-server run build
 )
 
-start "API Server" cmd /k "cd /d "%~dp0" && call config.bat && set PORT=3001 && set NODE_ENV=production && node artifacts\api-server\dist\index.mjs"
+start "API Server" cmd /k "call \"%~dp0_run_api.bat\""
 
 timeout /t 4 /nobreak > nul
 
-start "Frontend" cmd /k "cd /d "%~dp0" && pnpm --filter budget-app exec vite --config artifacts/budget-app/vite.config.local.ts"
+start "Frontend" cmd /k "call \"%~dp0_run_ui.bat\""
 
 timeout /t 8 /nobreak > nul
 
