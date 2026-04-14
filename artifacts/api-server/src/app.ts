@@ -31,4 +31,12 @@ app.use(express.urlencoded({ extended: true }));
 
 app.use("/api", router);
 
+app.use((err: any, req: any, res: any, _next: any) => {
+  const message = err?.message || String(err);
+  const stack = err?.stack || "";
+  console.error("[ERROR]", message);
+  if (stack) console.error(stack);
+  res.status(500).json({ error: message });
+});
+
 export default app;
