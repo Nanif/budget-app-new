@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { db, budgetYearsTable, systemSettingsTable, insertBudgetYearSchema, fundsTable } from "@workspace/db";
 import { eq, and, sql } from "drizzle-orm";
+import { serverError } from "../lib/helpers";
 
 const DEFAULT_YEAR_FUNDS = [
   { name: "קופת שוטף",          fundBehavior: "cash_monthly",       colorClass: "#f59e0b", monthlyAllocation: "0", annualAllocation: "0", initialBalance: "0", includeInBudget: true,  displayOrder: 0, isDefault: true },
@@ -29,8 +30,7 @@ router.get("/", async (req, res) => {
       .orderBy(budgetYearsTable.startDate);
     res.json(rows);
   } catch (err) {
-    req.log.error({ err }, "Failed to get budget years");
-    res.status(500).json({ error: "Failed to get budget years" });
+    serverError(req, res, err, "Failed to get budget years");
   }
 });
 
@@ -43,8 +43,7 @@ router.post("/", async (req, res) => {
     await seedDefaultFunds(DEFAULT_USER_ID, created.id);
     res.status(201).json(created);
   } catch (err) {
-    req.log.error({ err }, "Failed to create budget year");
-    res.status(500).json({ error: "Failed to create budget year" });
+    serverError(req, res, err, "Failed to create budget year");
   }
 });
 
@@ -59,8 +58,7 @@ router.put("/:id", async (req, res) => {
     if (!updated) { res.status(404).json({ error: "Not found" }); return; }
     res.json(updated);
   } catch (err) {
-    req.log.error({ err }, "Failed to update budget year");
-    res.status(500).json({ error: "Failed to update budget year" });
+    serverError(req, res, err, "Failed to update budget year");
   }
 });
 
@@ -73,9 +71,8 @@ router.delete("/:id", async (req, res) => {
       .where(and(eq(budgetYearsTable.id, id), eq(budgetYearsTable.userId, DEFAULT_USER_ID))).returning();
     if (!deleted) { res.status(404).json({ error: "Not found" }); return; }
     res.json({ ok: true });
-  } catch (err: any) {
-    req.log.error({ err }, "Failed to delete budget year");
-    res.status(500).json({ error: "שגיאה במחיקה. ייתכן שיש נתונים המשויכים לשנה זו." });
+  } catch (err) {
+    serverError(req, res, err, "Failed to delete budget year");
   }
 });
 
@@ -91,8 +88,7 @@ router.post("/:id/activate", async (req, res) => {
       .where(eq(systemSettingsTable.userId, DEFAULT_USER_ID));
     res.json(activated);
   } catch (err) {
-    req.log.error({ err }, "Failed to activate budget year");
-    res.status(500).json({ error: "Failed to activate budget year" });
+    serverError(req, res, err, "Failed to activate budget year");
   }
 });
 

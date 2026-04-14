@@ -75,7 +75,12 @@ export function serverError(
   message: string,
 ): void {
   (req as any).log?.error?.({ err }, message);
-  res.status(500).json({ error: message });
+  const errMsg = err instanceof Error ? err.message : String(err);
+  const stack  = err instanceof Error ? err.stack  : undefined;
+  console.error(`\n[ERROR] ${message}`);
+  console.error(`        ${errMsg}`);
+  if (stack) console.error(stack);
+  res.status(500).json({ error: message, detail: errMsg });
 }
 
 /** Respond with a 404. */
