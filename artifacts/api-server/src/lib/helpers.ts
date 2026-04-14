@@ -75,12 +75,21 @@ export function serverError(
   message: string,
 ): void {
   (req as any).log?.error?.({ err }, message);
-  const errMsg = err instanceof Error ? err.message : String(err);
-  const stack  = err instanceof Error ? err.stack  : undefined;
+  const errMsg  = err instanceof Error ? err.message : String(err);
+  const cause   = (err as any)?.cause;
+  const causeMsg = cause instanceof Error ? cause.message : (cause ? String(cause) : undefined);
+  const stack   = err instanceof Error ? err.stack : undefined;
+
   console.error(`\n[ERROR] ${message}`);
   console.error(`        ${errMsg}`);
+  if (causeMsg) console.error(`  cause: ${causeMsg}`);
   if (stack) console.error(stack);
-  res.status(500).json({ error: message, detail: errMsg });
+
+  res.status(500).json({
+    error: message,
+    detail: errMsg,
+    cause: causeMsg,
+  });
 }
 
 /** Respond with a 404. */
