@@ -21,7 +21,10 @@ export function getActiveBid(): number {
 }
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
-export const API_BASE = `${BASE}/api`;
+// On Netlify: VITE_API_URL points to Fly.io backend. On Replit: use relative path.
+export const API_BASE = import.meta.env.VITE_API_URL
+  ? `${import.meta.env.VITE_API_URL}/api`
+  : `${BASE}/api`;
 
 export async function apiFetch(path: string, opts?: RequestInit): Promise<any> {
   const sep = path.includes("?") ? "&" : "?";

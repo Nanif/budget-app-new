@@ -1,0 +1,30 @@
+# fly.toml — שנה את app = "YOUR-APP-NAME" לשם האפליקציה שיצרת ב-Fly.io
+app = "YOUR-APP-NAME"
+primary_region = "ams"
+
+[build]
+  dockerfile = "artifacts/api-server/Dockerfile"
+
+[env]
+  PORT = "8080"
+  NODE_ENV = "production"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = true
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [[http_service.checks]]
+    grace_period = "10s"
+    interval = "30s"
+    method = "GET"
+    path = "/api/healthz"
+    protocol = "http"
+    timeout = "5s"
+
+[[vm]]
+  memory = "512mb"
+  cpu_kind = "shared"
+  cpus = 1
