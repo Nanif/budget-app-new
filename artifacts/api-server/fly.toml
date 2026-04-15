@@ -1,5 +1,4 @@
-# fly.toml — שנה את app = "YOUR-APP-NAME" לשם האפליקציה שיצרת ב-Fly.io
-app = "YOUR-APP-NAME"
+app = "budgets-api"
 primary_region = "ams"
 
 [build]
