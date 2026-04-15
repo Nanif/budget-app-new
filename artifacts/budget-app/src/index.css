@@ -127,6 +127,11 @@
   background: hsl(var(--muted-foreground) / 0.5); 
 }
 
+/* FortuneSheet tooltip — must not block pointer events on cells */
+.fortune-tooltip {
+  pointer-events: none !important;
+}
+
 /* Remove number input spinners globally */
 input[type="number"]::-webkit-outer-spin-button,
 input[type="number"]::-webkit-inner-spin-button {
