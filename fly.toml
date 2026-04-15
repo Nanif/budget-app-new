@@ -2,7 +2,7 @@ app = "budgets-api"
 primary_region = "ams"
 
 [build]
-  dockerfile = "artifacts/api-server/Dockerfile"
+  dockerfile = "Dockerfile"
 
 [env]
   PORT = "8080"
