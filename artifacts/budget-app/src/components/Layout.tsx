@@ -1,4 +1,5 @@
 import { ReactNode } from "react";
+import { useLocation } from "wouter";
 import { Sidebar } from "./Sidebar";
 import { QuickActions } from "./QuickActions";
 // import { AgentChat } from "./AgentChat";
@@ -9,22 +10,31 @@ interface LayoutProps {
 }
 
 export function Layout({ children }: LayoutProps) {
+  const [location] = useLocation();
+  const isSpreadsheet = location === "/spreadsheet";
+
   return (
     <div className="min-h-screen bg-background flex" dir="rtl">
       <Sidebar />
       <main className="flex-1 md:ms-64 min-w-0 flex flex-col h-screen overflow-hidden">
-        <div className="flex-1 overflow-y-auto p-4 pb-20 md:pb-8 md:p-8 lg:p-10 md:pl-20">
-          <motion.div 
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, ease: "easeOut" }}
-            className="max-w-7xl mx-auto w-full"
-          >
+        {isSpreadsheet ? (
+          <div className="flex-1 overflow-hidden" dir="ltr">
             {children}
-          </motion.div>
-        </div>
+          </div>
+        ) : (
+          <div className="flex-1 overflow-y-auto p-4 pb-20 md:pb-8 md:p-8 lg:p-10 md:pl-20">
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, ease: "easeOut" }}
+              className="max-w-7xl mx-auto w-full"
+            >
+              {children}
+            </motion.div>
+          </div>
+        )}
       </main>
-      <QuickActions />
+      {!isSpreadsheet && <QuickActions />}
       {/* <AgentChat /> */}
     </div>
   );

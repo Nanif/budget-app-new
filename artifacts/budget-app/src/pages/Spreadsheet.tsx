@@ -30,10 +30,7 @@ export default function Spreadsheet() {
   }, []);
 
   return (
-    <div
-      style={{ width: "100%", height: "calc(100vh - 110px)" }}
-      className="-mx-4 md:-mx-8 lg:-mx-10 -mt-2"
-    >
+    <div style={{ width: "100%", height: "100%" }}>
       <Workbook
         data={data}
         onChange={handleChange}
