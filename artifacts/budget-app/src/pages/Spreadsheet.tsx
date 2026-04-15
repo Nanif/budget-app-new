@@ -4,9 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 const STORAGE_KEY = "budget_spreadsheet_v1";
 
-// Exact English strings that appear as text content in FortuneSheet's DOM
 const HE: Record<string, string> = {
-  // === Toolbar tooltips (title attribute) ===
+  // ── Toolbar tooltips (fortune-tooltip div + data-tips + aria-label) ──
   "Undo": "בטל",
   "Redo": "בצע שנית",
   "Clear Format": "נקה עיצוב",
@@ -75,21 +74,15 @@ const HE: Record<string, string> = {
   "Cell format config": "הגדרות פורמט תא",
   "Print": "הדפס",
 
-  // === Cell right-click context menu (luckysheet-cols-menuitem-content) ===
+  // ── Cell right-click context menu ──
   "Copy": "העתק",
   "Copy as": "העתק כ...",
   "Paste": "הדבק",
-  // Concatenated: rightclick.deleteSelected + rightclick.row
   "Delete selected Row": "מחק שורות נבחרות",
-  // Concatenated: rightclick.deleteSelected + rightclick.column
   "Delete selected Column": "מחק עמודות נבחרות",
-  // Concatenated: rightclick.hideSelected + rightclick.row
   "Hide selected Row": "הסתר שורות נבחרות",
-  // Concatenated: rightclick.showHide + rightclick.row
   "Show hidden Row": "הצג שורות מוסתרות",
-  // Concatenated: rightclick.hideSelected + rightclick.column
   "Hide selected Column": "הסתר עמודות נבחרות",
-  // Concatenated: rightclick.showHide + rightclick.column
   "Show hidden Column": "הצג עמודות מוסתרות",
   "Clear content": "נקה תוכן",
   "Ascending sort": "מיון עולה",
@@ -98,7 +91,7 @@ const HE: Record<string, string> = {
   "Matrix operation": "פעולת מטריצה",
   "Delete cell": "מחק תא",
 
-  // === Sheet tab right-click (sheetconfig locale) ===
+  // ── Sheet-tab right-click menu ──
   "Delete": "מחק",
   "Rename": "שנה שם",
   "Change color": "שנה צבע",
@@ -111,7 +104,7 @@ const HE: Record<string, string> = {
   "Confirm color": "אשר צבע",
   "Focus": "מיקוד",
 
-  // === Dialog buttons ===
+  // ── Dialog buttons ──
   "OK": "אישור",
   "Update": "עדכן",
   "Insert": "הכנס",
@@ -119,58 +112,113 @@ const HE: Record<string, string> = {
   "Next": "הבא",
   "Find": "חפש",
   "Replace": "החלף",
-
-  // === Sheet / info ===
   "Loading...": "טוען...",
   "New sheet": "גיליון חדש",
   "Untitled spreadsheet": "גיליון ללא שם",
+
+  // ── Bottom-bar / zoom ──
+  "Zoom in": "הגדל תצוגה",
+  "Zoom out": "הקטן תצוגה",
+  "Dropdown": "רשימה נפתחת",
+  "Sheet options": "אפשרויות גיליון",
 };
 
-function translateNode(root: Element) {
-  // 1. Translate all title/aria-label attributes (toolbar tooltips)
-  root.querySelectorAll<HTMLElement>("[title]").forEach((el) => {
-    const t = el.getAttribute("title")!;
-    if (HE[t]) el.setAttribute("title", HE[t]);
-  });
+// Partial-match map for aria-label patterns like "Font size: 10"
+const HE_PREFIX: Record<string, string> = {
+  "Font size": "גודל גופן",
+  "Font": "גופן",
+  "Format": "פורמט",
+  "Dropdown": "רשימה נפתחת",
+};
 
-  // 2. Translate text inside cell right-click menu items
-  //    Each item wraps content in .luckysheet-cols-menuitem-content
-  root.querySelectorAll<HTMLElement>(".luckysheet-cols-menuitem-content").forEach((el) => {
-    const raw = el.textContent?.trim() ?? "";
-    if (HE[raw]) {
-      // Replace only the text nodes, leave any child elements (icons, inputs) intact
-      replaceTextNodes(el, HE[raw]);
+const already = new WeakSet<Element>();
+
+function translateNode(root: Element) {
+  // 1. ── Toolbar tooltip divs (.fortune-tooltip) ──────────────────────────
+  root.querySelectorAll<HTMLElement>(".fortune-tooltip").forEach((el) => {
+    if (already.has(el)) return;
+    const t = el.textContent?.trim() ?? "";
+    if (HE[t]) {
+      el.textContent = HE[t];
+      already.add(el);
     }
   });
 
-  // 3. Translate sheet-tab context menu items
-  root.querySelectorAll<HTMLElement>(".fortune-sheet-list-item").forEach((el) => {
-    const raw = el.textContent?.trim() ?? "";
-    if (HE[raw]) replaceTextNodes(el, HE[raw]);
+  // 2. ── data-tips attribute ────────────────────────────────────────────────
+  root.querySelectorAll<HTMLElement>("[data-tips]").forEach((el) => {
+    const t = el.getAttribute("data-tips") ?? "";
+    if (HE[t] && el.getAttribute("data-tips") !== HE[t]) {
+      el.setAttribute("data-tips", HE[t]);
+    }
   });
 
-  // 4. Translate generic buttons and labels in dialogs
+  // 3. ── aria-label attribute ───────────────────────────────────────────────
+  root.querySelectorAll<HTMLElement>("[aria-label]").forEach((el) => {
+    const raw = el.getAttribute("aria-label") ?? "";
+    if (HE[raw]) {
+      el.setAttribute("aria-label", HE[raw]);
+      return;
+    }
+    // Handle "Font size: 10" style labels
+    for (const [en, he] of Object.entries(HE_PREFIX)) {
+      if (raw.startsWith(en + ":") || raw.startsWith(en + " ")) {
+        el.setAttribute("aria-label", raw.replace(en, he));
+        break;
+      }
+    }
+  });
+
+  // 4. ── title attribute ────────────────────────────────────────────────────
+  root.querySelectorAll<HTMLElement>("[title]").forEach((el) => {
+    const t = el.getAttribute("title") ?? "";
+    if (HE[t] && el.getAttribute("title") !== HE[t]) {
+      el.setAttribute("title", HE[t]);
+    }
+  });
+
+  // 5. ── Cell right-click context menu items ───────────────────────────────
+  root.querySelectorAll<HTMLElement>(".luckysheet-cols-menuitem-content").forEach((el) => {
+    if (already.has(el)) return;
+    const raw = el.textContent?.trim() ?? "";
+    if (HE[raw]) {
+      replaceFirstTextNode(el, HE[raw]);
+      already.add(el);
+    }
+  });
+
+  // 6. ── Sheet-tab context menu items ──────────────────────────────────────
+  root.querySelectorAll<HTMLElement>(".fortune-sheet-list-item").forEach((el) => {
+    if (already.has(el)) return;
+    const raw = el.textContent?.trim() ?? "";
+    if (HE[raw]) {
+      replaceFirstTextNode(el, HE[raw]);
+      already.add(el);
+    }
+  });
+
+  // 7. ── Dialog / modal buttons ─────────────────────────────────────────────
   root.querySelectorAll<HTMLButtonElement>(
-    ".fortune-dialog button, .luckysheet-modal-dialog button"
+    ".fortune-dialog button, .luckysheet-modal-dialog button, " +
+    ".fortune-dialog-box-button-container button"
   ).forEach((btn) => {
-    if (!btn.querySelector("svg, img")) {
-      const raw = btn.textContent?.trim() ?? "";
-      if (HE[raw]) btn.textContent = HE[raw];
+    if (already.has(btn) || btn.querySelector("svg, img")) return;
+    const raw = btn.textContent?.trim() ?? "";
+    if (HE[raw]) {
+      btn.textContent = HE[raw];
+      already.add(btn);
     }
   });
 }
 
-function replaceTextNodes(el: HTMLElement, translated: string) {
-  // If the element has no children (pure text node) just set textContent
+function replaceFirstTextNode(el: HTMLElement, translated: string) {
   if (el.children.length === 0) {
     el.textContent = translated;
     return;
   }
-  // Otherwise replace text nodes only (preserve sub-elements like <input>, <span>)
   for (const node of Array.from(el.childNodes)) {
     if (node.nodeType === Node.TEXT_NODE && (node.textContent?.trim() ?? "")) {
       node.textContent = translated;
-      break; // only replace the first meaningful text node
+      return;
     }
   }
 }
@@ -191,23 +239,31 @@ export default function Spreadsheet() {
     const container = containerRef.current;
     if (!container) return;
 
-    translateNode(container);
-    translateNode(document.body);
-
-    const observer = new MutationObserver(() => {
+    // Give FortuneSheet a tick to finish its internal render
+    const runTranslate = () => {
       translateNode(container);
       translateNode(document.body);
-    });
+    };
 
+    runTranslate();
+    // Also run after a short delay in case FortuneSheet renders async
+    const t1 = setTimeout(runTranslate, 300);
+    const t2 = setTimeout(runTranslate, 800);
+
+    const observer = new MutationObserver(runTranslate);
     observer.observe(container, {
       childList: true,
       subtree: true,
       attributes: true,
-      attributeFilter: ["title"],
+      attributeFilter: ["title", "data-tips", "aria-label"],
     });
     observer.observe(document.body, { childList: true, subtree: true });
 
-    return () => observer.disconnect();
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      observer.disconnect();
+    };
   }, []);
 
   const handleChange = useCallback((d: unknown[]) => {
