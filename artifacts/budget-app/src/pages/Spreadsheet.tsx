@@ -4,8 +4,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 const STORAGE_KEY = "budget_spreadsheet_v1";
 
+// Exact English strings that appear as text content in FortuneSheet's DOM
 const HE: Record<string, string> = {
-  // Toolbar
+  // === Toolbar tooltips (title attribute) ===
   "Undo": "בטל",
   "Redo": "בצע שנית",
   "Clear Format": "נקה עיצוב",
@@ -35,8 +36,6 @@ const HE: Record<string, string> = {
   "Reset": "אפס",
   "CUSTOM": "מותאם אישית",
   "Alternating colors": "צבעים מתחלפים",
-  "OK": "אישור",
-  "Cancel": "ביטול",
   "Collapse": "כווץ",
   "Fill color": "צבע מילוי",
   "Border": "גבול",
@@ -75,72 +74,105 @@ const HE: Record<string, string> = {
   "More options": "אפשרויות נוספות",
   "Cell format config": "הגדרות פורמט תא",
   "Print": "הדפס",
-  // Context menu
+
+  // === Cell right-click context menu (luckysheet-cols-menuitem-content) ===
   "Copy": "העתק",
-  "Cut": "גזור",
+  "Copy as": "העתק כ...",
   "Paste": "הדבק",
-  "Paste Special": "הדבקה מיוחדת",
-  "Insert Row": "הכנס שורה",
-  "Insert Column": "הכנס עמודה",
-  "Delete Row": "מחק שורה",
-  "Delete Column": "מחק עמודה",
-  "Delete Cell": "מחק תא",
-  "Hide Row": "הסתר שורה",
-  "Hide Column": "הסתר עמודה",
-  "Show Row": "הצג שורה",
-  "Show Column": "הצג עמודה",
-  "Set Row Height": "הגדר גובה שורה",
-  "Set Column Width": "הגדר רוחב עמודה",
-  "Clear Content": "נקה תוכן",
-  "Insert Comment": "הכנס הערה",
-  "Edit Comment": "ערוך הערה",
-  "Delete Comment": "מחק הערה",
-  "Format Cells": "עצב תאים",
-  "Freeze Row": "הקפא שורה",
-  "Freeze Column": "הקפא עמודה",
-  "Unfreeze": "בטל הקפאה",
-  "Add Sheet": "הוסף גיליון",
-  "Delete Sheet": "מחק גיליון",
-  "Rename Sheet": "שנה שם גיליון",
-  "Move Sheet": "הזז גיליון",
-  "Copy Sheet": "העתק גיליון",
-  // Dialogs
-  "Loading...": "טוען...",
-  "New sheet": "גיליון חדש",
+  // Concatenated: rightclick.deleteSelected + rightclick.row
+  "Delete selected Row": "מחק שורות נבחרות",
+  // Concatenated: rightclick.deleteSelected + rightclick.column
+  "Delete selected Column": "מחק עמודות נבחרות",
+  // Concatenated: rightclick.hideSelected + rightclick.row
+  "Hide selected Row": "הסתר שורות נבחרות",
+  // Concatenated: rightclick.showHide + rightclick.row
+  "Show hidden Row": "הצג שורות מוסתרות",
+  // Concatenated: rightclick.hideSelected + rightclick.column
+  "Hide selected Column": "הסתר עמודות נבחרות",
+  // Concatenated: rightclick.showHide + rightclick.column
+  "Show hidden Column": "הצג עמודות מוסתרות",
+  "Clear content": "נקה תוכן",
+  "Ascending sort": "מיון עולה",
+  "Descending sort": "מיון יורד",
+  "Create chart": "צור תרשים",
+  "Matrix operation": "פעולת מטריצה",
+  "Delete cell": "מחק תא",
+
+  // === Sheet tab right-click (sheetconfig locale) ===
   "Delete": "מחק",
-  "Insert": "הכנס",
+  "Rename": "שנה שם",
+  "Change color": "שנה צבע",
+  "Hide": "הסתר",
+  "Unhide": "הצג",
+  "Move left": "הזז שמאלה",
+  "Move right": "הזז ימינה",
+  "Reset color": "אפס צבע",
+  "Cancel": "ביטול",
+  "Confirm color": "אשר צבע",
+  "Focus": "מיקוד",
+
+  // === Dialog buttons ===
+  "OK": "אישור",
   "Update": "עדכן",
+  "Insert": "הכנס",
   "Previous": "הקודם",
   "Next": "הבא",
   "Find": "חפש",
   "Replace": "החלף",
-  "Find and Replace": "חפש והחלף",
+
+  // === Sheet / info ===
+  "Loading...": "טוען...",
+  "New sheet": "גיליון חדש",
   "Untitled spreadsheet": "גיליון ללא שם",
-  "Rename": "שנה שם",
 };
 
-function applyHebrew(root: Element) {
-  // Translate title attributes
-  root.querySelectorAll("[title]").forEach((el) => {
-    const t = el.getAttribute("title") || "";
+function translateNode(root: Element) {
+  // 1. Translate all title/aria-label attributes (toolbar tooltips)
+  root.querySelectorAll<HTMLElement>("[title]").forEach((el) => {
+    const t = el.getAttribute("title")!;
     if (HE[t]) el.setAttribute("title", HE[t]);
   });
-  // Translate visible text in menus / dialogs (not in cells)
-  root.querySelectorAll(
-    ".fortune-context-menu li, .fortune-modal button, .fortune-modal label, " +
-    ".fortune-toolbar-menu li, .fortune-dropdown-item, [class*='menu-item'], " +
-    "[class*='context-menu'] li, [class*='dropdown'] li"
-  ).forEach((el) => {
-    if (el.children.length === 0) {
-      const t = el.textContent?.trim() || "";
-      if (HE[t]) el.textContent = HE[t];
+
+  // 2. Translate text inside cell right-click menu items
+  //    Each item wraps content in .luckysheet-cols-menuitem-content
+  root.querySelectorAll<HTMLElement>(".luckysheet-cols-menuitem-content").forEach((el) => {
+    const raw = el.textContent?.trim() ?? "";
+    if (HE[raw]) {
+      // Replace only the text nodes, leave any child elements (icons, inputs) intact
+      replaceTextNodes(el, HE[raw]);
     }
   });
-  // Translate button text in dialogs
-  root.querySelectorAll("button").forEach((el) => {
-    const t = el.textContent?.trim() || "";
-    if (HE[t] && !el.querySelector("svg, img")) el.textContent = HE[t];
+
+  // 3. Translate sheet-tab context menu items
+  root.querySelectorAll<HTMLElement>(".fortune-sheet-list-item").forEach((el) => {
+    const raw = el.textContent?.trim() ?? "";
+    if (HE[raw]) replaceTextNodes(el, HE[raw]);
   });
+
+  // 4. Translate generic buttons and labels in dialogs
+  root.querySelectorAll<HTMLButtonElement>(
+    ".fortune-dialog button, .luckysheet-modal-dialog button"
+  ).forEach((btn) => {
+    if (!btn.querySelector("svg, img")) {
+      const raw = btn.textContent?.trim() ?? "";
+      if (HE[raw]) btn.textContent = HE[raw];
+    }
+  });
+}
+
+function replaceTextNodes(el: HTMLElement, translated: string) {
+  // If the element has no children (pure text node) just set textContent
+  if (el.children.length === 0) {
+    el.textContent = translated;
+    return;
+  }
+  // Otherwise replace text nodes only (preserve sub-elements like <input>, <span>)
+  for (const node of Array.from(el.childNodes)) {
+    if (node.nodeType === Node.TEXT_NODE && (node.textContent?.trim() ?? "")) {
+      node.textContent = translated;
+      break; // only replace the first meaningful text node
+    }
+  }
 }
 
 function getInitialData() {
@@ -159,23 +191,27 @@ export default function Spreadsheet() {
     const container = containerRef.current;
     if (!container) return;
 
-    // Initial pass
-    applyHebrew(container);
+    translateNode(container);
+    translateNode(document.body);
 
-    // Watch for DOM changes (menus opening, dialogs, etc.)
     const observer = new MutationObserver(() => {
-      applyHebrew(container);
-      // Also translate anything added to document body (portals)
-      applyHebrew(document.body);
+      translateNode(container);
+      translateNode(document.body);
     });
-    observer.observe(container, { childList: true, subtree: true, attributes: true, attributeFilter: ["title"] });
+
+    observer.observe(container, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["title"],
+    });
     observer.observe(document.body, { childList: true, subtree: true });
 
     return () => observer.disconnect();
   }, []);
 
-  const handleChange = useCallback((d: any[]) => {
-    setData(d);
+  const handleChange = useCallback((d: unknown[]) => {
+    setData(d as ReturnType<typeof getInitialData>);
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(d));
     } catch {}
@@ -186,9 +222,9 @@ export default function Spreadsheet() {
       <Workbook
         data={data}
         onChange={handleChange}
-        showToolbar={true}
-        showFormulaBar={true}
-        showSheetTabs={true}
+        showToolbar
+        showFormulaBar
+        showSheetTabs
         lang="en"
       />
     </div>
