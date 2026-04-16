@@ -1,8 +1,10 @@
 import { Workbook } from "@fortune-sheet/react";
 import "@fortune-sheet/react/dist/index.css";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { apiFetch } from "../lib/api";
 
 const STORAGE_KEY = "budget_spreadsheet_v1";
+const DEBOUNCE_MS = 1500;
 
 /* ─────────────────────────────────────────────────────────────────────────────
    Full Hebrew translation map — covers toolbar, context-menus, and all dialogs
@@ -629,21 +631,39 @@ function replaceFirstText(el: HTMLElement, translated: string) {
   }
 }
 
-/* ─────────────────────────────────────────────────────────────────────────────
-   Component
-   ───────────────────────────────────────────────────────────────────────────── */
-function getInitialData() {
+const DEFAULT_DATA = [{ name: "גליון 1", celldata: [], config: {}, index: "0" }];
+
+function getLocalData() {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) return JSON.parse(saved);
   } catch {}
-  return [{ name: "גליון 1", celldata: [], config: {}, index: "0" }];
+  return null;
 }
 
+/* ─────────────────────────────────────────────────────────────────────────────
+   Component
+   ───────────────────────────────────────────────────────────────────────────── */
 export default function Spreadsheet() {
-  const [data, setData] = useState(getInitialData);
+  const [data, setData] = useState<unknown[]>(getLocalData() ?? DEFAULT_DATA);
+  const [loaded, setLoaded] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Load from server on mount
+  useEffect(() => {
+    apiFetch("/spreadsheet")
+      .then((res) => {
+        if (res?.data) {
+          setData(res.data);
+          try { localStorage.setItem(STORAGE_KEY, JSON.stringify(res.data)); } catch {}
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoaded(true));
+  }, []);
+
+  // Hebrew translation observer
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
@@ -667,11 +687,21 @@ export default function Spreadsheet() {
     observer.observe(document.body, { childList: true, subtree: true });
 
     return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); observer.disconnect(); };
-  }, []);
+  }, [loaded]);
 
   const handleChange = useCallback((d: unknown[]) => {
-    setData(d as ReturnType<typeof getInitialData>);
+    setData(d);
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(d)); } catch {}
+
+    // Debounced save to server
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => {
+      apiFetch("/spreadsheet", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ data: d }),
+      }).catch(() => {});
+    }, DEBOUNCE_MS);
   }, []);
 
   return (
