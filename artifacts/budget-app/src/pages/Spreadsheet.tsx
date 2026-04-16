@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { apiFetch } from "../lib/api";
 
 const STORAGE_KEY = "budget_spreadsheet_v1";
-const DEBOUNCE_MS = 1500;
+const DEBOUNCE_MS = 500;
 
 /* ─────────────────────────────────────────────────────────────────────────────
    Full Hebrew translation map — covers toolbar, context-menus, and all dialogs
@@ -649,6 +649,16 @@ export default function Spreadsheet() {
   const [loaded, setLoaded] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const latestDataRef = useRef<unknown[] | null>(null);
+  const isDirtyRef = useRef(false);
+
+  const saveNow = useCallback((d: unknown[]) => {
+    apiFetch("/spreadsheet", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ data: d }),
+    }).catch(() => {});
+  }, []);
 
   // Load from server on mount — do NOT render Workbook until data arrives
   useEffect(() => {
@@ -656,19 +666,43 @@ export default function Spreadsheet() {
       .then((res) => {
         if (res?.data) {
           setData(res.data);
+          latestDataRef.current = res.data;
           try { localStorage.setItem(STORAGE_KEY, JSON.stringify(res.data)); } catch {}
         } else {
-          // No server data yet — use localStorage or defaults
-          setData(getLocalData() ?? DEFAULT_DATA);
+          const fallback = getLocalData() ?? DEFAULT_DATA;
+          setData(fallback);
+          latestDataRef.current = fallback;
         }
       })
       .catch(() => {
-        // On error — fall back to localStorage or defaults
-        setData(getLocalData() ?? DEFAULT_DATA);
+        const fallback = getLocalData() ?? DEFAULT_DATA;
+        setData(fallback);
+        latestDataRef.current = fallback;
       })
       .finally(() => {
         setLoaded(true);
+        isDirtyRef.current = false;
       });
+  }, []);
+
+  // Save immediately before page unloads so data is never lost
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (isDirtyRef.current && latestDataRef.current) {
+        if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+        // Use sendBeacon for reliable fire-and-forget on page close
+        const body = JSON.stringify({ data: latestDataRef.current });
+        const apiBase = import.meta.env.VITE_API_URL
+          ? `${import.meta.env.VITE_API_URL}/api`
+          : `${import.meta.env.BASE_URL.replace(/\/$/, "")}/api`;
+        navigator.sendBeacon(
+          `${apiBase}/spreadsheet`,
+          new Blob([body], { type: "application/json" })
+        );
+      }
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, []);
 
   // Hebrew translation observer — runs after Workbook mounts
@@ -700,18 +734,17 @@ export default function Spreadsheet() {
 
   const handleChange = useCallback((d: unknown[]) => {
     setData(d);
+    latestDataRef.current = d;
+    isDirtyRef.current = true;
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(d)); } catch {}
 
-    // Debounced save to server
+    // Debounced save to server (500ms)
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     saveTimerRef.current = setTimeout(() => {
-      apiFetch("/spreadsheet", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ data: d }),
-      }).catch(() => {});
+      isDirtyRef.current = false;
+      saveNow(d);
     }, DEBOUNCE_MS);
-  }, []);
+  }, [saveNow]);
 
   // Show spinner until server responds
   if (!loaded) {
