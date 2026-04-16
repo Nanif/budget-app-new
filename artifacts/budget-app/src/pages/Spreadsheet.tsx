@@ -641,6 +641,36 @@ function getLocalData() {
   return null;
 }
 
+/**
+ * Fortune Sheet's onChange returns sheets with a dense `data` 2D array.
+ * The Workbook component expects sheets with a sparse `celldata` array.
+ * This converts between the two so we always load the right format.
+ */
+function normalizeSheetsForLoad(sheets: unknown[]): unknown[] {
+  if (!Array.isArray(sheets)) return sheets;
+  return sheets.map((sheet: any) => {
+    if (!sheet) return sheet;
+    // Already has celldata — nothing to do
+    if (Array.isArray(sheet.celldata) && sheet.celldata.length > 0) return sheet;
+    // Has dense `data` array — convert to sparse celldata
+    if (Array.isArray(sheet.data)) {
+      const celldata: { r: number; c: number; v: unknown }[] = [];
+      for (let r = 0; r < sheet.data.length; r++) {
+        const row = sheet.data[r];
+        if (!Array.isArray(row)) continue;
+        for (let c = 0; c < row.length; c++) {
+          if (row[c] !== null && row[c] !== undefined) {
+            celldata.push({ r, c, v: row[c] });
+          }
+        }
+      }
+      const { data: _data, ...rest } = sheet;
+      return { ...rest, celldata };
+    }
+    return sheet;
+  });
+}
+
 /* ─────────────────────────────────────────────────────────────────────────────
    Component
    ───────────────────────────────────────────────────────────────────────────── */
@@ -668,17 +698,18 @@ export default function Spreadsheet() {
     apiFetch("/spreadsheet")
       .then((res) => {
         if (res?.data) {
-          setData(res.data);
-          latestDataRef.current = res.data;
-          try { localStorage.setItem(STORAGE_KEY, JSON.stringify(res.data)); } catch {}
+          const normalized = normalizeSheetsForLoad(res.data);
+          setData(normalized);
+          latestDataRef.current = normalized;
+          try { localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized)); } catch {}
         } else {
-          const fallback = getLocalData() ?? DEFAULT_DATA;
+          const fallback = normalizeSheetsForLoad(getLocalData() ?? DEFAULT_DATA);
           setData(fallback);
           latestDataRef.current = fallback;
         }
       })
       .catch(() => {
-        const fallback = getLocalData() ?? DEFAULT_DATA;
+        const fallback = normalizeSheetsForLoad(getLocalData() ?? DEFAULT_DATA);
         setData(fallback);
         latestDataRef.current = fallback;
       })
