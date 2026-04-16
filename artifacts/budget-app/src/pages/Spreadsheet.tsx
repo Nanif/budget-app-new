@@ -649,16 +649,15 @@ export default function Spreadsheet() {
   const [loaded, setLoaded] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // latestDataRef: always holds the most recent sheet data for beforeunload
   const latestDataRef = useRef<unknown[] | null>(null);
-  const isDirtyRef = useRef(false);
+  // readyToSaveRef: false until Fortune Sheet finishes its init onChange calls
+  const readyToSaveRef = useRef(false);
 
-  const saveNow = useCallback((d: unknown[]) => {
-    apiFetch("/spreadsheet", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ data: d }),
-    }).catch(() => {});
-  }, []);
+  // Build the API base URL once (same logic as apiFetch)
+  const apiBase = import.meta.env.VITE_API_URL
+    ? `${import.meta.env.VITE_API_URL}/api`
+    : `${import.meta.env.BASE_URL.replace(/\/$/, "")}/api`;
 
   // Load from server on mount — do NOT render Workbook until data arrives
   useEffect(() => {
@@ -679,31 +678,37 @@ export default function Spreadsheet() {
         setData(fallback);
         latestDataRef.current = fallback;
       })
-      .finally(() => {
-        setLoaded(true);
-        isDirtyRef.current = false;
-      });
+      .finally(() => setLoaded(true));
   }, []);
 
-  // Save immediately before page unloads so data is never lost
+  // After Workbook mounts (loaded=true), allow saves after a short delay
+  // so Fortune Sheet's own init onChange calls don't trigger a spurious save
+  useEffect(() => {
+    if (!loaded) return;
+    readyToSaveRef.current = false;
+    const t = setTimeout(() => { readyToSaveRef.current = true; }, 1000);
+    return () => clearTimeout(t);
+  }, [loaded]);
+
+  // Before page unloads: flush any pending save immediately using fetch+keepalive
+  // (sendBeacon+application/json requires a CORS preflight which may not complete on unload)
   useEffect(() => {
     const handleBeforeUnload = () => {
-      if (isDirtyRef.current && latestDataRef.current) {
-        if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-        // Use sendBeacon for reliable fire-and-forget on page close
-        const body = JSON.stringify({ data: latestDataRef.current });
-        const apiBase = import.meta.env.VITE_API_URL
-          ? `${import.meta.env.VITE_API_URL}/api`
-          : `${import.meta.env.BASE_URL.replace(/\/$/, "")}/api`;
-        navigator.sendBeacon(
-          `${apiBase}/spreadsheet`,
-          new Blob([body], { type: "application/json" })
-        );
+      if (!readyToSaveRef.current || !latestDataRef.current) return;
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current);
+        saveTimerRef.current = null;
       }
+      fetch(`${apiBase}/spreadsheet`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ data: latestDataRef.current }),
+        keepalive: true,
+      }).catch(() => {});
     };
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-  }, []);
+  }, [apiBase]);
 
   // Hebrew translation observer — runs after Workbook mounts
   useEffect(() => {
@@ -735,16 +740,22 @@ export default function Spreadsheet() {
   const handleChange = useCallback((d: unknown[]) => {
     setData(d);
     latestDataRef.current = d;
-    isDirtyRef.current = true;
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(d)); } catch {}
 
-    // Debounced save to server (500ms)
+    // Block server saves during Fortune Sheet's init phase
+    if (!readyToSaveRef.current) return;
+
+    // Debounced save to server
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     saveTimerRef.current = setTimeout(() => {
-      isDirtyRef.current = false;
-      saveNow(d);
+      saveTimerRef.current = null;
+      apiFetch("/spreadsheet", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ data: d }),
+      }).catch(() => {});
     }, DEBOUNCE_MS);
-  }, [saveNow]);
+  }, []);
 
   // Show spinner until server responds
   if (!loaded) {
