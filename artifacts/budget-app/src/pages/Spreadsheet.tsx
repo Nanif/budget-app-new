@@ -644,11 +644,15 @@ function getLocalData() {
 /* ─────────────────────────────────────────────────────────────────────────────
    Component
    ───────────────────────────────────────────────────────────────────────────── */
+type SaveStatus = "idle" | "saving" | "saved" | "error";
+
 export default function Spreadsheet() {
   const [data, setData] = useState<unknown[] | null>(null);
   const [loaded, setLoaded] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
   const containerRef = useRef<HTMLDivElement>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const savedBadgeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // latestDataRef: always holds the most recent sheet data for beforeunload
   const latestDataRef = useRef<unknown[] | null>(null);
   // readyToSaveRef: false until Fortune Sheet finishes its init onChange calls
@@ -745,6 +749,10 @@ export default function Spreadsheet() {
     // Block server saves during Fortune Sheet's init phase
     if (!readyToSaveRef.current) return;
 
+    // Show "pending" status immediately on change
+    setSaveStatus("saving");
+    if (savedBadgeTimerRef.current) clearTimeout(savedBadgeTimerRef.current);
+
     // Debounced save to server
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     saveTimerRef.current = setTimeout(() => {
@@ -753,7 +761,14 @@ export default function Spreadsheet() {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ data: d }),
-      }).catch(() => {});
+      })
+        .then(() => {
+          setSaveStatus("saved");
+          savedBadgeTimerRef.current = setTimeout(() => setSaveStatus("idle"), 3000);
+        })
+        .catch(() => {
+          setSaveStatus("error");
+        });
     }, DEBOUNCE_MS);
   }, []);
 
@@ -766,16 +781,42 @@ export default function Spreadsheet() {
     );
   }
 
+  const statusLabel =
+    saveStatus === "saving" ? "שומר..." :
+    saveStatus === "saved"  ? "נשמר ✓" :
+    saveStatus === "error"  ? "שגיאת שמירה ✕" :
+    null;
+
+  const statusColor =
+    saveStatus === "saving" ? "#6b7280" :
+    saveStatus === "saved"  ? "#16a34a" :
+    saveStatus === "error"  ? "#dc2626" :
+    "transparent";
+
   return (
-    <div ref={containerRef} style={{ width: "100%", height: "100%" }}>
-      <Workbook
-        data={data!}
-        onChange={handleChange}
-        showToolbar
-        showFormulaBar
-        showSheetTabs
-        lang="en"
-      />
+    <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", position: "relative" }}>
+      {/* Save status badge */}
+      {statusLabel && (
+        <div style={{
+          position: "absolute", top: 8, left: 8, zIndex: 100,
+          background: "white", border: `1px solid ${statusColor}`,
+          color: statusColor, borderRadius: 8, padding: "2px 10px",
+          fontSize: 12, fontWeight: 600, boxShadow: "0 1px 4px rgba(0,0,0,0.08)",
+          direction: "rtl",
+        }}>
+          {statusLabel}
+        </div>
+      )}
+      <div ref={containerRef} style={{ flex: 1, minHeight: 0 }}>
+        <Workbook
+          data={data!}
+          onChange={handleChange}
+          showToolbar
+          showFormulaBar
+          showSheetTabs
+          lang="en"
+        />
+      </div>
     </div>
   );
 }
