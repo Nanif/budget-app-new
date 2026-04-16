@@ -21,7 +21,16 @@ router.get("/", async (req, res) => {
   }
 });
 
+// POST is used by navigator.sendBeacon (beforeunload saves)
+router.post("/", async (req, res) => {
+  return handleSave(req, res);
+});
+
 router.put("/", async (req, res) => {
+  return handleSave(req, res);
+});
+
+async function handleSave(req: any, res: any) {
   try {
     const { data } = req.body;
     const content = JSON.stringify(data);
