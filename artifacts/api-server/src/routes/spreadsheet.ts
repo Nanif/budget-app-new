@@ -58,6 +58,6 @@ async function handleSave(req: any, res: any) {
     req.log.error({ err }, "Failed to save spreadsheet");
     res.status(500).json({ error: "Failed to save spreadsheet" });
   }
-});
+}
 
 export default router;
