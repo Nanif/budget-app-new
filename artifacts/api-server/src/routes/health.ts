@@ -12,7 +12,13 @@ const KEY_TABLES = [
   "users",
 ];
 
-router.get("/healthz", async (_req, res) => {
+// Liveness check — always 200 if the process is running (used by fly.io deploy)
+router.get("/healthz", (_req, res) => {
+  res.status(200).json({ status: "ok", timestamp: new Date().toISOString() });
+});
+
+// Readiness check — checks DB connectivity, returns 503 if DB is down
+router.get("/healthz/ready", async (_req, res) => {
   let dbStatus: "ok" | "error" = "ok";
   let dbError: string | undefined;
 
