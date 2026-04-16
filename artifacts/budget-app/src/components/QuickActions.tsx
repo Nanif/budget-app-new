@@ -117,7 +117,8 @@ export function QuickActions() {
       await apiFetch("/expenses", {
         method: "POST",
         body: JSON.stringify({
-          description:   ef.name.trim() + (ef.notes.trim() ? "\n\n" + ef.notes.trim() : ""),
+          description:   ef.name.trim(),
+          notes:         ef.notes.trim() || null,
           amount:        parseFloat(ef.amount),
           date:          ef.date,
           fundId:        parseInt(ef.fundId),
