@@ -78,6 +78,7 @@ import recurringTemplatesRouter   from "./recurringTemplates";
 import netWorthRecordsRouter      from "./netWorthRecords";
 import devRouter                  from "./dev";
 import agentRouter                from "./agent";
+import spreadsheetRouter          from "./spreadsheet";
 
 const router = Router();
 
@@ -142,5 +143,8 @@ router.use("/dev", devRouter);
 
 // AI Agent
 router.use("/agent", agentRouter);
+
+// Spreadsheet
+router.use("/spreadsheet", spreadsheetRouter);
 
 export default router;
