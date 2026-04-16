@@ -1,6 +1,8 @@
 import { Router } from "express";
 import { db, notesTable, noteTabsTable, insertNoteSchema } from "@workspace/db";
-import { eq, desc, and } from "drizzle-orm";
+import { eq, desc, and, ne } from "drizzle-orm";
+
+const SYSTEM_NOTE_TITLES = ["__SPREADSHEET_DATA__"];
 
 const router = Router();
 const DEFAULT_USER_ID = 1;
@@ -24,7 +26,10 @@ router.get("/", async (req, res) => {
       })
       .from(notesTable)
       .leftJoin(noteTabsTable, eq(notesTable.tabId, noteTabsTable.id))
-      .where(eq(notesTable.userId, DEFAULT_USER_ID))
+      .where(and(
+        eq(notesTable.userId, DEFAULT_USER_ID),
+        ne(notesTable.title, SYSTEM_NOTE_TITLES[0]),
+      ))
       .orderBy(desc(notesTable.isPinned), notesTable.sortOrder, desc(notesTable.updatedAt));
     res.json(rows);
   } catch (err) {
