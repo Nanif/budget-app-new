@@ -649,8 +649,9 @@ export default function Spreadsheet() {
   const [loaded, setLoaded] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const readyToSaveRef = useRef(false);
 
-  // Load from server on mount
+  // Load from server on mount — block saves until fetch resolves
   useEffect(() => {
     apiFetch("/spreadsheet")
       .then((res) => {
@@ -660,7 +661,11 @@ export default function Spreadsheet() {
         }
       })
       .catch(() => {})
-      .finally(() => setLoaded(true));
+      .finally(() => {
+        setLoaded(true);
+        // Allow saves only after server fetch is done (success or failure)
+        setTimeout(() => { readyToSaveRef.current = true; }, 500);
+      });
   }, []);
 
   // Hebrew translation observer
@@ -692,6 +697,9 @@ export default function Spreadsheet() {
   const handleChange = useCallback((d: unknown[]) => {
     setData(d);
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(d)); } catch {}
+
+    // Only save to server after initial load is complete
+    if (!readyToSaveRef.current) return;
 
     // Debounced save to server
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
