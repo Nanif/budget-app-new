@@ -690,7 +690,7 @@ export default function Spreadsheet() {
   useEffect(() => {
     if (!loaded) return;
     readyToSaveRef.current = false;
-    const t = setTimeout(() => { readyToSaveRef.current = true; }, 1000);
+    const t = setTimeout(() => { readyToSaveRef.current = true; }, 1500);
     return () => clearTimeout(t);
   }, [loaded]);
 
@@ -742,12 +742,13 @@ export default function Spreadsheet() {
   }, [loaded]);
 
   const handleChange = useCallback((d: unknown[]) => {
+    // During Fortune Sheet's init phase, ignore onChange calls —
+    // they may contain empty/partial data that would overwrite the loaded server data.
+    if (!readyToSaveRef.current) return;
+
     setData(d);
     latestDataRef.current = d;
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(d)); } catch {}
-
-    // Block server saves during Fortune Sheet's init phase
-    if (!readyToSaveRef.current) return;
 
     // Show "pending" status immediately on change
     setSaveStatus("saving");
