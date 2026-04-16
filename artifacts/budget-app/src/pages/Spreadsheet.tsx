@@ -645,31 +645,35 @@ function getLocalData() {
    Component
    ───────────────────────────────────────────────────────────────────────────── */
 export default function Spreadsheet() {
-  const [data, setData] = useState<unknown[]>(getLocalData() ?? DEFAULT_DATA);
+  const [data, setData] = useState<unknown[] | null>(null);
   const [loaded, setLoaded] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const readyToSaveRef = useRef(false);
 
-  // Load from server on mount — block saves until fetch resolves
+  // Load from server on mount — do NOT render Workbook until data arrives
   useEffect(() => {
     apiFetch("/spreadsheet")
       .then((res) => {
         if (res?.data) {
           setData(res.data);
           try { localStorage.setItem(STORAGE_KEY, JSON.stringify(res.data)); } catch {}
+        } else {
+          // No server data yet — use localStorage or defaults
+          setData(getLocalData() ?? DEFAULT_DATA);
         }
       })
-      .catch(() => {})
+      .catch(() => {
+        // On error — fall back to localStorage or defaults
+        setData(getLocalData() ?? DEFAULT_DATA);
+      })
       .finally(() => {
         setLoaded(true);
-        // Allow saves only after server fetch is done (success or failure)
-        setTimeout(() => { readyToSaveRef.current = true; }, 500);
       });
   }, []);
 
-  // Hebrew translation observer
+  // Hebrew translation observer — runs after Workbook mounts
   useEffect(() => {
+    if (!loaded) return;
     const container = containerRef.current;
     if (!container) return;
 
@@ -698,9 +702,6 @@ export default function Spreadsheet() {
     setData(d);
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(d)); } catch {}
 
-    // Only save to server after initial load is complete
-    if (!readyToSaveRef.current) return;
-
     // Debounced save to server
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     saveTimerRef.current = setTimeout(() => {
@@ -712,10 +713,19 @@ export default function Spreadsheet() {
     }, DEBOUNCE_MS);
   }, []);
 
+  // Show spinner until server responds
+  if (!loaded) {
+    return (
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", color: "#666" }}>
+        טוען גליון...
+      </div>
+    );
+  }
+
   return (
     <div ref={containerRef} style={{ width: "100%", height: "100%" }}>
       <Workbook
-        data={data}
+        data={data!}
         onChange={handleChange}
         showToolbar
         showFormulaBar
